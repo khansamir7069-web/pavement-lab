@@ -1,0 +1,40 @@
+I am continuing a multi-phase upgrade of an existing project called Pavement Lab.
+
+PROJECT ROOT: E:\myclaud project\1\pavement_lab
+
+BEFORE DOING ANYTHING ELSE:
+1. Read the file: E:\myclaud project\1\pavement_lab\developer_handoff.md
+   (It contains: completed phases, architecture, DB schema, spec system, binder
+    system, structural module status, pending phases, deferred items, warnings,
+    safe-continuation rules, and the Phase 5 plan.)
+2. Run: python -m pytest tests/test_excel_parity.py -q
+   This MUST show "16 passed" before you change anything.
+
+WORKING RULES (apply to every phase):
+- Compact responses. Minimize token usage.
+- Do not repeat analysis already in developer_handoff.md.
+- Do not refactor any working module.
+- Do not modify app/core/* (engine), tests/test_excel_parity.py,
+  tests/golden/shirdi_dbm.json, app/graphs/, or app/ui/widgets/inputs_panel.py.
+- Add new files for new functionality.
+- For each phase: implement minimum safe changes, follow the patterns the
+  handoff describes (back-button lambda *_ trick, _migrate_schema ALTER TABLE,
+  module-status keys, etc.).
+- Do NOT rebuild the .exe between phases — EXE rebuild only happens in Phase 8.
+- After each phase: stop, list files changed, show test result, wait for my
+  approval. Do not auto-chain to the next phase.
+
+CURRENT STATE: Phases 1–4 complete. Ready to start Phase 5.
+
+Phase 5 = Maintenance / Rehabilitation skeleton.
+Scope:
+  - New engine package: app/core/maintenance/
+    (overlay.py BBD-based, cold_mix.py, micro_surfacing.py — skeleton only)
+  - New DB table: MaintenanceDesign (with cascade-delete from Project)
+  - New UI panel: app/ui/widgets/maintenance_panel.py with sub-tabs
+  - Wire into main_window.py (sidebar item, hub routing, back-button, saved
+    signal, module status update)
+  - No Word report (deferred to Phase 6), no advanced mechanistic calcs,
+    no EXE rebuild.
+
+START PHASE 5 NOW using the compact style described above.

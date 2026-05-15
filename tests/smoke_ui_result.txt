@@ -1,0 +1,7 @@
+MainWindow constructed OK
+project id: 8
+OBC%: 4.2540
+Gsb: 2.7556
+Compliance: PASS
+summary rows: 5
+SMOKE OK
