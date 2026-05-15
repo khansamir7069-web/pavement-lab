@@ -1,24 +1,34 @@
-"""Pavement Condition Survey panel — Phase 10.
+"""Pavement Condition Survey panel — Phase 10 + Phase 11 image wiring.
 
 Independent panel mirroring TrafficPanel: metadata header + distress
 table (add/remove rows) + Compute + Save + Export Word.
 
-Image / AI / GIS fields are accepted in ConditionSurveyInput but exposed
-on this panel only as a read-only reserved-for-future banner.
+Phase 11 (additive): the previously stub-only ``image_paths`` reserved
+field is now backed by a working image-evidence gallery that calls
+``app.core.condition_survey.image_pipeline.attach_image`` / ``delete_evidence``.
+The PCI engine still ignores ``image_paths``; only the storage + UI hook
+is wired in this step. AI / GIS fields remain stub-only.
 """
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import sys
+from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QComboBox,
     QDoubleSpinBox,
+    QFileDialog,
     QFormLayout,
     QHBoxLayout,
     QHeaderView,
     QLabel,
     QLineEdit,
+    QListWidget,
+    QListWidgetItem,
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
@@ -30,6 +40,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from app.config import IMAGES_DIR
 from app.core import (
     DISTRESS_TYPES,
     SEVERITY_LEVELS,
@@ -37,6 +48,10 @@ from app.core import (
     ConditionSurveyResult,
     DistressRecord,
     compute_condition_survey,
+)
+from app.core.condition_survey.image_pipeline import (
+    attach_image,
+    delete_evidence,
 )
 from .common import (
     Card,
@@ -61,6 +76,25 @@ def _spin(value: float, lo: float, hi: float, step: float,
 _DISTRESS_LABELS = {code: t.label for code, t in DISTRESS_TYPES.items()}
 _DISTRESS_CODES = tuple(DISTRESS_TYPES.keys())
 
+# Phase 11: pre-save attachments live under
+# IMAGES_DIR / "condition" / <project_id> / <DRAFT_SURVEY_ID>. We don't
+# migrate files when the survey row gets a real id; the relative path
+# persisted on the survey continues to resolve.
+DRAFT_SURVEY_ID: int = 0
+
+
+def _open_in_file_browser(path: Path) -> None:
+    """Best-effort OS-native folder open. Silent on failure."""
+    try:
+        if sys.platform.startswith("win"):
+            os.startfile(str(path))  # type: ignore[attr-defined]
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", str(path)])
+        else:
+            subprocess.Popen(["xdg-open", str(path)])
+    except Exception:
+        pass
+
 
 class ConditionSurveyPanel(QWidget):
     """Independent pavement condition survey page."""
@@ -73,6 +107,11 @@ class ConditionSurveyPanel(QWidget):
         self.db = db
         self._project_id: int | None = None
         self._last: ConditionSurveyResult | None = None
+        # Phase 11: relative paths (POSIX, relative to IMAGES_DIR) of
+        # images attached via the gallery. Source of truth for
+        # ConditionSurveyInput.image_paths whenever non-empty; the
+        # read-only ed_image_paths textarea acts only as a mirror.
+        self._evidence: list[str] = []
         self._build()
 
     # ---------- UI build ----------------------------------------------------
@@ -182,32 +221,56 @@ class ConditionSurveyPanel(QWidget):
         )
         bl.addWidget(self.lbl_future)
 
-        # ---- Reserved-field editor (Phase 11/12 hooks — STUB) ---------
-        # Three widgets bound to ConditionSurveyInput.image_paths /
-        # .ai_classification_hint / .gis_geometry_geojson. The values
-        # round-trip through save/load JSON so Phase 11/12 can replace
-        # the stub widgets with real dialogs without restructuring the
-        # input dataclass or persistence path. The engine still ignores
-        # all three fields in this phase.
+        # ---- Reserved-field editor + Phase 11 image gallery -----------
+        # The image-paths field is now backed by a working gallery that
+        # calls the image_pipeline (Phase 11 step 2). The AI / GIS
+        # fields remain stub-only — their values round-trip via JSON so
+        # later phases can plug in real dialogs without restructuring
+        # the input dataclass or persistence path. The PCI engine still
+        # ignores all three fields.
         self.reserved_card = Card()
         rcl = QVBoxLayout(self.reserved_card)
         rcl.setContentsMargins(20, 16, 20, 16); rcl.setSpacing(8)
         rcl.addWidget(QLabel(
-            "<b>Reserved Field Hooks  [STUB — Phase 11/12]</b><br>"
+            "<b>Image Evidence Gallery</b>  "
             "<span style='color:#6a7180; font-size:9pt;'>"
-            "Values entered here are saved with the survey but are NOT "
-            "consumed by the PCI engine in this phase. They exist so the "
-            "image / AI / GIS dialogs of later phases can plug in without "
-            "changing the input dataclass or DB schema."
+            "(Phase 11 — files normalized to JPEG q85 / 1600 px max edge "
+            "and stored under the local IMAGES_DIR. PCI engine ignores "
+            "them; UI + persistence only.)"
+            "</span>"
+        ))
+
+        gal_btns = QHBoxLayout()
+        self.btn_add_image = styled_button("Add image...", "secondary")
+        self.btn_add_image.clicked.connect(self._on_add_image)
+        self.btn_remove_image = styled_button("Remove selected", "secondary")
+        self.btn_remove_image.clicked.connect(self._on_remove_image)
+        self.btn_open_folder = styled_button("Open folder", "secondary")
+        self.btn_open_folder.clicked.connect(self._on_open_folder)
+        for b in (self.btn_add_image, self.btn_remove_image, self.btn_open_folder):
+            b.setEnabled(False)
+            gal_btns.addWidget(b)
+        gal_btns.addStretch(1)
+        rcl.addLayout(gal_btns)
+
+        self.lst_evidence = QListWidget()
+        self.lst_evidence.setFixedHeight(120)
+        rcl.addWidget(self.lst_evidence)
+
+        rcl.addWidget(QLabel(
+            "<b>AI / GIS Reserved Hooks  [STUB — Phase 12+]</b><br>"
+            "<span style='color:#6a7180; font-size:9pt;'>"
+            "Stored with the survey; not consumed by the PCI engine."
             "</span>"
         ))
 
         rf_form = QFormLayout()
         self.ed_image_paths = QPlainTextEdit()
         self.ed_image_paths.setPlaceholderText(
-            "One image path per line (no logic in this phase)")
+            "Mirror of gallery — populated automatically (read-only)")
         self.ed_image_paths.setFixedHeight(60)
-        rf_form.addRow("Image paths (one per line)", self.ed_image_paths)
+        self.ed_image_paths.setReadOnly(True)
+        rf_form.addRow("Stored relative paths (mirror)", self.ed_image_paths)
 
         self.ed_ai_hint = QLineEdit()
         self.ed_ai_hint.setPlaceholderText(
@@ -284,13 +347,18 @@ class ConditionSurveyPanel(QWidget):
                 count=int(sp_c.value()) if sp_c else 0,
                 notes=ed_n.text() if ed_n else "",
             ))
-        # Reserved-field editors — values are stored but the engine
-        # ignores them in this phase. See ConditionSurveyInput docstring.
-        image_paths = tuple(
-            line.strip()
-            for line in self.ed_image_paths.toPlainText().splitlines()
-            if line.strip()
-        )
+        # Image evidence: prefer the gallery model when present. Fall
+        # back to parsing the (read-only) mirror textarea so callers
+        # that inject paths programmatically (e.g. legacy/smoke flows
+        # that set ed_image_paths directly) still round-trip.
+        if self._evidence:
+            image_paths = tuple(self._evidence)
+        else:
+            image_paths = tuple(
+                line.strip()
+                for line in self.ed_image_paths.toPlainText().splitlines()
+                if line.strip()
+            )
         return ConditionSurveyInput(
             work_name=self.work_name.text(),
             surveyed_by=self.surveyed_by.text(),
@@ -356,6 +424,85 @@ class ConditionSurveyPanel(QWidget):
             return
         self.export_requested.emit(self._project_id)
 
+    # ---------- image-evidence gallery (Phase 11) --------------------------
+    def _refresh_evidence_mirror(self) -> None:
+        """Sync the read-only ed_image_paths textarea from self._evidence."""
+        self.ed_image_paths.setPlainText("\n".join(self._evidence))
+
+    def _evidence_row_label(self, rel_path: str) -> str:
+        abs_path = IMAGES_DIR / Path(rel_path)
+        if not abs_path.is_file():
+            return f"{rel_path}  (missing)"
+        try:
+            size_kb = abs_path.stat().st_size / 1024.0
+            return f"{abs_path.name}  -  {size_kb:.1f} KB  -  {rel_path}"
+        except OSError:
+            return rel_path
+
+    def _rebuild_evidence_list_widget(self) -> None:
+        self.lst_evidence.clear()
+        for rel in self._evidence:
+            item = QListWidgetItem(self._evidence_row_label(rel))
+            item.setData(Qt.UserRole, rel)
+            self.lst_evidence.addItem(item)
+
+    def _set_gallery_enabled(self, enabled: bool) -> None:
+        for b in (self.btn_add_image, self.btn_remove_image,
+                  self.btn_open_folder):
+            b.setEnabled(enabled)
+
+    def _on_add_image(self) -> None:
+        if self._project_id is None:
+            QMessageBox.warning(self, "No project",
+                "Create or load a project before attaching images.")
+            return
+        paths, _ = QFileDialog.getOpenFileNames(
+            self, "Attach pavement image(s)", "",
+            "Images (*.png *.jpg *.jpeg *.bmp *.tif *.tiff *.webp)"
+        )
+        if not paths:
+            return
+        added: list[str] = []
+        for p in paths:
+            try:
+                ev = attach_image(self._project_id, DRAFT_SURVEY_ID, p)
+            except Exception as e:
+                QMessageBox.warning(self, "Image rejected",
+                    f"Could not attach {p}:\n{e}")
+                continue
+            if ev.relative_path in self._evidence:
+                continue  # dedup — content-addressed pipeline already did
+            self._evidence.append(ev.relative_path)
+            added.append(ev.relative_path)
+        if added:
+            self._rebuild_evidence_list_widget()
+            self._refresh_evidence_mirror()
+
+    def _on_remove_image(self) -> None:
+        if self._project_id is None:
+            return
+        item = self.lst_evidence.currentItem()
+        if item is None:
+            return
+        rel = item.data(Qt.UserRole)
+        if not rel:
+            return
+        try:
+            delete_evidence(self._project_id, DRAFT_SURVEY_ID, rel)
+        except Exception:
+            pass  # best-effort; we still drop the panel reference
+        if rel in self._evidence:
+            self._evidence.remove(rel)
+        self._rebuild_evidence_list_widget()
+        self._refresh_evidence_mirror()
+
+    def _on_open_folder(self) -> None:
+        if self._project_id is None:
+            return
+        folder = IMAGES_DIR / "condition" / str(self._project_id)
+        folder.mkdir(parents=True, exist_ok=True)
+        _open_in_file_browser(folder)
+
     # ---------- project binding --------------------------------------------
     def set_project(self, pid: int | None, name: str = "") -> None:
         self._project_id = pid
@@ -365,9 +512,12 @@ class ConditionSurveyPanel(QWidget):
         # Clear table + reserved-field widgets on project switch
         self.table.setRowCount(0)
         self.breakdown_table.setRowCount(0)
+        self._evidence = []
+        self.lst_evidence.clear()
         self.ed_image_paths.setPlainText("")
         self.ed_ai_hint.setText("")
         self.ed_gis_geojson.setPlainText("")
+        self._set_gallery_enabled(pid is not None)
         if pid is None:
             self.proj_banner.setText("[WARN] No project loaded.")
             self.btn_export.setEnabled(False)
@@ -393,10 +543,13 @@ class ConditionSurveyPanel(QWidget):
                         count=int(rec.get("count") or 0),
                         notes=rec.get("notes", "") or "",
                     )
-                # Reserved-field reload (Phase 11/12 hooks — stored only)
-                self.ed_image_paths.setPlainText(
-                    "\n".join(d.get("image_paths") or ())
-                )
+                # Image evidence reload — restore the saved relative
+                # paths verbatim (including any that no longer resolve
+                # on disk; the gallery row label flags them as missing).
+                self._evidence = list(d.get("image_paths") or ())
+                self._rebuild_evidence_list_widget()
+                self._refresh_evidence_mirror()
+                # AI / GIS hooks remain stub-only.
                 self.ed_ai_hint.setText(d.get("ai_classification_hint", "") or "")
                 self.ed_gis_geojson.setPlainText(d.get("gis_geometry_geojson", "") or "")
             except Exception:
