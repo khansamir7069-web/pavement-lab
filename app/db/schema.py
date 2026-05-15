@@ -77,6 +77,9 @@ class Project(Base):
     traffic_analyses: Mapped[list["TrafficAnalysis"]] = relationship(
         back_populates="project", cascade="all, delete-orphan"
     )
+    condition_surveys: Mapped[list["ConditionSurvey"]] = relationship(
+        back_populates="project", cascade="all, delete-orphan"
+    )
 
 
 class MixDesign(Base):
@@ -197,6 +200,21 @@ class TrafficAnalysis(Base):
     computed_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
     project: Mapped[Project] = relationship(back_populates="traffic_analyses")
+
+
+class ConditionSurvey(Base):
+    """Phase-10 module: per-project pavement condition survey + PCI score."""
+    __tablename__ = "condition_surveys"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False)
+    inputs_json: Mapped[Optional[str]] = mapped_column(JSON)
+    results_json: Mapped[Optional[str]] = mapped_column(JSON)
+    pci_score: Mapped[Optional[float]] = mapped_column(Float)
+    condition_category: Mapped[Optional[str]] = mapped_column(String(40))
+    notes: Mapped[Optional[str]] = mapped_column(Text)
+    computed_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+    project: Mapped[Project] = relationship(back_populates="condition_surveys")
 
 
 class User(Base):

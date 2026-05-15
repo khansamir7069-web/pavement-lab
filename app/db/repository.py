@@ -17,6 +17,7 @@ from .schema import (
     AuditLog,
     Base,
     Client,
+    ConditionSurvey,
     MaintenanceDesign,
     Material,
     MaterialQuantityDesign,
@@ -374,6 +375,36 @@ class Database:
                 select(TrafficAnalysis)
                 .where(TrafficAnalysis.project_id == project_id)
                 .order_by(TrafficAnalysis.computed_at.desc())
+                .limit(1)
+            )
+            return s.scalars(stmt).first()
+
+    # ---- Condition surveys (Phase 10) ----------------------------------
+    def save_condition_survey(
+        self, *, project_id: int, result
+    ) -> ConditionSurvey:
+        inputs_dict = _to_json_safe(getattr(result, "inputs", None))
+        result_dict = _to_json_safe(result)
+        if isinstance(result_dict, dict):
+            result_dict.pop("inputs", None)
+        with self.session() as s:
+            row = ConditionSurvey(
+                project_id=project_id,
+                inputs_json=json.dumps(inputs_dict),
+                results_json=json.dumps(result_dict),
+                pci_score=float(getattr(result, "pci_score", 0.0)),
+                condition_category=getattr(result, "condition_category", "") or "",
+                notes=getattr(result, "notes", "") or "",
+            )
+            s.add(row); s.flush()
+            return row
+
+    def latest_condition_survey(self, project_id: int) -> ConditionSurvey | None:
+        with self.session() as s:
+            stmt = (
+                select(ConditionSurvey)
+                .where(ConditionSurvey.project_id == project_id)
+                .order_by(ConditionSurvey.computed_at.desc())
                 .limit(1)
             )
             return s.scalars(stmt).first()

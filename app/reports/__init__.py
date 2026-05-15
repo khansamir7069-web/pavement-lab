@@ -21,6 +21,11 @@ from .traffic_report import (
     build_traffic_docx,
     write_traffic_section,
 )
+from .condition_report import (
+    ConditionReportContext,
+    build_condition_docx,
+    write_condition_section,
+)
 from .report_builder import (
     CombinedReportContext,
     build_combined_report,
@@ -45,4 +50,7 @@ __all__ = [
     "TrafficReportContext",
     "build_traffic_docx",
     "write_traffic_section",
+    "ConditionReportContext",
+    "build_condition_docx",
+    "write_condition_section",
 ]

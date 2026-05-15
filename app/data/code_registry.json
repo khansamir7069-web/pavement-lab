@@ -7,6 +7,7 @@
     "IRC:37-2018":    {"title": "Guidelines for the Design of Flexible Pavements",                         "year": 2018, "org": "IRC",    "scope": "flexible_pavement_design"},
     "IRC:58":         {"title": "Guidelines for Design of Plain Jointed Rigid Pavements",                  "year": 2015, "org": "IRC",    "scope": "rigid_pavement_design"},
     "IRC:81-1997":    {"title": "Guidelines for Strengthening of Flexible Pavements using BBD",            "year": 1997, "org": "IRC",    "scope": "bbd_overlay"},
+    "IRC:82-1982":    {"title": "Code of Practice for Maintenance of Bituminous Surfaces of Highways",     "year": 1982, "org": "IRC",    "scope": "bituminous_maintenance"},
     "IRC:115":        {"title": "Structural Evaluation and Strengthening using FWD",                       "year": 2014, "org": "IRC",    "scope": "fwd_evaluation"},
     "IRC:SP:16":      {"title": "Laboratory Manual for Bituminous Mix Design",                             "year": 2019, "org": "IRC",    "scope": "mix_design_lab"},
     "IRC:SP:53":      {"title": "Guidelines on Use of Modified Bitumen in Road Construction",              "year": 2010, "org": "IRC",    "scope": "modified_binder"},

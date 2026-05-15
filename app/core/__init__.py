@@ -85,6 +85,21 @@ from .maintenance import (
     MicroSurfacingResult,
     compute_micro_surfacing,
 )
+from .condition_survey import (
+    DISTRESS_TYPES,
+    SEVERITY_LEVELS,
+    DistressType,
+    DistressRecord,
+    ConditionSurveyInput,
+    ConditionSurveyResult,
+    PerDistressBreakdown,
+    RehabRecommendation,
+    compute_condition_survey,
+    condition_category,
+    recommend_rehab,
+    RECALIBRATE_ME as PCI_RECALIBRATE_ME,
+    PLACEHOLDER_NOTE as PCI_PLACEHOLDER_NOTE,
+)
 
 __all__ = [
     "linear_interpolate",
@@ -182,4 +197,17 @@ __all__ = [
     "ldf_preset",
     "traffic_category",
     "compute_traffic_analysis",
+    "DISTRESS_TYPES",
+    "SEVERITY_LEVELS",
+    "DistressType",
+    "DistressRecord",
+    "ConditionSurveyInput",
+    "ConditionSurveyResult",
+    "PerDistressBreakdown",
+    "RehabRecommendation",
+    "compute_condition_survey",
+    "condition_category",
+    "recommend_rehab",
+    "PCI_RECALIBRATE_ME",
+    "PCI_PLACEHOLDER_NOTE",
 ]

@@ -32,6 +32,8 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 from app.core import (
     ColdMixInput,
+    ConditionSurveyInput,
+    DistressRecord,
     LayerInput,
     MaterialQuantityInput,
     MicroSurfacingInput,
@@ -40,6 +42,7 @@ from app.core import (
     StructuralInput,
     TrafficInput,
     compute_cold_mix,
+    compute_condition_survey,
     compute_material_quantity,
     compute_micro_surfacing,
     compute_overlay,
@@ -69,6 +72,10 @@ from .material_qty_report import (
 from .traffic_report import (
     TrafficReportContext,
     write_traffic_section,
+)
+from .condition_report import (
+    ConditionReportContext,
+    write_condition_section,
 )
 from .structural_report import (
     StructuralReportContext,
@@ -186,6 +193,40 @@ def _rehydrate_traffic(row) -> "TrafficResult | None":
         survey_source_file=d.get("survey_source_file", "") or "",
     )
     return compute_traffic_analysis(inp)
+
+
+def _rehydrate_condition(row) -> "ConditionSurveyResult | None":
+    if not row or not row.inputs_json:
+        return None
+    try:
+        d = json.loads(row.inputs_json)
+    except json.JSONDecodeError:
+        return None
+    records = tuple(
+        DistressRecord(
+            distress_type=r.get("distress_type", "cracking"),
+            severity=r.get("severity", "low"),
+            length_m=float(r.get("length_m") or 0),
+            area_m2=float(r.get("area_m2") or 0),
+            count=int(r.get("count") or 0),
+            notes=r.get("notes", "") or "",
+        )
+        for r in (d.get("records") or ())
+    )
+    inp = ConditionSurveyInput(
+        work_name=d.get("work_name", "") or "",
+        surveyed_by=d.get("surveyed_by", "") or "",
+        survey_date=d.get("survey_date", "") or "",
+        chainage_from_km=float(d.get("chainage_from_km") or 0),
+        chainage_to_km=float(d.get("chainage_to_km") or 0),
+        lane_id=d.get("lane_id", "") or "",
+        records=records,
+        notes=d.get("notes", "") or "",
+        image_paths=tuple(d.get("image_paths") or ()),
+        ai_classification_hint=d.get("ai_classification_hint", "") or "",
+        gis_geometry_geojson=d.get("gis_geometry_geojson", "") or "",
+    )
+    return compute_condition_survey(inp)
 
 
 def _rehydrate_material_qty(row) -> "MaterialQuantityResult | None":
@@ -308,9 +349,12 @@ def build_combined_report(
     material_qty = _rehydrate_material_qty(mq_row)
     tr_row = db.latest_traffic_analysis(project_id)
     traffic = _rehydrate_traffic(tr_row)
+    cs_row = db.latest_condition_survey(project_id)
+    condition = _rehydrate_condition(cs_row)
 
     have_mix = mix_result_live is not None
-    have_any = any((have_mix, traffic, structural, overlay, cold_mix, micro, material_qty))
+    have_any = any((have_mix, traffic, structural, overlay, cold_mix, micro,
+                    material_qty, condition))
     if not have_any:
         raise ValueError(
             "No module data found for this project — compute and save at "
@@ -359,6 +403,9 @@ def build_combined_report(
     if material_qty:
         toc_rows.append(["Bill of Material Quantities",
                          "MoRTH-400 / MoRTH-500 / IRC:111"])
+    if condition:
+        toc_rows.append(["Pavement Condition Survey",
+                         "ASTM D6433 / IRC:82-1982 (placeholder PCI)"])
 
     from ._docx_common import add_table
     add_table(doc, ["Section", "Governing Reference"], toc_rows)
@@ -498,6 +545,21 @@ def build_combined_report(
         write_material_quantity_section(doc, mq_ctx, material_qty,
                                         include_header=True)
         included.append("Bill of Material Quantities")
+
+    # ---- Pavement Condition Survey (Phase 10 — placeholder PCI) ----
+    if condition:
+        doc.add_page_break()
+        cs_ctx = ConditionReportContext(
+            project_title=ctx.project_title,
+            work_name=ctx.work_name,
+            work_order_no=ctx.work_order_no,
+            work_order_date=ctx.work_order_date,
+            client=ctx.client, agency=ctx.agency,
+            submitted_by=ctx.submitted_by,
+            lab_name=ctx.lab_name, report_date=ctx.report_date,
+        )
+        write_condition_section(doc, cs_ctx, condition, include_header=True)
+        included.append("Pavement Condition Survey")
 
     add_signature_block(doc)
     doc.save(out_path)

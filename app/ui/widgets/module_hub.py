@@ -31,6 +31,8 @@ MODULES: tuple[tuple[str, str, str], ...] = (
         "Overlay / BBD · Cold mix · Slurry · Micro surfacing"),
     ("material_qty",  "Material Quantity Calculator",
         "Quantities for a road stretch (area × thickness × density)"),
+    ("condition",     "Pavement Condition Survey",
+        "Distress recording · PCI score · rehab placeholders (ASTM D6433)"),
     ("specs_admin",   "Specification Database",
         "View / edit mix-type limits, gradations and binder rules"),
     ("reports",       "Reports",
