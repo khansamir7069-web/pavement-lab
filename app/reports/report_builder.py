@@ -38,11 +38,13 @@ from app.core import (
     MixDesignResult,
     OverlayInput,
     StructuralInput,
+    TrafficInput,
     compute_cold_mix,
     compute_material_quantity,
     compute_micro_surfacing,
     compute_overlay,
     compute_structural_design,
+    compute_traffic_analysis,
 )
 from app.core.import_summary import ImportedMixResult
 from app.graphs import MarshallChartSet, build_chart_set
@@ -63,6 +65,10 @@ from .maintenance_report import (
 from .material_qty_report import (
     MaterialQuantityReportContext,
     write_material_quantity_section,
+)
+from .traffic_report import (
+    TrafficReportContext,
+    write_traffic_section,
 )
 from .structural_report import (
     StructuralReportContext,
@@ -156,6 +162,30 @@ def _rehydrate_cold_mix(row) -> "ColdMixResult | None":
         notes=d.get("notes", "") or "",
     )
     return compute_cold_mix(inp)
+
+
+def _rehydrate_traffic(row) -> "TrafficResult | None":
+    if not row or not row.inputs_json:
+        return None
+    try:
+        d = json.loads(row.inputs_json)
+    except json.JSONDecodeError:
+        return None
+    inp = TrafficInput(
+        initial_cvpd=float(d.get("initial_cvpd", 2000.0)),
+        growth_rate_pct=float(d.get("growth_rate_pct", 7.5)),
+        design_life_years=int(d.get("design_life_years", 15)),
+        terrain=d.get("terrain", "Plain"),
+        lane_config=d.get("lane_config", "Two-lane carriageway"),
+        vdf=d.get("vdf"),
+        ldf=d.get("ldf"),
+        road_category=d.get("road_category", "NH / SH"),
+        notes=d.get("notes", "") or "",
+        axle_spectrum_kn=tuple(d.get("axle_spectrum_kn") or ()),
+        wim_records=tuple(d.get("wim_records") or ()),
+        survey_source_file=d.get("survey_source_file", "") or "",
+    )
+    return compute_traffic_analysis(inp)
 
 
 def _rehydrate_material_qty(row) -> "MaterialQuantityResult | None":
@@ -276,9 +306,11 @@ def build_combined_report(
     micro = _rehydrate_micro(ms_row)
     mq_row = db.latest_material_quantity(project_id)
     material_qty = _rehydrate_material_qty(mq_row)
+    tr_row = db.latest_traffic_analysis(project_id)
+    traffic = _rehydrate_traffic(tr_row)
 
     have_mix = mix_result_live is not None
-    have_any = any((have_mix, structural, overlay, cold_mix, micro, material_qty))
+    have_any = any((have_mix, traffic, structural, overlay, cold_mix, micro, material_qty))
     if not have_any:
         raise ValueError(
             "No module data found for this project — compute and save at "
@@ -313,6 +345,8 @@ def build_combined_report(
     if have_mix:
         toc_rows.append(["Bituminous Mix Design",
                          "MoRTH Section 500 / IRC:111 / Marshall Mix Design"])
+    if traffic:
+        toc_rows.append(["Traffic / ESAL / MSA Analysis", "IRC:37-2018 / AASHTO-1993"])
     if structural:
         toc_rows.append(["Flexible Pavement Structural Design",
                          "IRC:37-2018"])
@@ -397,6 +431,17 @@ def build_combined_report(
              "PASS" if mix_result_live.compliance.overall_pass else "FAIL"),
         ))
         included.append("Bituminous Mix Design (companion file)")
+
+    # ---- Traffic (precedes structural — its MSA feeds the structural design) ----
+    if traffic:
+        doc.add_page_break()
+        write_traffic_section(doc, TrafficReportContext(
+            project_title=ctx.project_title, work_name=ctx.work_name,
+            work_order_no=ctx.work_order_no, work_order_date=ctx.work_order_date,
+            client=ctx.client, agency=ctx.agency, submitted_by=ctx.submitted_by,
+            lab_name=ctx.lab_name, report_date=ctx.report_date,
+        ), traffic, include_header=True)
+        included.append("Traffic / ESAL / MSA Analysis")
 
     # ---- Structural ----
     if structural:

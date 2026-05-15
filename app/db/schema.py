@@ -74,6 +74,9 @@ class Project(Base):
     material_quantities: Mapped[list["MaterialQuantityDesign"]] = relationship(
         back_populates="project", cascade="all, delete-orphan"
     )
+    traffic_analyses: Mapped[list["TrafficAnalysis"]] = relationship(
+        back_populates="project", cascade="all, delete-orphan"
+    )
 
 
 class MixDesign(Base):
@@ -178,6 +181,22 @@ class MaterialQuantityDesign(Base):
     computed_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
     project: Mapped[Project] = relationship(back_populates="material_quantities")
+
+
+class TrafficAnalysis(Base):
+    """Phase-8 module: per-project traffic / ESAL / MSA analysis."""
+    __tablename__ = "traffic_analyses"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False)
+    inputs_json: Mapped[Optional[str]] = mapped_column(JSON)
+    results_json: Mapped[Optional[str]] = mapped_column(JSON)
+    design_msa: Mapped[Optional[float]] = mapped_column(Float)
+    aashto_esal: Mapped[Optional[float]] = mapped_column(Float)
+    traffic_category: Mapped[Optional[str]] = mapped_column(String(40))
+    notes: Mapped[Optional[str]] = mapped_column(Text)
+    computed_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+    project: Mapped[Project] = relationship(back_populates="traffic_analyses")
 
 
 class User(Base):

@@ -52,6 +52,16 @@ from .material_quantity import (
     compute_layer,
     compute_material_quantity,
 )
+from .traffic import (
+    TrafficInput,
+    TrafficResult,
+    TERRAINS,
+    LANE_CONFIGS,
+    vdf_preset,
+    ldf_preset,
+    traffic_category,
+    compute_traffic_analysis,
+)
 from .structural_design import (
     StructuralInput,
     PavementLayer,
@@ -164,4 +174,12 @@ __all__ = [
     "LAYER_TYPES",
     "compute_layer",
     "compute_material_quantity",
+    "TrafficInput",
+    "TrafficResult",
+    "TERRAINS",
+    "LANE_CONFIGS",
+    "vdf_preset",
+    "ldf_preset",
+    "traffic_category",
+    "compute_traffic_analysis",
 ]

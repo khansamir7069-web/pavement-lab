@@ -40,11 +40,13 @@ from app.reports import (
     MaterialQuantityReportContext,
     ReportContext,
     StructuralReportContext,
+    TrafficReportContext,
     build_combined_report,
     build_maintenance_docx,
     build_material_quantity_docx,
     build_mix_design_docx,
     build_structural_docx,
+    build_traffic_docx,
 )
 from app.reports.word_report import export_to_pdf
 
@@ -53,6 +55,7 @@ from .widgets.dashboard import Dashboard
 from .widgets.inputs_panel import InputsPanel
 from .widgets.maintenance_panel import MaintenancePanel
 from .widgets.material_qty_panel import MaterialQuantityPanel
+from .widgets.traffic_panel import TrafficPanel
 from .widgets.module_hub import ModuleHub
 from .widgets.project_form import ProjectForm
 from .widgets.results_panel import ResultsPanel
@@ -68,6 +71,7 @@ SIDEBAR_ITEMS = [
     ("Project", "project"),
     ("Module Hub", "hub"),
     ("Mix Design Inputs", "inputs"),
+    ("Traffic / MSA", "traffic"),
     ("Structural Design", "structural"),
     ("Maintenance", "maintenance"),
     ("Material Quantity", "material_qty"),
@@ -151,6 +155,7 @@ class MainWindow(QMainWindow):
         self.structural = StructuralPanel(self.db)
         self.maintenance = MaintenancePanel(self.db)
         self.material_qty = MaterialQuantityPanel(self.db)
+        self.traffic = TrafficPanel(self.db)
 
         # Wire Back buttons on every page's header.
         # Lambdas must swallow Qt's clicked(bool) positional arg with *_.
@@ -163,6 +168,7 @@ class MainWindow(QMainWindow):
             (self.structural,   "hub"),
             (self.maintenance,  "hub"),
             (self.material_qty, "hub"),
+            (self.traffic,      "hub"),
         )
         for w, target in back_routes:
             hdr = w.findChild(PageHeader)
@@ -181,6 +187,7 @@ class MainWindow(QMainWindow):
                 "structural": self.structural,
                 "maintenance": self.maintenance,
                 "material_qty": self.material_qty,
+                "traffic": self.traffic,
             }[key]
             idx = self.stack.addWidget(widget)
             self._page_keys[key] = idx
@@ -202,6 +209,8 @@ class MainWindow(QMainWindow):
         self.maintenance.export_requested.connect(self._on_export_maintenance)
         self.material_qty.saved.connect(self._on_material_qty_saved)
         self.material_qty.export_requested.connect(self._on_export_material_qty)
+        self.traffic.saved.connect(self._on_traffic_saved)
+        self.traffic.export_requested.connect(self._on_export_traffic)
         self.inputs.compute_requested.connect(self._on_compute)
         self.inputs.load_demo_requested.connect(self._on_load_demo)
         self.results.generate_word.connect(self._on_export_word)
@@ -317,6 +326,17 @@ class MainWindow(QMainWindow):
                 self._current_project_id, p.work_name if p else ""
             )
             self._show_page("material_qty")
+        elif key == "traffic":
+            if self._current_project_id is None:
+                QMessageBox.warning(self, "No project",
+                                    "Please save a project first.")
+                self._show_page("project")
+                return
+            p = self.db.get_project(self._current_project_id)
+            self.traffic.set_project(
+                self._current_project_id, p.work_name if p else ""
+            )
+            self._show_page("traffic")
         else:
             QMessageBox.information(
                 self, "Coming soon",
@@ -334,6 +354,13 @@ class MainWindow(QMainWindow):
     def _on_maintenance_saved(self, project_id: int) -> None:
         self.statusBar().showMessage(
             f"Maintenance design saved for project #{project_id}."
+        )
+        self._refresh_hub()
+        self.dashboard.refresh()
+
+    def _on_traffic_saved(self, project_id: int) -> None:
+        self.statusBar().showMessage(
+            f"Traffic analysis saved for project #{project_id}."
         )
         self._refresh_hub()
         self.dashboard.refresh()
@@ -420,6 +447,31 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(f"Maintenance Word saved: {out}")
         except Exception as e:
             log.exception("Maintenance export failed")
+            QMessageBox.critical(self, "Export failed", str(e))
+
+    def _on_export_traffic(self, project_id: int) -> None:
+        from app.reports.report_builder import _rehydrate_traffic
+        row = self.db.latest_traffic_analysis(project_id)
+        result = _rehydrate_traffic(row)
+        if result is None:
+            QMessageBox.information(self, "Nothing to export",
+                "Save a traffic analysis first.")
+            return
+        default = REPORTS_DIR / f"Traffic_{project_id}.docx"
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save Traffic Word Report",
+            str(default), "Word Document (*.docx)"
+        )
+        if not path:
+            return
+        try:
+            meta = self._project_meta_for_report(project_id)
+            ctx = TrafficReportContext(**meta)
+            out = build_traffic_docx(Path(path), ctx, result)
+            QMessageBox.information(self, "Report exported", f"Saved to:\n{out}")
+            self.statusBar().showMessage(f"Traffic Word saved: {out}")
+        except Exception as e:
+            log.exception("Traffic export failed")
             QMessageBox.critical(self, "Export failed", str(e))
 
     def _on_export_material_qty(self, project_id: int) -> None:

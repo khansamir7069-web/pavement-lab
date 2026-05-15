@@ -16,6 +16,11 @@ from .material_qty_report import (
     build_material_quantity_docx,
     write_material_quantity_section,
 )
+from .traffic_report import (
+    TrafficReportContext,
+    build_traffic_docx,
+    write_traffic_section,
+)
 from .report_builder import (
     CombinedReportContext,
     build_combined_report,
@@ -37,4 +42,7 @@ __all__ = [
     "MaterialQuantityReportContext",
     "build_material_quantity_docx",
     "write_material_quantity_section",
+    "TrafficReportContext",
+    "build_traffic_docx",
+    "write_traffic_section",
 ]

@@ -24,6 +24,7 @@ from .schema import (
     Project,
     Report,
     StructuralDesign,
+    TrafficAnalysis,
     User,
 )
 
@@ -342,6 +343,37 @@ class Database:
                 select(MaterialQuantityDesign)
                 .where(MaterialQuantityDesign.project_id == project_id)
                 .order_by(MaterialQuantityDesign.computed_at.desc())
+                .limit(1)
+            )
+            return s.scalars(stmt).first()
+
+    # ---- Traffic analyses (Phase 8) ------------------------------------
+    def save_traffic_analysis(
+        self, *, project_id: int, result
+    ) -> TrafficAnalysis:
+        inputs_dict = _to_json_safe(getattr(result, "inputs", None))
+        result_dict = _to_json_safe(result)
+        if isinstance(result_dict, dict):
+            result_dict.pop("inputs", None)
+        with self.session() as s:
+            row = TrafficAnalysis(
+                project_id=project_id,
+                inputs_json=json.dumps(inputs_dict),
+                results_json=json.dumps(result_dict),
+                design_msa=getattr(result, "design_msa", 0.0),
+                aashto_esal=getattr(result, "aashto_esal", 0.0),
+                traffic_category=getattr(result, "traffic_category", "") or "",
+                notes=getattr(result, "notes", "") or "",
+            )
+            s.add(row); s.flush()
+            return row
+
+    def latest_traffic_analysis(self, project_id: int) -> TrafficAnalysis | None:
+        with self.session() as s:
+            stmt = (
+                select(TrafficAnalysis)
+                .where(TrafficAnalysis.project_id == project_id)
+                .order_by(TrafficAnalysis.computed_at.desc())
                 .limit(1)
             )
             return s.scalars(stmt).first()

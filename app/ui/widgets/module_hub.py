@@ -23,6 +23,8 @@ MODULES: tuple[tuple[str, str, str], ...] = (
     # (key, title, description)
     ("mix_design",    "Bituminous Mix Design",
         "Marshall mix design (DBM / BC / SDBC / SDAC / BM …)"),
+    ("traffic",       "Traffic / ESAL / MSA",
+        "IRC:37 — CVPD, VDF, LDF → design MSA & AASHTO ESAL"),
     ("structural",    "Flexible Pavement Structural Design",
         "IRC:37 — traffic, CBR, layer thickness"),
     ("maintenance",   "Maintenance / Rehabilitation",
