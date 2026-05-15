@@ -112,3 +112,19 @@ Schedule **Phase 9 = "Mix-Design Stabilization"** (F1 + F2 + F4 only). Rationale
 The engine math is **clean and mix-agnostic**. The compliance database is **clean and dynamic**. The Phase-6 source-tagging infrastructure is **clean**. The leak is concentrated in **one file** (`inputs_panel.py`) and **six fallback strings** elsewhere. F1 + F2 + F4 will close all three critical gaps with ~65 additive lines.
 
 Until then: **for non-DBM-II mixes, the engineer must manually overwrite the gradation envelope cells in the inputs panel before clicking Compute**, otherwise the report will be internally inconsistent.
+
+---
+
+## 7. Phase 9 Stabilization — closed 2026-05-15
+
+F1 + F2 + F4 are landed. Tracked in `tests/_smoke_phase9_stabilization.py`.
+
+| Fix | What changed | Files |
+|---|---|---|
+| **F1** dynamic gradation/sieve loading | `InputsPanel.set_mix_type(code)` rebuilds the gradation tab from `MIX_TYPES[code]` — sieve set, lower/upper envelope, mix-name header with applicable-code source tag. Demo defaults remain as the fallback only when no mix type is selected. Wired into `_on_module_selected("mix_design")` and `_on_load_demo`. | `app/ui/widgets/inputs_panel.py`, `app/ui/main_window.py` |
+| **F2** placeholder/unverified warnings | Orange banner on the gradation tab, on the results panel above the compliance card, and inserted into the Word report below the title block. Triggered by `MIX_TYPES[code].status == "placeholder_editable"`. Banner text quotes the applicable-code source from `MixTypeRecord`. | `app/ui/widgets/inputs_panel.py`, `app/ui/widgets/results_panel.py`, `app/reports/word_report.py`, `app/ui/main_window.py` |
+| **F4** remove hidden DBM-II fallback | Compute path now redirects to project form if `mix_type` is empty (defensive — hub guard runs first). `_build_report_context` no longer rewrites empty mix_type to DBM-II. Import-summary dialog defaults to the first **verified** entry in `MIX_SPECS` instead of the literal `"DBM-II"`. `build_combined_report` raises `ValueError` if a live mix-design result is supplied with empty `mix_type_key`. `parse_summary_excel` requires `mix_type_key` explicitly. | `app/ui/main_window.py`, `app/reports/report_builder.py`, `app/core/import_summary.py` |
+
+**Smoke coverage:** `python -m tests._smoke_phase9_stabilization` asserts (1) DBM-II loads 8 sieves, (2) DBM-I loads 9 sieves including 45 mm, (3) BC-II envelope differs from DBM-II, (4) SMA placeholder banner is visible on inputs and results panels, (5) `parse_summary_excel` rejects empty mix_type_key, (6) `build_combined_report` rejects empty mix_type_key when a live mix-design is included, (7) zero `"DBM-II"` code literals remain in `app/ui/` or `app/reports/`, (8) Marshall compute still passes for DBM-II / BC-II / SMA using the panel pipeline. Existing parity (16/16) and prior phase smokes (Maintenance, Phase 6/7/8, smoke_ui, smoke_export) all stay green.
+
+**Deferred (Phase 10+):** F3 (compaction-blows badge), F5 (target_air_voids driven by spec midpoint), F6 (filter project_form dropdown to verified entries). No `references[]` plumbing changes — Phase 6 source-tags now surface in the gradation tab's mix-name label and inside the placeholder banner.

@@ -27,7 +27,7 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Cm, Inches, Pt, RGBColor
 
-from app.core import MIX_SPECS, MaterialCalcResult, MixDesignResult
+from app.core import MIX_SPECS, MIX_TYPES, MaterialCalcResult, MixDesignResult
 from app.core.import_summary import ImportedMixResult
 from app.graphs import MarshallChartSet, save_chart_pngs
 
@@ -184,6 +184,22 @@ def build_mix_design_docx(
                align=WD_ALIGN_PARAGRAPH.CENTER)
     _add_p(doc, f"{ctx.lab_name}  •  Report Date: {ctx.report_date}",
            size=10, align=WD_ALIGN_PARAGRAPH.CENTER)
+
+    # F2 placeholder warning — surfaces unverified spec status in the report.
+    _record = MIX_TYPES.get(ctx.mix_type_key)
+    if _record and (_record.status or "").strip() == "placeholder_editable":
+        _src = _record.applicable_code or "unverified"
+        warn_para = doc.add_paragraph()
+        warn_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        warn_run = warn_para.add_run(
+            f"⚠ Spec limits for {_record.mix_code} ({_record.full_name}) are "
+            f"not IRC-verified. Compliance verdict in this report is "
+            f"indicative only — confirm against the relevant IRC clause "
+            f"before adoption. (Source: {_src})"
+        )
+        warn_run.bold = True
+        warn_run.font.size = Pt(10)
+        warn_run.font.color.rgb = RGBColor(0x8A, 0x5A, 0x00)
 
     # Project info
     _add_heading(doc, "Project Information", level=2)

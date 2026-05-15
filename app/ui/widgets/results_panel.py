@@ -24,7 +24,7 @@ from PySide6.QtWidgets import (
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
-from app.core import MaterialCalcResult, MixDesignResult
+from app.core import MaterialCalcResult, MixDesignResult, MIX_TYPES
 from app.core.import_summary import ImportedMixResult
 from app.graphs import build_chart_set, render_chart_to_axes
 from .common import Card, PageHeader, styled_button
@@ -38,6 +38,7 @@ class ResultsPanel(QWidget):
         super().__init__(parent)
         self._result: MixDesignResult | None = None
         self._material: MaterialCalcResult | None = None
+        self._mix_type_key: str = ""
         self._build()
 
     def _build(self) -> None:
@@ -67,6 +68,16 @@ class ResultsPanel(QWidget):
         body_layout.setSpacing(14)
         scroll.setWidget(body)
         layout.addWidget(scroll, stretch=1)
+
+        # F2 placeholder warning banner — surfaces placeholder_editable status
+        self.lbl_placeholder_warning = QLabel("")
+        self.lbl_placeholder_warning.setWordWrap(True)
+        self.lbl_placeholder_warning.setStyleSheet(
+            "background:#fff4e0; color:#8a5a00; padding:8px 10px;"
+            "border:1px solid #f0c97a; border-radius:4px; font-size:10pt;"
+        )
+        self.lbl_placeholder_warning.setVisible(False)
+        body_layout.addWidget(self.lbl_placeholder_warning)
 
         # OBC card
         self.obc_card = Card()
@@ -167,10 +178,33 @@ class ResultsPanel(QWidget):
 
     # ----------------------------------------------------------------
 
+    def set_mix_type_key(self, mix_type_key: str) -> None:
+        """Tell the panel which mix type the current result belongs to.
+
+        Drives the F2 placeholder warning banner. Should be called before
+        :meth:`set_result`; if not, the banner stays hidden.
+        """
+        self._mix_type_key = mix_type_key or ""
+        self._refresh_placeholder_warning()
+
+    def _refresh_placeholder_warning(self) -> None:
+        rec = MIX_TYPES.get(self._mix_type_key) if self._mix_type_key else None
+        if rec and (rec.status or "").strip() == "placeholder_editable":
+            self.lbl_placeholder_warning.setText(
+                f"⚠ Spec limits for {rec.mix_code} ({rec.full_name}) are not "
+                f"IRC-verified. Compliance verdict below is indicative only — "
+                f"confirm against the relevant IRC clause before adoption. "
+                f"(Source: {rec.applicable_code or 'unverified'})"
+            )
+            self.lbl_placeholder_warning.setVisible(True)
+        else:
+            self.lbl_placeholder_warning.setVisible(False)
+
     def set_result(self, result: "MixDesignResult | ImportedMixResult",
                    material: MaterialCalcResult | None = None) -> None:
         self._result = result
         self._material = material
+        self._refresh_placeholder_warning()
 
         # OBC card
         self.lbl_obc.setText(f"{result.obc.obc_pct:.2f}%")

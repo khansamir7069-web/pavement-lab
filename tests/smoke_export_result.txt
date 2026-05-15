@@ -1,5 +1,5 @@
 Report built: E:\myclaud project\1\pavement_lab\build\smoke_report.docx
-Size: 302350 bytes
+Size: 302325 bytes
 Has Material Calculation section: True
 Material standard wt: 1256.54 g
 Material target  wt: 1256.54 g

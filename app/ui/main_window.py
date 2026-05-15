@@ -281,6 +281,9 @@ class MainWindow(QMainWindow):
                 )
                 self._show_page("project")
                 return
+            # F1 wire-up: drive the inputs panel from the selected mix type
+            # (sieve set, gradation envelope, placeholder warning banner).
+            self.inputs.set_mix_type(p.mix_type)
             self._show_page("inputs")
         elif key == "reports":
             if self._current_project_id is None:
@@ -572,6 +575,13 @@ class MainWindow(QMainWindow):
         self.stack.insertWidget(idx, new)
         old.deleteLater()
         self.inputs = new
+        # F1 wire-up: re-apply mix-type-driven panel population after reset,
+        # so the rebuilt panel matches the current project's mix type
+        # rather than the hardcoded DBM-II demo defaults.
+        if self._current_project_id is not None:
+            p = self.db.get_project(self._current_project_id)
+            if p and p.mix_type:
+                self.inputs.set_mix_type(p.mix_type)
         self._show_page("inputs")
 
     def _on_compute(self) -> None:
@@ -600,7 +610,18 @@ class MainWindow(QMainWindow):
             )
 
             p = self.db.get_project(self._current_project_id)
-            mix_type = p.mix_type if p else "DBM-II"
+            # F4: refuse to compute without an explicit mix type. The hub
+            # guard at _on_module_selected redirects users back to the
+            # project form, so reaching here without mix_type is a bug.
+            if not p or not p.mix_type:
+                QMessageBox.warning(
+                    self, "Mix type required",
+                    "This project has no Mix Type set. Please pick one in "
+                    "the Project form before computing the mix design."
+                )
+                self._show_page("project")
+                return
+            mix_type = p.mix_type
             proj = ProjectInfo(
                 mix_type=mix_type,
                 work_name=p.work_name if p else "",
@@ -635,6 +656,9 @@ class MainWindow(QMainWindow):
                 },
                 result=result,
             )
+            # F2 wire-up: tell the results panel which mix type this result
+            # belongs to, so the placeholder warning banner can surface.
+            self.results.set_mix_type_key(mix_type)
             self.results.set_result(result, mat_result)
             self.db.set_module_status(self._current_project_id, "mix_design", "complete")
             self._refresh_hub()
@@ -669,9 +693,12 @@ class MainWindow(QMainWindow):
                 binder_props = _json.loads(p.binder_properties_json)
             except _json.JSONDecodeError:
                 binder_props = {}
+        # F4: do not silently default to DBM-II. Pass through the project's
+        # actual mix_type; callers requiring a non-empty value validate
+        # before reaching here (compute path + hub guard).
         return ReportContext(
             project_title=(p.work_name if p else "") or "Mix Design",
-            mix_type_key=(p.mix_type if (p and p.mix_type) else "DBM-II"),
+            mix_type_key=(p.mix_type if (p and p.mix_type) else ""),
             work_name=p.work_name if p else "",
             work_order_no=p.work_order_no if p else "",
             work_order_date=p.work_order_date if p else "",
@@ -709,7 +736,7 @@ class MainWindow(QMainWindow):
 
     def _on_import_summary(self) -> None:
         """Import a pre-computed Marshall summary Excel and show results."""
-        from app.core import MIX_SPECS
+        from app.core import MIX_SPECS, MIX_TYPES
 
         # 1. File picker
         path, _ = QFileDialog.getOpenFileName(
@@ -730,8 +757,15 @@ class MainWindow(QMainWindow):
         combo = QComboBox()
         for key, spec in MIX_SPECS.items():
             combo.addItem(f"{key}  —  {spec.name}", key)
-        # Default to DBM-II
-        idx = combo.findData("DBM-II")
+        # F4: default selection is the first *verified* MIX_SPECS entry, not
+        # the hardcoded literal "DBM-II". Falls back to the first available
+        # entry if none are marked verified.
+        default_key = next(
+            (k for k in MIX_SPECS.keys()
+             if (MIX_TYPES.get(k) and (MIX_TYPES[k].status or "").strip() == "verified")),
+            next(iter(MIX_SPECS.keys()), None),
+        )
+        idx = combo.findData(default_key) if default_key else -1
         if idx >= 0:
             combo.setCurrentIndex(idx)
         form.addRow("Mix Type / Spec:", combo)
@@ -766,6 +800,8 @@ class MainWindow(QMainWindow):
         self._last_inputs_payload = None
         self._last_chart_set = build_chart_set(imported.summary, imported.obc)
 
+        # F2 wire-up for imported results too
+        self.results.set_mix_type_key(mix_type_key)
         self.results.set_result(imported)
         self._show_page("results")
         self.statusBar().showMessage(

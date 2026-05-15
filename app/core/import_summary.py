@@ -92,7 +92,7 @@ def _float(val) -> float:
 
 def parse_summary_excel(
     path: str | Path,
-    mix_type_key: str = "DBM-II",
+    mix_type_key: str,
     gsb: float | None = None,
 ) -> "ImportedMixResult":
     """Parse *path* (any Excel format) into an :class:`ImportedMixResult`.
@@ -102,12 +102,19 @@ def parse_summary_excel(
     path:
         Full path to the .xlsx / .xls / .xlsm file.
     mix_type_key:
-        One of ``MIX_SPECS`` keys (``"DBM-I"``, ``"DBM-II"``, ``"BC-I"`` …).
-        Used for compliance checking.
+        Required. One of ``MIX_SPECS`` keys (``"DBM-I"``, ``"BC-II"``, …).
+        Used for compliance checking. F4 (Phase 9 stabilization): no
+        silent DBM-II default — caller must specify.
     gsb:
         If provided, use this Gsb value directly.  Otherwise estimate it
         from the VMA formula: ``Gsb = Gmb × (100-Pb) / (100 - VMA)``.
     """
+    if not mix_type_key:
+        raise ValueError(
+            "parse_summary_excel requires an explicit mix_type_key "
+            "(e.g. 'DBM-II', 'BC-II'). Empty/missing values are no longer "
+            "accepted to prevent silent DBM-II routing."
+        )
     import openpyxl
 
     path = Path(path)

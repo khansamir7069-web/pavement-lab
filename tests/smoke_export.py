@@ -23,7 +23,16 @@ try:
             w.project_form.work_name.setText("Shirdi Airport DBM Trial")
             w.project_form.client.setText("Shri Sai Construction")
             w.project_form.agency.setText("Arcstone Infrastructure")
+            # Phase-9 stabilization (F4): mix_type is required; pre-select
+            # DBM-II to keep this driver's Shirdi DBM dataset coherent.
+            _mix_idx = w.project_form.mix_type.findData("DBM-II")
+            if _mix_idx >= 0:
+                w.project_form.mix_type.setCurrentIndex(_mix_idx)
             w.project_form._on_save()
+            # The hub route applies set_mix_type to the inputs panel; we
+            # also call it here so the panel's gradation envelope tracks
+            # the project's mix type before _on_compute reads it.
+            w.inputs.set_mix_type("DBM-II")
             w._on_compute()
 
             # Build report directly (skipping the file-save dialog)

@@ -37,12 +37,16 @@ from app.core import (
     GmmSampleRaw,
     GradationInput,
     MaterialCalcInput,
+    MIX_TYPES,
     StabilityFlowInput,
     StabilitySpecimen,
 )
 from .common import PageHeader, styled_button
 
 
+# Demo defaults are DBM-II-shaped — used only as fallback when no mix_type
+# is supplied. F1 (dynamic gradation) drives the panel from MIX_TYPES at
+# runtime via GradationTab.set_mix_type / InputsPanel.set_mix_type.
 SIEVES = (37.5, 26.5, 19, 13.2, 4.75, 2.36, 0.3, 0.075)
 AGGS = ("25mm", "20mm", "6mm", "SD", "Cement")
 DESIGN_PB = (3.5, 4.0, 4.5, 5.0, 5.5)
@@ -101,48 +105,132 @@ DEMO_SPEC_UP  = (100, 100, 95, 80, 54, 42, 21, 8)
 class GradationTab(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._sieves: tuple[float, ...] = SIEVES
+        self._aggs: tuple[str, ...] = AGGS
+        self._mix_type_key: str = ""
+        self._mix_code_label = QLabel("")
+        self._mix_code_label.setStyleSheet(
+            "color:#1f3a68; font-size:10pt; font-weight:bold;"
+        )
+        self._warning_banner = QLabel("")
+        self._warning_banner.setWordWrap(True)
+        self._warning_banner.setStyleSheet(
+            "background:#fff4e0; color:#8a5a00; padding:8px 10px;"
+            "border:1px solid #f0c97a; border-radius:4px; font-size:10pt;"
+        )
+        self._warning_banner.setVisible(False)
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(12, 12, 12, 12)
+        layout.addWidget(self._mix_code_label)
+        layout.addWidget(self._warning_banner)
 
         # Blend ratios row (small)
-        blend_form = QFormLayout()
+        self._blend_form = QFormLayout()
         self.blend_spins: dict[str, QDoubleSpinBox] = {}
-        blend_row = QHBoxLayout()
-        for name in AGGS:
+        self._blend_row_widget = QWidget()
+        self._blend_row = QHBoxLayout(self._blend_row_widget)
+        self._blend_row.setContentsMargins(0, 0, 0, 0)
+        for name in self._aggs:
             sp = QDoubleSpinBox()
             sp.setDecimals(3)
             sp.setRange(0, 1)
             sp.setSingleStep(0.01)
             sp.setValue(DEMO_BLEND.get(name, 0))
             self.blend_spins[name] = sp
-            blend_row.addWidget(QLabel(name))
-            blend_row.addWidget(sp)
-        blend_form.addRow("Blend Ratios (sum to 1.000):", blend_row)
-        layout.addLayout(blend_form)
+            self._blend_row.addWidget(QLabel(name))
+            self._blend_row.addWidget(sp)
+        self._blend_form.addRow("Blend Ratios (sum to 1.000):", self._blend_row_widget)
+        layout.addLayout(self._blend_form)
 
         # Gradation table
-        headers = ["IS Sieve (mm)"] + list(AGGS) + ["MoRTH Lower", "MoRTH Upper"]
-        self.table = QTableWidget(len(SIEVES), len(headers))
+        headers = ["IS Sieve (mm)"] + list(self._aggs) + ["MoRTH Lower", "MoRTH Upper"]
+        self.table = QTableWidget(len(self._sieves), len(headers))
         self.table.setHorizontalHeaderLabels(headers)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.table.verticalHeader().setVisible(False)
-        for r, sieve in enumerate(SIEVES):
+        for r, sieve in enumerate(self._sieves):
             _set_text(self.table, r, 0, f"{sieve:g}")
-            for ci, name in enumerate(AGGS, start=1):
+            for ci, name in enumerate(self._aggs, start=1):
                 _set_num(self.table, r, ci, DEMO_GRADATION_PASS[name][r], decimals=2)
-            _set_num(self.table, r, len(AGGS) + 1, DEMO_SPEC_LOW[r], decimals=0)
-            _set_num(self.table, r, len(AGGS) + 2, DEMO_SPEC_UP[r], decimals=0)
+            _set_num(self.table, r, len(self._aggs) + 1, DEMO_SPEC_LOW[r], decimals=0)
+            _set_num(self.table, r, len(self._aggs) + 2, DEMO_SPEC_UP[r], decimals=0)
         layout.addWidget(self.table)
 
+    def set_mix_type(self, mix_type_key: str) -> None:
+        """Rebuild the gradation table from MIX_TYPES[mix_type_key].
+
+        Replaces sieve set, lower/upper envelope from the spec database
+        (Phase 6 source-tagged). Per-aggregate passing% cells are cleared
+        because demo numbers are mix-specific. The blend ratios row keeps
+        its current AGG column structure (renaming bins is deferred — F3).
+        Surfaces the placeholder warning banner when status is unverified.
+        """
+        record = MIX_TYPES.get(mix_type_key) if mix_type_key else None
+        if not record or not record.sieve_sizes_mm:
+            # Fallback: leave the demo (DBM-II) shape in place
+            self._mix_type_key = ""
+            self._mix_code_label.setText("")
+            self._warning_banner.setVisible(False)
+            return
+
+        self._mix_type_key = record.mix_code
+        self._sieves = tuple(record.sieve_sizes_mm)
+        lower = tuple(record.gradation_lower) if record.gradation_lower else tuple(
+            None for _ in self._sieves
+        )
+        upper = tuple(record.gradation_upper) if record.gradation_upper else tuple(
+            None for _ in self._sieves
+        )
+
+        # Header label with mix code + applicable code (Phase 6 source tag)
+        src = record.applicable_code or "—"
+        self._mix_code_label.setText(
+            f"Mix: {record.mix_code} — {record.full_name}    •    Spec: {src}"
+        )
+
+        # Placeholder warning banner (F2)
+        if (record.status or "").strip() == "placeholder_editable":
+            self._warning_banner.setText(
+                f"⚠ Spec limits and gradation envelope for {record.mix_code} "
+                f"are not IRC-verified. Results are indicative — confirm against "
+                f"the relevant IRC clause before adoption. (Source: "
+                f"{record.applicable_code or 'unverified'})"
+            )
+            self._warning_banner.setVisible(True)
+        else:
+            self._warning_banner.setVisible(False)
+
+        # Rebuild table with new sieve count
+        headers = ["IS Sieve (mm)"] + list(self._aggs) + ["MoRTH Lower", "MoRTH Upper"]
+        self.table.setRowCount(len(self._sieves))
+        self.table.setColumnCount(len(headers))
+        self.table.setHorizontalHeaderLabels(headers)
+        for r, sieve in enumerate(self._sieves):
+            _set_text(self.table, r, 0, f"{sieve:g}")
+            for ci, _name in enumerate(self._aggs, start=1):
+                # Clear per-aggregate cells — demo values are DBM-II-shaped
+                self.table.setItem(r, ci, QTableWidgetItem(""))
+            lo = lower[r] if r < len(lower) else None
+            hi = upper[r] if r < len(upper) else None
+            if lo is not None:
+                _set_num(self.table, r, len(self._aggs) + 1, float(lo), decimals=0)
+            else:
+                self.table.setItem(r, len(self._aggs) + 1, QTableWidgetItem(""))
+            if hi is not None:
+                _set_num(self.table, r, len(self._aggs) + 2, float(hi), decimals=0)
+            else:
+                self.table.setItem(r, len(self._aggs) + 2, QTableWidgetItem(""))
+
     def collect(self) -> GradationInput:
-        blend = {n: self.blend_spins[n].value() for n in AGGS}
+        blend = {n: self.blend_spins[n].value() for n in self._aggs}
         pass_pct = {}
-        for ci, name in enumerate(AGGS, start=1):
-            pass_pct[name] = tuple(_get_num(self.table, r, ci) for r in range(len(SIEVES)))
-        spec_low = tuple(_get_num(self.table, r, len(AGGS) + 1) for r in range(len(SIEVES)))
-        spec_up = tuple(_get_num(self.table, r, len(AGGS) + 2) for r in range(len(SIEVES)))
+        for ci, name in enumerate(self._aggs, start=1):
+            pass_pct[name] = tuple(_get_num(self.table, r, ci) for r in range(len(self._sieves)))
+        spec_low = tuple(_get_num(self.table, r, len(self._aggs) + 1) for r in range(len(self._sieves)))
+        spec_up = tuple(_get_num(self.table, r, len(self._aggs) + 2) for r in range(len(self._sieves)))
         return GradationInput(
-            sieve_sizes_mm=SIEVES,
+            sieve_sizes_mm=tuple(self._sieves),
             pass_pct=pass_pct,
             blend_ratios=blend,
             spec_lower=spec_low,
@@ -559,6 +647,14 @@ class InputsPanel(QWidget):
         self.tabs.addTab(self.tab_sf, "5. Stability / Flow")
         self.tabs.addTab(self.tab_material, "6. Material Calc")
         layout.addWidget(self.tabs, stretch=1)
+
+    def set_mix_type(self, mix_type_key: str) -> None:
+        """Drive the inputs panel from a selected mix type (F1).
+
+        Forwards to the gradation tab which rebuilds its sieve set,
+        envelope and placeholder warning from MIX_TYPES.
+        """
+        self.tab_gradation.set_mix_type(mix_type_key)
 
     def collect_all(self):
         grad = self.tab_gradation.collect()

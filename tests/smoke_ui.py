@@ -27,8 +27,13 @@ try:
             w._on_new_project()
             w.project_form.work_name.setText("Smoke Test")
             w.project_form.client.setText("QA")
+            # Phase-9 stabilization (F4): explicit mix_type required.
+            _mix_idx = w.project_form.mix_type.findData("DBM-II")
+            if _mix_idx >= 0:
+                w.project_form.mix_type.setCurrentIndex(_mix_idx)
             w.project_form._on_save()
             lines.append(f"project id: {w._current_project_id}")
+            w.inputs.set_mix_type("DBM-II")
             w._on_compute()
             r = w._last_result
             lines.append(f"OBC%: {r.obc.obc_pct:.4f}")

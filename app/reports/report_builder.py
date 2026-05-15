@@ -387,11 +387,21 @@ def build_combined_report(
         # section pointing to the standalone mix-design file generated next
         # to the combined doc.
         mix_path = out_path.with_name(f"{out_path.stem}_MixDesign.docx")
+        # F4: refuse to render a mix-design report under the hidden DBM-II
+        # default. If a live mix-design result is being included, the caller
+        # must supply mix_type_key explicitly.
+        if not ctx.mix_type_key:
+            raise ValueError(
+                "Combined report includes a live mix-design result but "
+                "ctx.mix_type_key is empty. Set ReportContext.mix_type_key "
+                "to the project's mix type (e.g. 'BC-II') before calling "
+                "build_combined_report()."
+            )
         word_report.build_mix_design_docx(
             mix_path,
             word_report.ReportContext(
                 project_title=ctx.project_title,
-                mix_type_key=(ctx.mix_type_key or "DBM-II"),
+                mix_type_key=ctx.mix_type_key,
                 work_name=ctx.work_name,
                 work_order_no=ctx.work_order_no,
                 work_order_date=ctx.work_order_date,
@@ -418,10 +428,11 @@ def build_combined_report(
               "the full Bituminous Mix Design section. Design basis: MoRTH "
               "Section 500 / IRC:111.",
               size=10)
-        # OBC summary inline so the combined doc is self-explanatory
+        # OBC summary inline so the combined doc is self-explanatory.
+        # F4: mix_type_key is guaranteed non-empty here (raised above).
         obc = mix_result_live.obc
-        spec_name = MIX_SPECS.get(ctx.mix_type_key or "DBM-II")
-        spec_label = spec_name.name if spec_name else (ctx.mix_type_key or "—")
+        spec_name = MIX_SPECS.get(ctx.mix_type_key)
+        spec_label = spec_name.name if spec_name else ctx.mix_type_key
         add_kv_table(doc, (
             ("Mix Type", spec_label),
             ("Optimum Bitumen Content (OBC)", f"{obc.obc_pct:.2f} %"),

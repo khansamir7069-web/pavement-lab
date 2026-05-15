@@ -1,5 +1,5 @@
 MainWindow constructed OK
-project id: 8
+project id: 18
 OBC%: 4.2540
 Gsb: 2.7556
 Compliance: PASS
