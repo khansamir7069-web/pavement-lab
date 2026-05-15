@@ -8,13 +8,25 @@ Scope of this module (intentionally minimal):
 Full mechanistic fatigue & rutting analysis (IITPAVE) is NOT included here;
 fields are reserved so future phases can fill them in without breaking the
 public dataclass shape.
+
+Phase 15 P3 (additive): ``StructuralResult`` carries an optional
+``mechanistic_validation`` reference so reports can render a real
+``MechanisticValidationSummary`` (Phase 14) when one has been computed
+for the project. The legacy ``fatigue_check`` / ``rutting_check`` string
+fields stay as the fallback rendering path.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Tuple
+from typing import TYPE_CHECKING, Optional, Tuple
 
 from .code_refs import CodeRef
+
+if TYPE_CHECKING:
+    # TYPE_CHECKING-only import keeps ``app.core.structural_design`` free
+    # of a runtime dependency on the mechanistic-validation package
+    # (preserves the existing import order in ``app.core.__init__``).
+    from .mechanistic_validation import MechanisticValidationSummary
 
 REFERENCES: Tuple[CodeRef, ...] = (
     CodeRef("IRC:37-2018", "cl. 4.6",  "Cumulative design traffic (MSA)"),
@@ -56,9 +68,14 @@ class StructuralResult:
     subgrade_mr_mpa: float
     composition: Tuple[PavementLayer, ...]
     total_pavement_thickness_mm: float
-    fatigue_check: str = ""        # filled with placeholder until mech. analysis added
-    rutting_check: str = ""
+    fatigue_check: str = ""        # legacy string placeholder (Phase 4)
+    rutting_check: str = ""        # legacy string placeholder (Phase 4)
     notes: str = ""
+    # Phase 15 P3 — optional richer surface. When set, the structural
+    # Word section renders the Phase-14 mechanistic helper instead of
+    # the legacy string fields. Default None preserves Phase-4 behaviour
+    # for every existing project.
+    mechanistic_validation: "Optional[MechanisticValidationSummary]" = None
 
 
 # ---------------------------------------------------------------------------

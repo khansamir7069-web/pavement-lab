@@ -144,14 +144,45 @@ def write_structural_section(
         "adoption for construction."
     )
 
-    # Mechanistic checks (placeholder until IITPAVE is integrated)
+    # Mechanistic checks — Phase 15 P3:
+    #   * If a Phase-14 MechanisticValidationSummary is attached, render
+    #     the rich mechanistic section here so the fatigue + rutting
+    #     verdicts appear with the IRC:37 cl. 6.4 calibration table.
+    #   * Otherwise fall back to the legacy string-status table so old
+    #     persisted projects (and any compute path that hasn't run the
+    #     mechanistic validation yet) keep working unchanged.
     add_heading(doc, "6. Mechanistic Checks (IITPAVE)", level=2)
-    add_table(doc, ["Check", "Status"], [
-        ["Bituminous-layer fatigue (IRC:37-2018 cl. 6.4.1)",
-         result.fatigue_check or "Not performed."],
-        ["Subgrade rutting (IRC:37-2018 cl. 6.4.2)",
-         result.rutting_check or "Not performed."],
-    ])
+    if result.mechanistic_validation is not None:
+        # Avoid a circular import at module-load time.
+        from .mechanistic_report import (
+            MechanisticReportContext,
+            write_mechanistic_section,
+        )
+        write_mechanistic_section(
+            doc,
+            MechanisticReportContext(
+                project_title=ctx.project_title,
+                work_name=ctx.work_name,
+                work_order_no=ctx.work_order_no,
+                work_order_date=ctx.work_order_date,
+                client=ctx.client, agency=ctx.agency,
+                submitted_by=ctx.submitted_by,
+                lab_name=ctx.lab_name,
+                report_date=ctx.report_date,
+            ),
+            result.mechanistic_validation,
+            # Header for the standalone variant is suppressed — this is
+            # already an embedded sub-section under "6. Mechanistic
+            # Checks" inside the structural report.
+            include_header=False,
+        )
+    else:
+        add_table(doc, ["Check", "Status"], [
+            ["Bituminous-layer fatigue (IRC:37-2018 cl. 6.4.1)",
+             result.fatigue_check or "Not performed."],
+            ["Subgrade rutting (IRC:37-2018 cl. 6.4.2)",
+             result.rutting_check or "Not performed."],
+        ])
 
     # Notes
     if result.notes:
