@@ -210,6 +210,7 @@ def _rehydrate_condition(row) -> "ConditionSurveyResult | None":
             area_m2=float(r.get("area_m2") or 0),
             count=int(r.get("count") or 0),
             notes=r.get("notes", "") or "",
+            image_paths=tuple(r.get("image_paths") or ()),
         )
         for r in (d.get("records") or ())
     )

@@ -147,7 +147,18 @@ class Database:
             if not p:
                 return False
             s.delete(p)
-            return True
+        # Best-effort filesystem cleanup of the project's image evidence
+        # tree. Lazy import to avoid hard-coupling the DB layer to the
+        # condition-survey pipeline at module load. Outcome does not
+        # affect the return value — DB delete is the contract.
+        try:
+            from app.core.condition_survey.image_pipeline import (
+                delete_project_images,
+            )
+            delete_project_images(project_id)
+        except Exception:
+            pass
+        return True
 
     def set_module_status(self, project_id: int, module: str, status: str) -> None:
         """Update modules_json: {module_key: 'complete' | 'in_progress' | 'empty'}."""

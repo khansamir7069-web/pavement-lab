@@ -61,6 +61,7 @@ from .common import (
     PlaceholderBanner,
     styled_button,
 )
+from .distress_images_dialog import DistressImagesDialog
 
 
 def _spin(value: float, lo: float, hi: float, step: float,
@@ -181,7 +182,7 @@ class ConditionSurveyPanel(QWidget):
         tl.addWidget(QLabel("<b>Distress Records</b>  "
                             "(Add a row per distress observed; severity drives the PCI deduct)"))
         headers = ["Distress Type", "Severity", "Length (m)",
-                   "Area (m^2)", "Count", "Notes"]
+                   "Area (m^2)", "Count", "Notes", "Images"]
         self.table = QTableWidget(0, len(headers))
         self.table.setHorizontalHeaderLabels(headers)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
@@ -292,7 +293,8 @@ class ConditionSurveyPanel(QWidget):
     # ---------- row management ---------------------------------------------
     def _add_row(self, distress_code: str = "cracking", severity: str = "low",
                  length_m: float = 0.0, area_m2: float = 0.0,
-                 count: int = 0, notes: str = "") -> None:
+                 count: int = 0, notes: str = "",
+                 image_paths: tuple[str, ...] = ()) -> None:
         r = self.table.rowCount()
         self.table.insertRow(r)
 
@@ -322,6 +324,18 @@ class ConditionSurveyPanel(QWidget):
         ed_notes = QLineEdit(notes)
         self.table.setCellWidget(r, 5, ed_notes)
 
+        # Per-distress image attachment button — stores its own
+        # image_paths list on the widget itself so _collect() doesn't
+        # need a parallel data structure that can drift out of sync
+        # with row insertion / removal.
+        btn_img = QPushButton()
+        btn_img._image_paths = list(image_paths)  # type: ignore[attr-defined]
+        btn_img.setText(f"{len(btn_img._image_paths)} image(s)")  # type: ignore[attr-defined]
+        btn_img.clicked.connect(
+            lambda _checked=False, b=btn_img: self._on_open_distress_images(b)
+        )
+        self.table.setCellWidget(r, 6, btn_img)
+
     def _remove_row(self) -> None:
         r = self.table.currentRow()
         if r >= 0:
@@ -337,8 +351,10 @@ class ConditionSurveyPanel(QWidget):
             sp_a = self.table.cellWidget(r, 3)
             sp_c = self.table.cellWidget(r, 4)
             ed_n = self.table.cellWidget(r, 5)
+            btn_img = self.table.cellWidget(r, 6)
             if cb_t is None or cb_s is None:
                 continue
+            row_imgs = tuple(getattr(btn_img, "_image_paths", ()) or ())
             records.append(DistressRecord(
                 distress_type=cb_t.currentData() or "cracking",
                 severity=cb_s.currentData() or "low",
@@ -346,6 +362,7 @@ class ConditionSurveyPanel(QWidget):
                 area_m2=float(sp_a.value()) if sp_a else 0.0,
                 count=int(sp_c.value()) if sp_c else 0,
                 notes=ed_n.text() if ed_n else "",
+                image_paths=row_imgs,
             ))
         # Image evidence: prefer the gallery model when present. Fall
         # back to parsing the (read-only) mirror textarea so callers
@@ -503,6 +520,35 @@ class ConditionSurveyPanel(QWidget):
         folder.mkdir(parents=True, exist_ok=True)
         _open_in_file_browser(folder)
 
+    def _on_open_distress_images(self, btn: QPushButton) -> None:
+        """Open the per-distress image dialog for the row owning ``btn``."""
+        if self._project_id is None:
+            QMessageBox.warning(self, "No project",
+                "Create or load a project before attaching images.")
+            return
+        # Resolve the distress label for the dialog title from the row's
+        # type combobox (the panel doesn't track row->label outside the
+        # table widget).
+        row = -1
+        for r in range(self.table.rowCount()):
+            if self.table.cellWidget(r, 6) is btn:
+                row = r
+                break
+        if row < 0:
+            return
+        cb_t = self.table.cellWidget(row, 0)
+        code = cb_t.currentData() if cb_t is not None else "cracking"
+        label = _DISTRESS_LABELS.get(code, code)
+        dlg = DistressImagesDialog(
+            project_id=self._project_id,
+            distress_label=label,
+            initial_paths=tuple(getattr(btn, "_image_paths", ()) or ()),
+            parent=self,
+        )
+        dlg.exec()
+        btn._image_paths = list(dlg.image_paths())  # type: ignore[attr-defined]
+        btn.setText(f"{len(btn._image_paths)} image(s)")  # type: ignore[attr-defined]
+
     # ---------- project binding --------------------------------------------
     def set_project(self, pid: int | None, name: str = "") -> None:
         self._project_id = pid
@@ -542,6 +588,7 @@ class ConditionSurveyPanel(QWidget):
                         area_m2=float(rec.get("area_m2") or 0),
                         count=int(rec.get("count") or 0),
                         notes=rec.get("notes", "") or "",
+                        image_paths=tuple(rec.get("image_paths") or ()),
                     )
                 # Image evidence reload — restore the saved relative
                 # paths verbatim (including any that no longer resolve

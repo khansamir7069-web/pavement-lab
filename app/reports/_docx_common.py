@@ -169,6 +169,49 @@ def get_code_record(code_id: str):
     return get_code(code_id)
 
 
+def add_image_grid(
+    doc: Document,
+    image_paths: Iterable[str],
+    *,
+    base_dir: Path,
+    cols: int = 2,
+    width_in: float = 3.1,
+) -> int:
+    """Render IMAGES_DIR-relative paths as a centered N-column python-docx
+    table of pictures. Missing files are skipped silently (the panel
+    already flags them).
+
+    Returns the number of images actually embedded so callers can decide
+    whether to render a heading or an empty-state note.
+    """
+    resolved: list[Path] = []
+    for rel in image_paths or ():
+        if not rel:
+            continue
+        p = base_dir / Path(rel)
+        if p.is_file():
+            resolved.append(p)
+    if not resolved:
+        return 0
+    cols = max(1, int(cols))
+    rows = (len(resolved) + cols - 1) // cols
+    t = doc.add_table(rows=rows, cols=cols)
+    t.alignment = WD_TABLE_ALIGNMENT.CENTER
+    for idx, p in enumerate(resolved):
+        r, c = divmod(idx, cols)
+        cell = t.rows[r].cells[c]
+        cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
+        para = cell.paragraphs[0]
+        para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run = para.add_run()
+        try:
+            run.add_picture(str(p), width=Inches(width_in))
+        except Exception:
+            # Corrupt / unreadable file — silently skip cell content.
+            continue
+    return len(resolved)
+
+
 def add_signature_block(doc: Document) -> None:
     doc.add_paragraph()
     doc.add_paragraph()

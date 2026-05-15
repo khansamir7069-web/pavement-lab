@@ -45,6 +45,10 @@ class DistressRecord:
     area_m2: float = 0.0        # used iff DISTRESS_TYPES[t].extent_unit == area_m2
     count: int = 0              # used iff DISTRESS_TYPES[t].extent_unit == count
     notes: str = ""
+    # Phase 11 step 3: per-distress evidence (IMAGES_DIR-relative POSIX
+    # paths from image_pipeline.attach_image). Engine ignores the field;
+    # report renderer + UI dialog consume it.
+    image_paths: Tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

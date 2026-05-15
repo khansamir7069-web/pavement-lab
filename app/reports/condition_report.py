@@ -13,12 +13,14 @@ from pathlib import Path
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 
+from app.config import IMAGES_DIR
 from app.core import ConditionSurveyResult, DISTRESS_TYPES
 from app.core.condition_survey import REFERENCES as ENGINE_REFS
 
 from ._docx_common import (
     add_code_references,
     add_heading,
+    add_image_grid,
     add_kv_table,
     add_note,
     add_p,
@@ -142,11 +144,40 @@ def write_condition_section(
         add_table(doc, ["Distress", "Severity", "Treatment (placeholder)",
                         "Reference"], rehab_rows)
 
+    # ---- Image Evidence (Phase 11 step 3) ------------------------------
+    add_heading(doc, "Image Evidence", level=2)
+    total_embedded = 0
+    if inp.image_paths:
+        add_heading(doc, "Survey-wide", level=3)
+        embedded = add_image_grid(doc, inp.image_paths,
+                                  base_dir=IMAGES_DIR, cols=2, width_in=3.1)
+        total_embedded += embedded
+        if embedded == 0:
+            add_p(doc, "(Referenced files not found on disk.)",
+                  italic=True, size=10)
+    # Per-distress sub-grids — iterate the original records so we keep
+    # one section per captured record (the breakdown is per-row too).
+    for idx, rec in enumerate(inp.records, start=1):
+        if not rec.image_paths:
+            continue
+        t = DISTRESS_TYPES.get(rec.distress_type)
+        label = t.label if t else rec.distress_type
+        add_heading(doc,
+                    f"Distress {idx} - {label} ({rec.severity.title()})",
+                    level=3)
+        embedded = add_image_grid(doc, rec.image_paths,
+                                  base_dir=IMAGES_DIR, cols=2, width_in=2.4)
+        total_embedded += embedded
+        if embedded == 0:
+            add_p(doc, "(Referenced files not found on disk.)",
+                  italic=True, size=10)
+    if total_embedded == 0 and not inp.image_paths and not any(
+            r.image_paths for r in inp.records):
+        add_p(doc, "No image evidence attached.", italic=True, size=10)
+
     # ---- Reserved-for-future placeholders ------------------------------
     add_heading(doc, "Reserved for Future Expansion", level=3)
     add_table(doc, ["Item", "Status"], [
-        ["Image-based distress detection",
-            "Not provided" if not inp.image_paths else f"{len(inp.image_paths)} image(s)"],
         ["AI-assisted classification hint",
             inp.ai_classification_hint or "Not provided"],
         ["GIS geometry (GeoJSON)",
