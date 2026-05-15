@@ -26,6 +26,11 @@ from .condition_report import (
     build_condition_docx,
     write_condition_section,
 )
+from .mechanistic_report import (
+    MechanisticReportContext,
+    build_mechanistic_docx,
+    write_mechanistic_section,
+)
 from .report_builder import (
     CombinedReportContext,
     build_combined_report,
@@ -53,4 +58,7 @@ __all__ = [
     "ConditionReportContext",
     "build_condition_docx",
     "write_condition_section",
+    "MechanisticReportContext",
+    "build_mechanistic_docx",
+    "write_mechanistic_section",
 ]
