@@ -31,6 +31,11 @@ from .mechanistic_report import (
     build_mechanistic_docx,
     write_mechanistic_section,
 )
+from .rehab_report import (
+    RehabReportContext,
+    build_rehab_docx,
+    write_rehab_section,
+)
 from .report_builder import (
     CombinedReportContext,
     build_combined_report,
@@ -61,4 +66,7 @@ __all__ = [
     "MechanisticReportContext",
     "build_mechanistic_docx",
     "write_mechanistic_section",
+    "RehabReportContext",
+    "build_rehab_docx",
+    "write_rehab_section",
 ]

@@ -77,6 +77,10 @@ from .condition_report import (
     ConditionReportContext,
     write_condition_section,
 )
+from .rehab_report import (
+    RehabReportContext,
+    write_rehab_section,
+)
 from .structural_report import (
     StructuralReportContext,
     write_structural_section,
@@ -407,6 +411,28 @@ def build_combined_report(
     if condition:
         toc_rows.append(["Pavement Condition Survey",
                          "ASTM D6433 / IRC:82-1982 (placeholder PCI)"])
+    # Phase 12 synthesis — derived on-demand from the rehydrated
+    # condition + traffic + maintenance results. Not persisted (no DB
+    # schema change in Phase 15 P2).
+    rehab_synthesis = None
+    if condition is not None:
+        from app.core import (
+            RecommendationContext,
+            compute_rehab_recommendations,
+        )
+        rehab_synthesis = compute_rehab_recommendations(
+            RecommendationContext(
+                condition=condition,
+                traffic=traffic,
+                overlay_design=overlay,
+                cold_mix_design=cold_mix,
+                micro_surfacing_design=micro,
+            )
+        )
+        toc_rows.append([
+            "Rehabilitation Recommendations",
+            "IRC:82-1982 / IRC:81-1997 / IRC:115 / IRC:SP:81 / IRC:SP:101",
+        ])
 
     from ._docx_common import add_table
     add_table(doc, ["Section", "Governing Reference"], toc_rows)
@@ -561,6 +587,21 @@ def build_combined_report(
         )
         write_condition_section(doc, cs_ctx, condition, include_header=True)
         included.append("Pavement Condition Survey")
+
+    # ---- Rehabilitation Recommendations (Phase 12 synthesis) ----
+    if rehab_synthesis is not None:
+        doc.add_page_break()
+        rh_ctx = RehabReportContext(
+            project_title=ctx.project_title,
+            work_name=ctx.work_name,
+            work_order_no=ctx.work_order_no,
+            work_order_date=ctx.work_order_date,
+            client=ctx.client, agency=ctx.agency,
+            submitted_by=ctx.submitted_by,
+            lab_name=ctx.lab_name, report_date=ctx.report_date,
+        )
+        write_rehab_section(doc, rh_ctx, rehab_synthesis, include_header=True)
+        included.append("Rehabilitation Recommendations")
 
     add_signature_block(doc)
     doc.save(out_path)
