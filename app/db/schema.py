@@ -80,6 +80,9 @@ class Project(Base):
     condition_surveys: Mapped[list["ConditionSurvey"]] = relationship(
         back_populates="project", cascade="all, delete-orphan"
     )
+    mechanistic_validations: Mapped[list["MechanisticValidation"]] = relationship(
+        back_populates="project", cascade="all, delete-orphan"
+    )
 
 
 class MixDesign(Base):
@@ -215,6 +218,34 @@ class ConditionSurvey(Base):
     computed_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
     project: Mapped[Project] = relationship(back_populates="condition_surveys")
+
+
+class MechanisticValidation(Base):
+    """Phase-15 P4: optional persistence of a Phase-14
+    ``MechanisticValidationSummary``.
+
+    Additive only — no existing table touched. The summary is stored as
+    a JSON blob to keep the schema stable as Phase-13/14 surfaces
+    evolve; the columns alongside the JSON are denormalized scalars
+    that let queries / dashboards filter without parsing the blob.
+    """
+    __tablename__ = "mechanistic_validations"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False)
+    inputs_json: Mapped[Optional[str]] = mapped_column(JSON)
+    summary_json: Mapped[Optional[str]] = mapped_column(JSON)
+    refused: Mapped[Optional[bool]] = mapped_column(Boolean)
+    is_placeholder: Mapped[Optional[bool]] = mapped_column(Boolean)
+    fatigue_verdict: Mapped[Optional[str]] = mapped_column(String(20))     # PASS | FAIL | None ("refused")
+    rutting_verdict: Mapped[Optional[str]] = mapped_column(String(20))
+    fatigue_life_msa: Mapped[Optional[float]] = mapped_column(Float)
+    rutting_life_msa: Mapped[Optional[float]] = mapped_column(Float)
+    design_msa: Mapped[Optional[float]] = mapped_column(Float)
+    refused_reason: Mapped[Optional[str]] = mapped_column(Text)
+    notes: Mapped[Optional[str]] = mapped_column(Text)
+    computed_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+    project: Mapped[Project] = relationship(back_populates="mechanistic_validations")
 
 
 class User(Base):

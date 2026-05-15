@@ -21,6 +21,7 @@ from .schema import (
     MaintenanceDesign,
     Material,
     MaterialQuantityDesign,
+    MechanisticValidation,
     MixDesign,
     Project,
     Report,
@@ -416,6 +417,49 @@ class Database:
                 select(ConditionSurvey)
                 .where(ConditionSurvey.project_id == project_id)
                 .order_by(ConditionSurvey.computed_at.desc())
+                .limit(1)
+            )
+            return s.scalars(stmt).first()
+
+    # ---- Mechanistic validation (Phase 15 P4) --------------------------
+    def save_mechanistic_validation(
+        self, *, project_id: int, summary, inputs=None,
+    ) -> MechanisticValidation:
+        """Persist a Phase-14 ``MechanisticValidationSummary``.
+
+        ``inputs`` is optional — when supplied it is serialised
+        alongside the summary so the report layer can reproduce the
+        exact validation that was run. Cascade-on-project-delete is
+        wired via the ORM relationship; no extra cleanup needed.
+        """
+        summary_dict = _to_json_safe(summary)
+        inputs_dict = _to_json_safe(inputs) if inputs is not None else None
+        with self.session() as s:
+            row = MechanisticValidation(
+                project_id=project_id,
+                inputs_json=json.dumps(inputs_dict) if inputs_dict is not None else None,
+                summary_json=json.dumps(summary_dict),
+                refused=bool(getattr(summary, "refused", False)),
+                is_placeholder=bool(getattr(summary, "is_placeholder", True)),
+                fatigue_verdict=getattr(summary.fatigue, "verdict", None),
+                rutting_verdict=getattr(summary.rutting, "verdict", None),
+                fatigue_life_msa=getattr(summary.fatigue, "cumulative_life_msa", None),
+                rutting_life_msa=getattr(summary.rutting, "cumulative_life_msa", None),
+                design_msa=float(getattr(summary.fatigue, "design_msa", 0.0)),
+                refused_reason=getattr(summary, "refused_reason", "") or "",
+                notes=getattr(summary, "notes", "") or "",
+            )
+            s.add(row); s.flush()
+            return row
+
+    def latest_mechanistic_validation(
+        self, project_id: int,
+    ) -> MechanisticValidation | None:
+        with self.session() as s:
+            stmt = (
+                select(MechanisticValidation)
+                .where(MechanisticValidation.project_id == project_id)
+                .order_by(MechanisticValidation.computed_at.desc())
                 .limit(1)
             )
             return s.scalars(stmt).first()
