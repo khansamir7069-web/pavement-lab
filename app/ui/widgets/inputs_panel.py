@@ -37,11 +37,12 @@ from app.core import (
     GmmSampleRaw,
     GradationInput,
     MaterialCalcInput,
+    MIX_SPECS,
     MIX_TYPES,
     StabilityFlowInput,
     StabilitySpecimen,
 )
-from .common import PageHeader, styled_button
+from .common import PageHeader, PlaceholderBanner, styled_button
 
 
 # Demo defaults are DBM-II-shaped — used only as fallback when no mix_type
@@ -112,13 +113,7 @@ class GradationTab(QWidget):
         self._mix_code_label.setStyleSheet(
             "color:#1f3a68; font-size:10pt; font-weight:bold;"
         )
-        self._warning_banner = QLabel("")
-        self._warning_banner.setWordWrap(True)
-        self._warning_banner.setStyleSheet(
-            "background:#fff4e0; color:#8a5a00; padding:8px 10px;"
-            "border:1px solid #f0c97a; border-radius:4px; font-size:10pt;"
-        )
-        self._warning_banner.setVisible(False)
+        self._warning_banner = PlaceholderBanner()
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(12, 12, 12, 12)
@@ -184,22 +179,28 @@ class GradationTab(QWidget):
         )
 
         # Header label with mix code + applicable code (Phase 6 source tag)
+        # + compaction blows from MIX_SPECS (F3 — Phase-9 audit close-out).
         src = record.applicable_code or "—"
+        spec = MIX_SPECS.get(record.mix_code)
+        blows_txt = (
+            f"    •    Compaction: {spec.compaction_blows_each_face} blows/face"
+            if spec else ""
+        )
         self._mix_code_label.setText(
-            f"Mix: {record.mix_code} — {record.full_name}    •    Spec: {src}"
+            f"Mix: {record.mix_code} — {record.full_name}"
+            f"    •    Spec: {src}{blows_txt}"
         )
 
         # Placeholder warning banner (F2)
         if (record.status or "").strip() == "placeholder_editable":
-            self._warning_banner.setText(
+            self._warning_banner.set_message(
                 f"⚠ Spec limits and gradation envelope for {record.mix_code} "
                 f"are not IRC-verified. Results are indicative — confirm against "
                 f"the relevant IRC clause before adoption. (Source: "
                 f"{record.applicable_code or 'unverified'})"
             )
-            self._warning_banner.setVisible(True)
         else:
-            self._warning_banner.setVisible(False)
+            self._warning_banner.set_message("", visible=False)
 
         # Rebuild table with new sieve count
         headers = ["IS Sieve (mm)"] + list(self._aggs) + ["MoRTH Lower", "MoRTH Upper"]

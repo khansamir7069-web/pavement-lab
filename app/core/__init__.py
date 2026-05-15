@@ -21,7 +21,7 @@ from .stability_flow import (
     compute_stability_flow,
 )
 from .marshall import MarshallSummary, MarshallRow, build_marshall_summary
-from .obc import compute_obc, properties_at_obc, OBCResult
+from .obc import compute_obc, properties_at_obc, OBCResult, spec_target_air_voids
 from .compliance import (
     MixSpec,
     MixTypeRecord,
@@ -94,6 +94,11 @@ from .condition_survey import (
     ConditionSurveyResult,
     PerDistressBreakdown,
     RehabRecommendation,
+    PCICalibration,
+    DEFAULT_CALIBRATION as PCI_DEFAULT_CALIBRATION,
+    get_calibration as get_pci_calibration,
+    set_calibration as set_pci_calibration,
+    reset_calibration as reset_pci_calibration,
     compute_condition_survey,
     condition_category,
     recommend_rehab,
@@ -134,6 +139,7 @@ __all__ = [
     "compute_obc",
     "properties_at_obc",
     "OBCResult",
+    "spec_target_air_voids",
     "MixSpec",
     "MixTypeRecord",
     "ComplianceResult",
@@ -205,6 +211,11 @@ __all__ = [
     "ConditionSurveyResult",
     "PerDistressBreakdown",
     "RehabRecommendation",
+    "PCICalibration",
+    "PCI_DEFAULT_CALIBRATION",
+    "get_pci_calibration",
+    "set_pci_calibration",
+    "reset_pci_calibration",
     "compute_condition_survey",
     "condition_category",
     "recommend_rehab",

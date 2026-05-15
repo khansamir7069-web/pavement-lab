@@ -30,7 +30,7 @@ from app.core import (
     ldf_preset,
     vdf_preset,
 )
-from .common import Card, PageHeader, styled_button
+from .common import Card, InfoBanner, PageHeader, styled_button
 
 
 ROAD_CATEGORIES = (
@@ -88,10 +88,7 @@ class TrafficPanel(QWidget):
         bl = QVBoxLayout(body)
         bl.setContentsMargins(20, 16, 20, 16); bl.setSpacing(12)
 
-        self.proj_banner = QLabel("")
-        self.proj_banner.setStyleSheet(
-            "background:#eaf0fa; color:#1f3a68; padding:8px 12px; "
-            "border:1px solid #c9d6ec; border-radius:4px;")
+        self.proj_banner = InfoBanner("")
         bl.addWidget(self.proj_banner)
 
         # Inputs

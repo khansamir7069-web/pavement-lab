@@ -4,12 +4,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Mapping
 
-from .compliance import ComplianceResult, check_compliance
+from .compliance import ComplianceResult, MIX_SPECS, check_compliance
 from .gmb import GmbInput, GmbResult, compute_gmb
 from .gmm import GmmInput, GmmResult, compute_gmm
 from .gradation import GradationInput, GradationResult, compute_gradation
 from .marshall import MarshallSummary, build_marshall_summary
-from .obc import OBCResult, properties_at_obc
+from .obc import OBCResult, properties_at_obc, spec_target_air_voids
 from .specific_gravity import (
     BitumenSGInput,
     CoarseAggSGInput,
@@ -105,7 +105,12 @@ def compute_mix_design(inp: MixDesignInput) -> MixDesignResult:
 
     design_pbs = gmm_in.design_pb_pct
     summary = build_marshall_summary(design_pbs, gmm_map, gmb_map, sf_map, gsb)
-    obc = properties_at_obc(summary)
+    # F5: drive the target air voids from the selected mix spec midpoint
+    # so the OBC matches the spec's allowed band. Falls back to the
+    # legacy 4.0 constant when no recognised mix spec is set.
+    mix_spec = MIX_SPECS.get(inp.project.mix_type) if inp.project else None
+    target_av = spec_target_air_voids(mix_spec)
+    obc = properties_at_obc(summary, target_air_voids=target_av)
     comp = check_compliance(
         inp.project.mix_type,
         stability_kn=obc.stability_at_obc_kn,

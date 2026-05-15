@@ -21,6 +21,7 @@ from .distress_types import (
     SEVERITY_LEVELS,
     SEVERITY_WEIGHTS,
     extent_factor,
+    get_calibration,
 )
 from .rehab_recommendations import RehabRecommendation, recommend_rehab
 
@@ -157,12 +158,18 @@ def compute_condition_survey(inp: ConditionSurveyInput) -> ConditionSurveyResult
             recommendation=recommend_rehab(rec.distress_type, rec.severity),
         ))
     pci = max(0.0, 100.0 - total)
+    cal = get_calibration()
+    note = (
+        f"Calibration: {cal.label}. " + PLACEHOLDER_NOTE
+        if cal.is_placeholder else
+        f"Calibration: {cal.label}."
+    )
     return ConditionSurveyResult(
         inputs=inp,
         pci_score=round(pci, 2),
         condition_category=condition_category(pci),
         total_deduct=round(total, 2),
         breakdown=tuple(rows),
-        is_placeholder=RECALIBRATE_ME,
-        notes=PLACEHOLDER_NOTE,
+        is_placeholder=cal.is_placeholder,
+        notes=note,
     )

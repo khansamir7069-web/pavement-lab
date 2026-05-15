@@ -133,6 +133,20 @@ def add_note(doc: Document, text: str) -> None:
     r.font.color.rgb = RGBColor(0x55, 0x5B, 0x6E)
 
 
+def add_placeholder_banner(doc: Document, text: str) -> None:
+    """Bold orange-toned warning paragraph for placeholder/un-IRC-verified
+    content. Single source of truth — every report uses this helper.
+    """
+    if not text:
+        return
+    para = doc.add_paragraph()
+    para.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    run = para.add_run(text)
+    run.bold = True
+    run.font.size = Pt(10)
+    run.font.color.rgb = RGBColor(0x8A, 0x5A, 0x00)
+
+
 def add_code_references(doc: Document, refs, heading: str = "References") -> None:
     """Uniform citation block rendered from a tuple of CodeRef objects.
 

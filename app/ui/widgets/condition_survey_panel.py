@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMessageBox,
+    QPlainTextEdit,
     QPushButton,
     QScrollArea,
     QSpinBox,
@@ -37,7 +38,14 @@ from app.core import (
     DistressRecord,
     compute_condition_survey,
 )
-from .common import Card, PageHeader, styled_button
+from .common import (
+    Card,
+    FutureExpansionBanner,
+    InfoBanner,
+    PageHeader,
+    PlaceholderBanner,
+    styled_button,
+)
 
 
 def _spin(value: float, lo: float, hi: float, step: float,
@@ -99,21 +107,14 @@ class ConditionSurveyPanel(QWidget):
         bl.setContentsMargins(20, 16, 20, 16); bl.setSpacing(12)
 
         # Placeholder warning banner (always shown — weights uncalibrated)
-        self.lbl_placeholder = QLabel(
+        self.lbl_placeholder = PlaceholderBanner(
             "[PLACEHOLDER] PCI weights, severity multipliers and rehab "
             "recommendations are uncalibrated foundation values. Confirm "
             "against ASTM D6433 / IRC:82 before adopting any verdict."
         )
-        self.lbl_placeholder.setWordWrap(True)
-        self.lbl_placeholder.setStyleSheet(
-            "background:#fff4e0; color:#8a5a00; padding:8px 10px; "
-            "border:1px solid #f0c97a; border-radius:4px; font-size:10pt;")
         bl.addWidget(self.lbl_placeholder)
 
-        self.proj_banner = QLabel("")
-        self.proj_banner.setStyleSheet(
-            "background:#eaf0fa; color:#1f3a68; padding:8px 12px; "
-            "border:1px solid #c9d6ec; border-radius:4px;")
+        self.proj_banner = InfoBanner("")
         bl.addWidget(self.proj_banner)
 
         # ---- Survey metadata card ------------------------------------
@@ -173,17 +174,53 @@ class ConditionSurveyPanel(QWidget):
         bl.addWidget(self.res_card)
 
         # ---- Reserved-for-future banner -------------------------------
-        self.lbl_future = QLabel(
+        self.lbl_future = FutureExpansionBanner(
             "Reserved for future expansion: image-based distress detection, "
             "AI-assisted classification and GIS integration are accepted in "
             "the engine API as placeholder fields but have no logic in this "
             "phase."
         )
-        self.lbl_future.setWordWrap(True)
-        self.lbl_future.setStyleSheet(
-            "background:#eef0f4; color:#4a5260; padding:8px 10px; "
-            "border:1px dashed #c9d6ec; border-radius:4px; font-size:9pt;")
         bl.addWidget(self.lbl_future)
+
+        # ---- Reserved-field editor (Phase 11/12 hooks — STUB) ---------
+        # Three widgets bound to ConditionSurveyInput.image_paths /
+        # .ai_classification_hint / .gis_geometry_geojson. The values
+        # round-trip through save/load JSON so Phase 11/12 can replace
+        # the stub widgets with real dialogs without restructuring the
+        # input dataclass or persistence path. The engine still ignores
+        # all three fields in this phase.
+        self.reserved_card = Card()
+        rcl = QVBoxLayout(self.reserved_card)
+        rcl.setContentsMargins(20, 16, 20, 16); rcl.setSpacing(8)
+        rcl.addWidget(QLabel(
+            "<b>Reserved Field Hooks  [STUB — Phase 11/12]</b><br>"
+            "<span style='color:#6a7180; font-size:9pt;'>"
+            "Values entered here are saved with the survey but are NOT "
+            "consumed by the PCI engine in this phase. They exist so the "
+            "image / AI / GIS dialogs of later phases can plug in without "
+            "changing the input dataclass or DB schema."
+            "</span>"
+        ))
+
+        rf_form = QFormLayout()
+        self.ed_image_paths = QPlainTextEdit()
+        self.ed_image_paths.setPlaceholderText(
+            "One image path per line (no logic in this phase)")
+        self.ed_image_paths.setFixedHeight(60)
+        rf_form.addRow("Image paths (one per line)", self.ed_image_paths)
+
+        self.ed_ai_hint = QLineEdit()
+        self.ed_ai_hint.setPlaceholderText(
+            "Optional free-text hint for a future classifier")
+        rf_form.addRow("AI classification hint", self.ed_ai_hint)
+
+        self.ed_gis_geojson = QPlainTextEdit()
+        self.ed_gis_geojson.setPlaceholderText(
+            "Optional GeoJSON snippet (no parsing in this phase)")
+        self.ed_gis_geojson.setFixedHeight(60)
+        rf_form.addRow("GIS geometry (GeoJSON)", self.ed_gis_geojson)
+        rcl.addLayout(rf_form)
+        bl.addWidget(self.reserved_card)
 
         bl.addStretch(1)
         scroll.setWidget(body)
@@ -247,6 +284,13 @@ class ConditionSurveyPanel(QWidget):
                 count=int(sp_c.value()) if sp_c else 0,
                 notes=ed_n.text() if ed_n else "",
             ))
+        # Reserved-field editors — values are stored but the engine
+        # ignores them in this phase. See ConditionSurveyInput docstring.
+        image_paths = tuple(
+            line.strip()
+            for line in self.ed_image_paths.toPlainText().splitlines()
+            if line.strip()
+        )
         return ConditionSurveyInput(
             work_name=self.work_name.text(),
             surveyed_by=self.surveyed_by.text(),
@@ -255,6 +299,9 @@ class ConditionSurveyPanel(QWidget):
             chainage_to_km=float(self.ch_to.value()),
             lane_id=self.lane_id.text(),
             records=tuple(records),
+            image_paths=image_paths,
+            ai_classification_hint=self.ed_ai_hint.text(),
+            gis_geometry_geojson=self.ed_gis_geojson.toPlainText(),
         )
 
     def _on_compute(self) -> None:
@@ -315,9 +362,12 @@ class ConditionSurveyPanel(QWidget):
         self._last = None
         self.btn_save.setEnabled(False)
         self.res_card.setVisible(False)
-        # Clear table on project switch
+        # Clear table + reserved-field widgets on project switch
         self.table.setRowCount(0)
         self.breakdown_table.setRowCount(0)
+        self.ed_image_paths.setPlainText("")
+        self.ed_ai_hint.setText("")
+        self.ed_gis_geojson.setPlainText("")
         if pid is None:
             self.proj_banner.setText("[WARN] No project loaded.")
             self.btn_export.setEnabled(False)
@@ -343,6 +393,12 @@ class ConditionSurveyPanel(QWidget):
                         count=int(rec.get("count") or 0),
                         notes=rec.get("notes", "") or "",
                     )
+                # Reserved-field reload (Phase 11/12 hooks — stored only)
+                self.ed_image_paths.setPlainText(
+                    "\n".join(d.get("image_paths") or ())
+                )
+                self.ed_ai_hint.setText(d.get("ai_classification_hint", "") or "")
+                self.ed_gis_geojson.setPlainText(d.get("gis_geometry_geojson", "") or "")
             except Exception:
                 pass
 

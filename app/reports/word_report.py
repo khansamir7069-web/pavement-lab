@@ -188,18 +188,15 @@ def build_mix_design_docx(
     # F2 placeholder warning — surfaces unverified spec status in the report.
     _record = MIX_TYPES.get(ctx.mix_type_key)
     if _record and (_record.status or "").strip() == "placeholder_editable":
+        from ._docx_common import add_placeholder_banner
         _src = _record.applicable_code or "unverified"
-        warn_para = doc.add_paragraph()
-        warn_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
-        warn_run = warn_para.add_run(
+        add_placeholder_banner(
+            doc,
             f"⚠ Spec limits for {_record.mix_code} ({_record.full_name}) are "
             f"not IRC-verified. Compliance verdict in this report is "
             f"indicative only — confirm against the relevant IRC clause "
             f"before adoption. (Source: {_src})"
         )
-        warn_run.bold = True
-        warn_run.font.size = Pt(10)
-        warn_run.font.color.rgb = RGBColor(0x8A, 0x5A, 0x00)
 
     # Project info
     _add_heading(doc, "Project Information", level=2)
@@ -211,6 +208,13 @@ def build_mix_design_docx(
     if ctx.agency: proj_rows.append(["Agency", ctx.agency])
     if ctx.submitted_by: proj_rows.append(["Submitted By", ctx.submitted_by])
     if ctx.binder_grade: proj_rows.append(["Binder Grade", ctx.binder_grade])
+    # F3 (Phase-9 audit close-out): show the compaction blows per face
+    # for the selected mix so the engineer / lab can match specimen prep.
+    proj_rows.append([
+        "Compaction (each face)",
+        f"{spec.compaction_blows_each_face} blows ({_record.applicable_code or '—'})"
+        if _record else f"{spec.compaction_blows_each_face} blows",
+    ])
     if proj_rows:
         _add_table(doc, ["Item", "Detail"], proj_rows)
 
@@ -326,9 +330,17 @@ def build_mix_design_docx(
     # ----- 7. OBC and compliance
     _add_heading(doc, "7. Optimum Bitumen Content (OBC)", level=2)
     obc = result.obc
+    # F5 (Phase-9 audit close-out): the target air-voids value below is
+    # the midpoint of MIX_SPECS[mix].air_voids_min/max, not a flat 4.0
+    # constant. Annotate the source so the reader can audit the choice.
+    av_source = (
+        f"midpoint of {spec.air_voids_min_pct:g}–{spec.air_voids_max_pct:g}% "
+        f"from {_record.applicable_code or spec.name}"
+        if _record else "default"
+    )
     _add_p(doc,
            f"OBC = {obc.obc_pct:.2f}% (at target {obc.target_air_voids_pct:.1f}% "
-           f"air voids — method: {obc.method.replace('_', ' ')})",
+           f"air voids — {av_source}; method: {obc.method.replace('_', ' ')})",
            bold=True, size=12)
 
     _add_heading(doc, "Mix Parameters at OBC vs Specification", level=3)

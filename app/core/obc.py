@@ -2,12 +2,37 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Optional
 
 from .interpolation import bracket_interpolate, closest_index, linear_interpolate
 from .marshall import MarshallSummary
 
 
+# Fallback target used when no mix spec is available. Kept as a named
+# constant for backwards compatibility with callers that pass no spec
+# (e.g. ad-hoc engine tests). For real workflows F5 drives the target
+# from MIX_SPECS[k] via :func:`spec_target_air_voids`.
 TARGET_AIR_VOIDS_PCT = 4.0
+
+
+def spec_target_air_voids(mix_spec) -> float:
+    """F5 — return the spec-driven target air voids for *mix_spec*.
+
+    Computes the midpoint of ``air_voids_min_pct`` and ``air_voids_max_pct``
+    from a :class:`MixSpec` (or any object exposing those two attributes).
+    Falls back to :data:`TARGET_AIR_VOIDS_PCT` if the spec is missing or
+    incomplete.
+    """
+    if mix_spec is None:
+        return TARGET_AIR_VOIDS_PCT
+    lo = getattr(mix_spec, "air_voids_min_pct", None)
+    hi = getattr(mix_spec, "air_voids_max_pct", None)
+    if lo is None or hi is None:
+        return TARGET_AIR_VOIDS_PCT
+    try:
+        return float((lo + hi) / 2.0)
+    except (TypeError, ValueError):
+        return TARGET_AIR_VOIDS_PCT
 
 
 @dataclass(frozen=True, slots=True)

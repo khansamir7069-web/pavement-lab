@@ -20,7 +20,7 @@ from typing import Sequence
 
 from .compliance import ComplianceResult, MIX_SPECS, check_compliance
 from .marshall import MarshallRow, MarshallSummary
-from .obc import OBCResult, properties_at_obc
+from .obc import OBCResult, properties_at_obc, spec_target_air_voids
 
 
 # ---------------------------------------------------------------------------
@@ -198,7 +198,11 @@ def parse_summary_excel(
         gsb = sum(gsb_estimates) / len(gsb_estimates)
 
     summary = MarshallSummary(rows=tuple(marshall_rows), gsb=gsb)
-    obc = properties_at_obc(summary)
+    # F5: drive target air voids from the imported mix spec's midpoint.
+    obc = properties_at_obc(
+        summary,
+        target_air_voids=spec_target_air_voids(MIX_SPECS.get(mix_type_key)),
+    )
 
     comp = check_compliance(
         mix_type_key,

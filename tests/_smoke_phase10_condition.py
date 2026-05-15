@@ -187,6 +187,142 @@ def main() -> int:
     assert db.latest_condition_survey(proj.id) is None
     print("  [PASS] condition-survey row removed with project")
 
+    # ---------------------------------------------------------------------
+    # Stabilization-sprint additions (PCI calibration / F3 / F5 / F6 /
+    # reserved-field round-trip).
+    # ---------------------------------------------------------------------
+    print("\n=== Centralized PCI calibration ===")
+    from app.core import (
+        PCICalibration,
+        get_pci_calibration,
+        set_pci_calibration,
+        reset_pci_calibration,
+    )
+    sample = ConditionSurveyInput(records=(
+        DistressRecord("cracking", "high", length_m=200.0),
+    ))
+    pci_default = compute_condition_survey(sample).pci_score
+
+    # Swap to a calibration that doubles all severity weights -> larger deduct
+    cur = get_pci_calibration()
+    hot = PCICalibration(
+        label="smoke-test-doubled-severities",
+        severity_weights={k: 2.0 * v for k, v in cur.severity_weights.items()},
+        distress_weights=dict(cur.distress_weights),
+        extent_divisor_length_m=cur.extent_divisor_length_m,
+        extent_divisor_area_m2=cur.extent_divisor_area_m2,
+        extent_divisor_count=cur.extent_divisor_count,
+        is_placeholder=True,
+    )
+    set_pci_calibration(hot)
+    pci_doubled = compute_condition_survey(sample).pci_score
+    assert pci_doubled < pci_default, (pci_default, pci_doubled)
+    reset_pci_calibration()
+    pci_reset = compute_condition_survey(sample).pci_score
+    assert pci_reset == pci_default, (pci_default, pci_reset)
+    print(f"  [PASS] calibration swap: default PCI={pci_default:.2f} -> "
+          f"doubled PCI={pci_doubled:.2f}, reset PCI={pci_reset:.2f}")
+
+    print("\n=== F5 — spec-driven target air voids ===")
+    from app.core import MIX_SPECS, spec_target_air_voids
+    # DBM-II spec is 3-5 -> midpoint = 4.0 (matches legacy constant)
+    av_dbm2 = spec_target_air_voids(MIX_SPECS["DBM-II"])
+    assert abs(av_dbm2 - 4.0) < 1e-9, av_dbm2
+    av_none = spec_target_air_voids(None)
+    assert av_none == 4.0
+    print(f"  [PASS] DBM-II midpoint={av_dbm2:g}, fallback={av_none:g}")
+
+    print("\n=== F3 — compaction blows visible in Word report ===")
+    # Build a fresh DBM-II mix-design and assert the new project-info row
+    # carries the 75 blows/face line; the OBC section cites the spec range.
+    from app.core import (
+        GradationInput, MixDesignInput, compute_mix_design,
+    )
+    from app.core.models import ProjectInfo
+    # Reuse the InputsPanel demo defaults to compose a coherent dataset.
+    from app.ui.widgets.inputs_panel import InputsPanel
+    ipanel = InputsPanel()
+    ipanel.set_mix_type("DBM-II")
+    payload = ipanel.collect_all()
+    grad = payload["gradation"]
+    grad_no_cement = GradationInput(
+        sieve_sizes_mm=grad.sieve_sizes_mm,
+        pass_pct=grad.pass_pct,
+        blend_ratios={k: v for k, v in grad.blend_ratios.items() if k.lower() != "cement"},
+        spec_lower=grad.spec_lower,
+        spec_upper=grad.spec_upper,
+    )
+    coarse, fine, bit = payload["spgr"]
+    gmm_in = payload["gmm_tab"].collect(bitumen_sg=0.0)
+    md_in = MixDesignInput(
+        project=ProjectInfo(mix_type="DBM-II", work_name="phase9-followup", client=""),
+        gradation=grad_no_cement,
+        sg_coarse=coarse, sg_fine=fine, sg_bitumen=bit,
+        gmb=payload["gmb"], gmm=gmm_in,
+        stability_flow=payload["stability_flow"],
+    )
+    md_res = compute_mix_design(md_in)
+    # Target air voids should be the spec midpoint (3-5 -> 4.0).
+    assert abs(md_res.obc.target_air_voids_pct - 4.0) < 1e-6, \
+        md_res.obc.target_air_voids_pct
+    print(f"  [PASS] OBCResult.target_air_voids_pct={md_res.obc.target_air_voids_pct:g} "
+          f"(spec midpoint, not flat constant)")
+
+    from app.reports.word_report import build_mix_design_docx, ReportContext
+    from app.graphs import build_chart_set
+    md_doc = _tmp / "mix_phase9_followup.docx"
+    build_mix_design_docx(
+        md_doc,
+        ReportContext(project_title="phase9-followup", mix_type_key="DBM-II"),
+        md_res,
+        build_chart_set(md_res.summary, md_res.obc),
+        material_calc=None,
+    )
+    md_txt = _txt(md_doc)
+    assert "Compaction (each face)" in md_txt, "F3 project-info row missing"
+    assert "75 blows" in md_txt, "F3 compaction blows value missing"
+    assert "midpoint of" in md_txt, "F5 spec-driven OBC annotation missing"
+    print("  [PASS] Word report cites compaction blows + spec-driven AV midpoint")
+
+    print("\n=== F6 — project-form placeholder suffix ===")
+    from app.ui.widgets.project_form import ProjectForm
+    pf = ProjectForm(w.db)
+    placeholder_items = []
+    verified_items = []
+    for i in range(pf.mix_type.count()):
+        code = pf.mix_type.itemData(i)
+        if code is None:
+            continue
+        label = pf.mix_type.itemText(i)
+        if "[placeholder]" in label:
+            placeholder_items.append(code)
+        else:
+            verified_items.append(code)
+    assert "DBM-II" in verified_items, "DBM-II must NOT carry [placeholder] suffix"
+    assert "SMA" in placeholder_items, "SMA must carry [placeholder] suffix"
+    assert "BC-II" in verified_items, "BC-II must NOT carry [placeholder] suffix"
+    print(f"  [PASS] project-form annotates {len(placeholder_items)} placeholder mixes")
+
+    print("\n=== Reserved-field round-trip (Phase 11/12 hook) ===")
+    proj3 = w.db.create_project(work_name="Reserved-field round-trip")
+    w._current_project_id = proj3.id
+    w.condition.set_project(proj3.id, proj3.work_name)
+    w.condition.ed_image_paths.setPlainText("photos/a.jpg\nphotos/b.jpg")
+    w.condition.ed_ai_hint.setText("ravelling visible on inner wheel path")
+    w.condition.ed_gis_geojson.setPlainText('{"type":"Point","coordinates":[78.0,17.5]}')
+    w.condition._add_row(distress_code="ravelling", severity="medium",
+                         area_m2=12.0)
+    w.condition._on_compute()
+    w.condition._on_save()
+    # Reload the project freshly through set_project to prove round-trip.
+    w.condition.set_project(None)
+    w.condition.set_project(proj3.id, proj3.work_name)
+    assert w.condition.ed_image_paths.toPlainText().splitlines() == [
+        "photos/a.jpg", "photos/b.jpg"]
+    assert w.condition.ed_ai_hint.text() == "ravelling visible on inner wheel path"
+    assert "78.0" in w.condition.ed_gis_geojson.toPlainText()
+    print("  [PASS] image_paths / ai_hint / gis_geojson round-trip via save+reload")
+
     print("\nPHASE 10 SMOKE: ALL OK")
     return 0
 

@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from app.core import BINDER_GRADES, MIX_SPECS, PROPERTY_LABELS
+from app.core import BINDER_GRADES, MIX_SPECS, MIX_TYPES, PROPERTY_LABELS
 from .common import PageHeader, Card, styled_button
 
 
@@ -115,8 +115,15 @@ class ProjectForm(QWidget):
         self.submitted_by = QLineEdit()
         self.mix_type = QComboBox()
         self.mix_type.addItem("— Not selected (set later in module) —", None)
+        # F6 (Phase-9 audit close-out): annotate non-IRC-verified mixes with
+        # a [placeholder] suffix so the engineer is told before selecting.
+        # The combo's *data* attribute stays the bare mix code, so existing
+        # saved projects round-trip unchanged via findData(p.mix_type).
         for key, spec in MIX_SPECS.items():
-            self.mix_type.addItem(f"{key} — {spec.name}", key)
+            rec = MIX_TYPES.get(key)
+            status = (rec.status if rec else "").strip()
+            suffix = "  [placeholder]" if status == "placeholder_editable" else ""
+            self.mix_type.addItem(f"{key} — {spec.name}{suffix}", key)
 
         # Binder grade combo + properties editor button
         self.binder_grade = QComboBox()

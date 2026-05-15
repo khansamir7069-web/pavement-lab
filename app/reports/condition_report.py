@@ -12,7 +12,6 @@ from pathlib import Path
 
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.shared import Pt, RGBColor
 
 from app.core import ConditionSurveyResult, DISTRESS_TYPES
 from app.core.condition_survey import REFERENCES as ENGINE_REFS
@@ -23,6 +22,7 @@ from ._docx_common import (
     add_kv_table,
     add_note,
     add_p,
+    add_placeholder_banner,
     add_signature_block,
     add_table,
     new_portrait_document,
@@ -40,16 +40,6 @@ class ConditionReportContext:
     submitted_by: str = ""
     lab_name: str = "Pavement Laboratory"
     report_date: str = field(default_factory=lambda: datetime.now().strftime("%d-%b-%Y"))
-
-
-def _add_placeholder_banner(doc: Document, text: str) -> None:
-    """Render an orange-toned PLACEHOLDER warning paragraph."""
-    para = doc.add_paragraph()
-    para.alignment = WD_ALIGN_PARAGRAPH.LEFT
-    run = para.add_run(text)
-    run.bold = True
-    run.font.size = Pt(10)
-    run.font.color.rgb = RGBColor(0x8A, 0x5A, 0x00)
 
 
 def write_condition_section(
@@ -84,7 +74,7 @@ def write_condition_section(
 
     # Placeholder banner (always shown in Phase 10)
     if result.is_placeholder:
-        _add_placeholder_banner(doc, "[PLACEHOLDER] " + (result.notes or
+        add_placeholder_banner(doc, "[PLACEHOLDER] " + (result.notes or
             "PCI weights and rehab recommendations are uncalibrated."))
 
     inp = result.inputs

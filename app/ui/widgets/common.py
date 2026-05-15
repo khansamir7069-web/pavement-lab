@@ -80,3 +80,58 @@ def styled_button(text: str, kind: str = "primary") -> QPushButton:
     elif kind == "danger":
         b.setProperty("class", "Danger")
     return b
+
+
+# ---------------------------------------------------------------------------
+# Banner helpers — single source of truth for placeholder / info styling
+# ---------------------------------------------------------------------------
+
+_PLACEHOLDER_QSS = (
+    "background:#fff4e0; color:#8a5a00; padding:8px 10px;"
+    "border:1px solid #f0c97a; border-radius:4px; font-size:10pt;"
+)
+
+_INFO_QSS = (
+    "background:#eaf0fa; color:#1f3a68; padding:8px 12px;"
+    "border:1px solid #c9d6ec; border-radius:4px;"
+)
+
+_FUTURE_QSS = (
+    "background:#eef0f4; color:#4a5260; padding:8px 10px;"
+    "border:1px dashed #c9d6ec; border-radius:4px; font-size:9pt;"
+)
+
+
+class PlaceholderBanner(QLabel):
+    """Orange-toned banner for un-IRC-verified / placeholder content."""
+
+    def __init__(self, text: str = "", parent=None):
+        super().__init__(text, parent)
+        self.setWordWrap(True)
+        self.setStyleSheet(_PLACEHOLDER_QSS)
+        if not text:
+            self.setVisible(False)
+
+    def set_message(self, text: str, *, visible: bool | None = None) -> None:
+        self.setText(text)
+        if visible is None:
+            visible = bool(text)
+        self.setVisible(visible)
+
+
+class InfoBanner(QLabel):
+    """Blue-toned informational banner (e.g. 'Project #N: name')."""
+
+    def __init__(self, text: str = "", parent=None):
+        super().__init__(text, parent)
+        self.setWordWrap(True)
+        self.setStyleSheet(_INFO_QSS)
+
+
+class FutureExpansionBanner(QLabel):
+    """Dashed grey banner reserved for non-functional placeholder hooks."""
+
+    def __init__(self, text: str = "", parent=None):
+        super().__init__(text, parent)
+        self.setWordWrap(True)
+        self.setStyleSheet(_FUTURE_QSS)
