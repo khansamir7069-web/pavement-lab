@@ -1,0 +1,70 @@
+{
+  "name": "corpus_01_low_traffic_routine",
+  "description": "Excellent PCI; low CVPD; small mechanistic strains -> routine maintenance only.",
+  "engineering_intent": "Newly built rural road; nothing observed; mechanistic checks pass with margin.",
+  "condition": {
+    "work_name": "Rural NH connector (sample 01)",
+    "surveyed_by": "PavementLab QA",
+    "survey_date": "2026-04-10",
+    "lane_id": "LHS",
+    "chainage_from_km": 0.0,
+    "chainage_to_km": 1.0,
+    "records": []
+  },
+  "traffic": {
+    "initial_cvpd": 100.0,
+    "growth_rate_pct": 3.0,
+    "design_life_years": 10,
+    "terrain": "Plain",
+    "lane_config": "Two-lane carriageway",
+    "road_category": "MDR"
+  },
+  "structural": {
+    "road_category": "MDR",
+    "design_life_years": 10,
+    "initial_cvpd": 100.0,
+    "growth_rate_pct": 3.0,
+    "vdf": 1.7,
+    "ldf": 0.5,
+    "subgrade_cbr_pct": 10.0
+  },
+  "mechanistic": {
+    "include": true,
+    "is_placeholder": false,
+    "source": "external_exe",
+    "epsilon_t_microstrain": 80.0,
+    "epsilon_v_microstrain": 150.0,
+    "design_msa_override": 1.0,
+    "c_factor": 1.0,
+    "structure": {
+      "layers": [
+        {"name": "BC",  "material": "BC",  "modulus_mpa": 3000.0, "poisson_ratio": 0.35, "thickness_mm": 40.0},
+        {"name": "DBM", "material": "DBM", "modulus_mpa": 2500.0, "poisson_ratio": 0.35, "thickness_mm": 80.0},
+        {"name": "GSB", "material": "GSB", "modulus_mpa": 300.0,  "poisson_ratio": 0.35, "thickness_mm": 250.0},
+        {"name": "Subgrade", "material": "Subgrade", "modulus_mpa": 100.0, "poisson_ratio": 0.40, "thickness_mm": null}
+      ]
+    }
+  },
+  "calibration_overrides": {
+    "rehab_thresholds": null,
+    "fatigue_calibration": null,
+    "rutting_calibration": null
+  },
+  "expected": {
+    "condition": {
+      "pci_band": "Excellent"
+    },
+    "traffic": {
+      "msa_band": "very_low"
+    },
+    "mechanistic": {
+      "refused": false,
+      "fatigue_verdict": "PASS",
+      "rutting_verdict": "PASS"
+    },
+    "rehab": {
+      "categories_must_include": ["routine_maintenance"],
+      "categories_must_exclude": ["overlay", "reconstruction", "pothole_patching"]
+    }
+  }
+}

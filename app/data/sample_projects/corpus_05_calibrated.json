@@ -1,0 +1,90 @@
+{
+  "name": "corpus_05_calibrated",
+  "description": "Same Fair-PCI / mid-MSA inputs as corpus_02, but with calibration overrides — verifies set_rehab_thresholds + set_fatigue_calibration shift the verdict and category set.",
+  "engineering_intent": "Demonstrates that swapping placeholder calibration constants visibly changes downstream engineering decisions; corpus_02 with default calibration produces micro-surfacing + crack sealing, while this corpus with a tighter pci_fair_min (65) reroutes the survey into the overlay band, and a 10x stiffer fatigue k1 flips the fatigue verdict from PASS to FAIL.",
+  "condition": {
+    "work_name": "Calibration override (sample 05)",
+    "surveyed_by": "PavementLab QA",
+    "survey_date": "2026-04-20",
+    "lane_id": "Lane 1",
+    "chainage_from_km": 0.0,
+    "chainage_to_km": 0.5,
+    "records": [
+      {"distress_type": "rutting",   "severity": "medium", "length_m": 0.0, "area_m2": 80.0, "count": 0, "notes": "wheel-path consistent"},
+      {"distress_type": "cracking",  "severity": "low",    "length_m": 80.0, "area_m2": 0.0, "count": 0, "notes": "longitudinal hairline"},
+      {"distress_type": "ravelling", "severity": "low",    "length_m": 0.0, "area_m2": 30.0, "count": 0, "notes": "isolated patches"}
+    ]
+  },
+  "traffic": {
+    "initial_cvpd": 800.0,
+    "growth_rate_pct": 5.0,
+    "design_life_years": 15,
+    "terrain": "Plain",
+    "lane_config": "Two-lane carriageway",
+    "road_category": "SH"
+  },
+  "structural": {
+    "road_category": "SH",
+    "design_life_years": 15,
+    "initial_cvpd": 800.0,
+    "growth_rate_pct": 5.0,
+    "vdf": 3.9,
+    "ldf": 0.5,
+    "subgrade_cbr_pct": 8.0
+  },
+  "mechanistic": {
+    "include": true,
+    "is_placeholder": false,
+    "source": "external_exe",
+    "epsilon_t_microstrain": 180.0,
+    "epsilon_v_microstrain": 350.0,
+    "design_msa_override": null,
+    "c_factor": 1.0,
+    "structure": {
+      "layers": [
+        {"name": "BC",  "material": "BC",  "modulus_mpa": 3000.0, "poisson_ratio": 0.35, "thickness_mm": 40.0},
+        {"name": "DBM", "material": "DBM", "modulus_mpa": 2500.0, "poisson_ratio": 0.35, "thickness_mm": 80.0},
+        {"name": "GSB", "material": "GSB", "modulus_mpa": 300.0,  "poisson_ratio": 0.35, "thickness_mm": 200.0},
+        {"name": "Subgrade", "material": "Subgrade", "modulus_mpa": 80.0, "poisson_ratio": 0.40, "thickness_mm": null}
+      ]
+    }
+  },
+  "calibration_overrides": {
+    "rehab_thresholds": {
+      "label": "smoke-calibrated-tighter-fair",
+      "pci_excellent_min": 85.0,
+      "pci_good_min": 70.0,
+      "pci_fair_min": 65.0,
+      "pci_poor_min": 40.0,
+      "msa_low_max": 5.0,
+      "msa_mid_max": 30.0,
+      "ravelling_area_m2_min": 50.0,
+      "bleeding_area_m2_min": 50.0
+    },
+    "fatigue_calibration": {
+      "label": "IRC37_PLACEHOLDER_80pct_tightened_x10",
+      "k1": 2.21e-05,
+      "k2": 3.89,
+      "k3": 0.854,
+      "reliability_pct": 80
+    },
+    "rutting_calibration": null
+  },
+  "expected": {
+    "condition": {
+      "pci_band": "Fair"
+    },
+    "traffic": {
+      "msa_band": "mid"
+    },
+    "mechanistic": {
+      "refused": false,
+      "fatigue_verdict": "FAIL",
+      "rutting_verdict": "PASS"
+    },
+    "rehab": {
+      "categories_must_include": ["overlay", "surface_treatment"],
+      "categories_must_exclude": ["routine_maintenance", "reconstruction", "crack_sealing", "micro_surfacing", "slurry_seal"]
+    }
+  }
+}

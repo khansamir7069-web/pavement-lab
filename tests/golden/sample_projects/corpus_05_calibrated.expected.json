@@ -1,0 +1,30 @@
+{
+  "condition": {
+    "distress_record_count": 3,
+    "is_placeholder": true,
+    "pci_band": "Fair"
+  },
+  "mechanistic": {
+    "fatigue_verdict": "FAIL",
+    "is_placeholder": true,
+    "refused": false,
+    "rutting_verdict": "PASS"
+  },
+  "name": "corpus_05_calibrated",
+  "rehab": {
+    "categories": [
+      "overlay",
+      "surface_treatment"
+    ],
+    "category_count": 2,
+    "is_placeholder": true
+  },
+  "structural": {
+    "layer_count": 4,
+    "thickness_band": "thick"
+  },
+  "traffic": {
+    "msa_band": "mid",
+    "traffic_category": "Moderate (5\u201330 MSA)"
+  }
+}

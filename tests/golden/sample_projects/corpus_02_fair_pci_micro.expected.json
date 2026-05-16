@@ -1,0 +1,31 @@
+{
+  "condition": {
+    "distress_record_count": 3,
+    "is_placeholder": true,
+    "pci_band": "Fair"
+  },
+  "mechanistic": {
+    "fatigue_verdict": "PASS",
+    "is_placeholder": true,
+    "refused": false,
+    "rutting_verdict": "PASS"
+  },
+  "name": "corpus_02_fair_pci_micro",
+  "rehab": {
+    "categories": [
+      "crack_sealing",
+      "micro_surfacing",
+      "surface_treatment"
+    ],
+    "category_count": 3,
+    "is_placeholder": true
+  },
+  "structural": {
+    "layer_count": 4,
+    "thickness_band": "thick"
+  },
+  "traffic": {
+    "msa_band": "mid",
+    "traffic_category": "Moderate (5\u201330 MSA)"
+  }
+}

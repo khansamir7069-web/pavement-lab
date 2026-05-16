@@ -1,0 +1,29 @@
+{
+  "condition": {
+    "distress_record_count": 0,
+    "is_placeholder": true,
+    "pci_band": "Excellent"
+  },
+  "mechanistic": {
+    "fatigue_verdict": "PASS",
+    "is_placeholder": true,
+    "refused": false,
+    "rutting_verdict": "PASS"
+  },
+  "name": "corpus_01_low_traffic_routine",
+  "rehab": {
+    "categories": [
+      "routine_maintenance"
+    ],
+    "category_count": 1,
+    "is_placeholder": true
+  },
+  "structural": {
+    "layer_count": 4,
+    "thickness_band": "thick"
+  },
+  "traffic": {
+    "msa_band": "very_low",
+    "traffic_category": "Low (< 5 MSA)"
+  }
+}

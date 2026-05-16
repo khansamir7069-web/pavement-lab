@@ -1,0 +1,31 @@
+{
+  "condition": {
+    "distress_record_count": 3,
+    "is_placeholder": true,
+    "pci_band": "Very Poor"
+  },
+  "mechanistic": {
+    "fatigue_verdict": "FAIL",
+    "is_placeholder": true,
+    "refused": false,
+    "rutting_verdict": "FAIL"
+  },
+  "name": "corpus_04_reconstruction",
+  "rehab": {
+    "categories": [
+      "overlay",
+      "pothole_patching",
+      "reconstruction"
+    ],
+    "category_count": 3,
+    "is_placeholder": true
+  },
+  "structural": {
+    "layer_count": 4,
+    "thickness_band": "thick"
+  },
+  "traffic": {
+    "msa_band": "heavy",
+    "traffic_category": "Heavy (30\u2013100 MSA)"
+  }
+}
