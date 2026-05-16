@@ -2,13 +2,18 @@
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 
 
 def _resource_root() -> Path:
-    # When frozen by PyInstaller, _MEIPASS points to the bundle.
-    if hasattr(os, "_MEIPASS"):
-        return Path(os._MEIPASS)  # type: ignore[attr-defined]
+    # When frozen by PyInstaller, ``sys._MEIPASS`` is set to the bundle
+    # extraction directory (canonical attribute since PyInstaller 3.x).
+    # Earlier hand-built freezing tooling sometimes set ``os._MEIPASS``
+    # so we honour both (additive — never narrower than before).
+    mei = getattr(sys, "_MEIPASS", None) or getattr(os, "_MEIPASS", None)
+    if mei:
+        return Path(mei)
     return Path(__file__).resolve().parent
 
 

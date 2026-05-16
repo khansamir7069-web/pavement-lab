@@ -127,13 +127,18 @@ def main() -> int:
     assert result.point_results[1].z_mm == 320.0
     print(f"  [PASS] n_points={len(result.point_results)} source={result.source!r}")
 
-    print("\n=== 6) ExternalExeRunner refuses to run in V1 ===")
+    print("\n=== 6) ExternalExeRunner refuses to run when binary absent ===")
+    # Phase-17 contract: the runner raises FileNotFoundError pointing at
+    # the bundling doc when the configured exe path is not on disk —
+    # never silently falls back to fake data (placeholder-safety).
     try:
         IITPaveExternalExeRunner().run(text)
-        raise AssertionError("ExternalExeRunner.run must raise in V1")
-    except NotImplementedError as e:
-        assert "Phase 17" in str(e) or "not bundled" in str(e), str(e)
-    print("  [PASS] NotImplementedError raised")
+        raise AssertionError("ExternalExeRunner.run must raise when exe is absent")
+    except FileNotFoundError as e:
+        msg = str(e)
+        assert "IITPAVE" in msg, msg
+        assert "bundle_iitpave.md" in msg, msg
+    print("  [PASS] FileNotFoundError raised with bundle_iitpave.md hint")
 
     print("\n=== 7) Adapter from structural layers ===")
     structural_comp = (

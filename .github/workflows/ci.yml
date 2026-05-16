@@ -1,0 +1,59 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: tests (${{ matrix.os }} / Python ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Windows is the primary V1 deployment target; ubuntu covers
+        # the cross-platform Python surface (and is cheaper / faster
+        # in CI). macOS deliberately omitted from V1.
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.12"]
+    env:
+      # All Qt-touching tests must run headless in CI.
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install Linux Qt deps
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libegl1 libgl1 libxkbcommon0 libdbus-1-3 \
+            libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 \
+            libxcb-image0 libxcb-randr0 libxcb-render-util0 \
+            libxcb-shape0 libxcb-xinerama0 libxcb-xkb1 libxkbcommon-x11-0
+
+      - name: Install Python deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Excel parity tests
+        run: pytest tests/test_excel_parity.py -q
+
+      - name: Phase-smoke aggregator + sample validation
+        run: pytest tests/pytest_smoke.py -q
+
+      - name: Validation harness (assert mode)
+        run: python -m tests.validation_harness
+
+      - name: Installer smoke (Phase 17)
+        run: python -m tests._smoke_phase17_installer

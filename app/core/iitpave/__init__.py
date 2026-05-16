@@ -48,6 +48,7 @@ from .runner import (
     ExternalExeRunner,
     IITPaveRunner,
     StubRunner,
+    default_iitpave_exe_path,
 )
 
 __all__ = [
@@ -73,6 +74,7 @@ __all__ = [
     "IITPaveRunner",
     "StubRunner",
     "ExternalExeRunner",
+    "default_iitpave_exe_path",
     "SOURCE_STUB",
     "SOURCE_EXTERNAL",
 ]

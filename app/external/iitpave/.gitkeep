@@ -1,0 +1,3 @@
+# Placeholder file so the bundled directory ships in source control
+# even before the IITPAVE executable is dropped in.
+# See build/installer/bundle_iitpave.md for binary placement.
