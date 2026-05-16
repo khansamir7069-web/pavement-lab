@@ -2,7 +2,7 @@
 
 Read-only fields: category, layer type, NMAS, applicable code.
 Editable: the 11 Marshall criteria (when present).  Save writes back to
-``%LOCALAPPDATA%\\PavementLab\\mix_specs.json`` (user override) and calls
+``%LOCALAPPDATA%\\SamPave\\mix_specs.json`` (user override) and calls
 ``reload_specs()`` so the change is live without restart.
 """
 from __future__ import annotations
@@ -175,7 +175,7 @@ class SpecAdminPanel(QWidget):
         # Footer hint
         bl.addWidget(QLabel(
             "<span style='color:#6a7180; font-size:9pt;'>"
-            "Edits are saved to <code>%LOCALAPPDATA%\\PavementLab\\mix_specs.json</code> "
+            "Edits are saved to <code>%LOCALAPPDATA%\\SamPave\\mix_specs.json</code> "
             "(your personal override). The bundled defaults are never modified."
             "</span>"))
 

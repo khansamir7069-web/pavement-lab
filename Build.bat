@@ -1,6 +1,6 @@
 @echo off
 REM ============================================================
-REM  Pavement Lab — clean rebuild of the standalone .exe.
+REM  SamPave Engineering Suite — clean rebuild of the standalone .exe.
 REM  Requires Setup.bat to have run at least once.
 REM ============================================================
 setlocal ENABLEDELAYEDEXPANSION
@@ -26,11 +26,11 @@ if !errorlevel! NEQ 0 (
     exit /b 1
 )
 
-if exist "%ROOT%build\PavementLab" rmdir /S /Q "%ROOT%build\PavementLab"
-if exist "%ROOT%dist\PavementLab" rmdir /S /Q "%ROOT%dist\PavementLab"
+if exist "%ROOT%build\SamPave" rmdir /S /Q "%ROOT%build\SamPave"
+if exist "%ROOT%dist\SamPave" rmdir /S /Q "%ROOT%dist\SamPave"
 
-echo Building .exe with PyInstaller...
-"%VENV_PY%" -m PyInstaller build\pavement_lab.spec --clean --noconfirm
+echo Building .exe with PyInstaller (V1 spec)...
+"%VENV_PY%" -m PyInstaller build\installer\pyinstaller.spec --clean --noconfirm
 if !errorlevel! NEQ 0 (
     echo Build failed.
     popd
@@ -39,7 +39,7 @@ if !errorlevel! NEQ 0 (
 )
 
 echo.
-echo Build complete: dist\PavementLab\PavementLab.exe
+echo Build complete: dist\SamPave\SamPave.exe
 echo Run Launch.bat to start the app.
 popd
 pause

@@ -7,7 +7,7 @@ from pathlib import Path
 
 from PySide6.QtWidgets import QApplication
 
-from app import __app_name__
+from app import __app_name__, __product_name__
 from app.config import APP_DIR
 from app.ui.main_window import MainWindow
 
@@ -23,7 +23,7 @@ def main() -> int:
     configure_logging()
     app = QApplication(sys.argv)
     app.setApplicationName(__app_name__)
-    app.setOrganizationName("PavementLab")
+    app.setOrganizationName(__product_name__)
 
     qss_path = APP_DIR / "ui" / "style.qss"
     if qss_path.exists():

@@ -7,23 +7,28 @@ from pathlib import Path
 
 
 def _resource_root() -> Path:
-    # When frozen by PyInstaller, ``sys._MEIPASS`` is set to the bundle
-    # extraction directory (canonical attribute since PyInstaller 3.x).
-    # Earlier hand-built freezing tooling sometimes set ``os._MEIPASS``
-    # so we honour both (additive — never narrower than before).
+    # Source mode: APP_DIR is the ``app/`` directory itself (this file
+    # lives at app/config.py).
+    # Frozen mode (PyInstaller): the bundle ships our ``app/`` tree at
+    # ``sys._MEIPASS / "app"`` because the spec's ``datas`` entries
+    # preserve the ``"app/..."`` destination prefix. Returning
+    # ``sys._MEIPASS / "app"`` keeps APP_DIR semantically consistent
+    # across source and frozen — every caller (data loaders, templates,
+    # ui stylesheet, external/iitpave) sees the same layout.
     mei = getattr(sys, "_MEIPASS", None) or getattr(os, "_MEIPASS", None)
     if mei:
-        return Path(mei)
+        return Path(mei) / "app"
     return Path(__file__).resolve().parent
 
 
 def _user_data_root() -> Path:
-    # %LOCALAPPDATA%\PavementLab on Windows, ~/.local/share/PavementLab elsewhere.
+    # SamPave V1 user-data root.
+    # %LOCALAPPDATA%\SamPave on Windows, ~/.local/share/SamPave elsewhere.
     if os.name == "nt":
         base = Path(os.environ.get("LOCALAPPDATA", Path.home()))
     else:
         base = Path.home() / ".local" / "share"
-    p = base / "PavementLab"
+    p = base / "SamPave"
     p.mkdir(parents=True, exist_ok=True)
     return p
 

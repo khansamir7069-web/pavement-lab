@@ -1,6 +1,6 @@
 @echo off
 REM ============================================================
-REM  Pavement Lab — first-time setup for a fresh Windows machine.
+REM  SamPave Engineering Suite — first-time setup for a fresh Windows machine.
 REM
 REM  What this does:
 REM    1. Locates a usable Python 3.11+ interpreter.
@@ -18,7 +18,7 @@ pushd "%ROOT%"
 
 echo.
 echo =====================================================
-echo   Pavement Lab — setup
+echo   SamPave Engineering Suite — setup
 echo =====================================================
 echo.
 
@@ -108,19 +108,19 @@ echo.
 choice /M "Build standalone Windows .exe with PyInstaller now? (recommended)"
 if !errorlevel! EQU 1 (
     echo Building .exe...
-    "%VENV_PY%" -m PyInstaller build\pavement_lab.spec --clean --noconfirm
+    "%VENV_PY%" -m PyInstaller build\installer\pyinstaller.spec --clean --noconfirm
     if !errorlevel! NEQ 0 (
         echo WARNING: PyInstaller build failed — you can still run via Launch.bat
         echo          which will fall back to the Python source.
     ) else (
-        echo .exe built at dist\PavementLab\PavementLab.exe
+        echo .exe built at dist\SamPave\SamPave.exe
     )
 )
 
 echo.
 echo =====================================================
 echo   Setup complete.
-echo   Double-click Launch.bat to start Pavement Lab.
+echo   Double-click Launch.bat to start SamPave Engineering Suite.
 echo =====================================================
 popd
 pause

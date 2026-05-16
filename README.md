@@ -1,12 +1,16 @@
-# Pavement Lab
+# SamPave Engineering Suite
 
-A commercial-grade desktop application for **Marshall Mix Design** of bituminous
-pavement mixes (DBM, BC, SDAC, BM). The calculation core is a **digital clone**
-of a production Excel workbook used by a working highway-materials consultancy
-— every computed value matches the source workbook to 1 × 10⁻⁹.
+A commercial-grade desktop application for **flexible-pavement engineering** —
+Marshall Mix Design (DBM, BC, SDAC, BM), structural design (IRC:37-2018),
+maintenance / rehabilitation (BBD overlay, cold mix, micro-surfacing, slurry
+seal), pavement condition survey with PCI scoring, rehab recommendation
+synthesis, and mechanistic fatigue / rutting validation. The mix-design core
+is a **digital clone** of a production Excel workbook — every computed value
+matches the source workbook to 1 × 10⁻⁹.
 
-![Status: Engine parity 12/12](https://img.shields.io/badge/Excel%20parity-12%2F12%20passing-2c8a3e)
-![Build](https://img.shields.io/badge/Windows%20build-PavementLab.exe%20(31%20MB)-1f3a68)
+![Status: Excel parity 16/16](https://img.shields.io/badge/Excel%20parity-16%2F16%20passing-2c8a3e)
+![Tests: 36/36](https://img.shields.io/badge/regression-36%2F36%20passing-2c8a3e)
+![Build](https://img.shields.io/badge/Windows%20build-SamPave.exe-1f3a68)
 
 ---
 
@@ -17,21 +21,21 @@ Nothing else needs installing.
 
 ### Option A — Double-click on this machine
 
-1. Open `dist\PavementLab\` and double-click **`PavementLab.exe`**,
+1. Open `dist\SamPave\` and double-click **`SamPave.exe`**,
 2. Or double-click **`Launch.bat`** in the project root,
-3. Or open the **Pavement Lab** shortcut that was placed on your Desktop.
+3. Or open the **SamPave** shortcut that was placed on your Desktop.
 
 ### Option B — Hand the build to another Windows PC
 
-A redistributable archive was created at:
+The V1 redistributable archive is generated at the repo root as:
 
 ```
-E:\myclaud project\1\PavementLab-Windows.zip   (~139 MB)
+SamPave_Engineering_Suite_V1_Windows.zip
 ```
 
-Copy that zip to the target PC, unzip it anywhere, open the folder, and
-double-click **`PavementLab.exe`**. The bundle embeds Python and every library;
-the target machine does **not** need Python installed.
+Copy that zip to the target PC, unzip it anywhere, open the `SamPave\` folder,
+and double-click **`SamPave.exe`**. The bundle embeds Python and every
+library; the target machine does **not** need Python installed.
 
 ---
 

@@ -1,6 +1,6 @@
 @echo off
 REM ============================================================
-REM  Pavement Lab — one-click launcher
+REM  SamPave Engineering Suite — one-click launcher
 REM  - If the standalone .exe exists, run it directly (no Python needed).
 REM  - Otherwise fall back to "python run.py" using whichever Python is
 REM    available (in this order: project venv  →  py launcher  →  python).
@@ -9,10 +9,10 @@ REM ============================================================
 setlocal ENABLEDELAYEDEXPANSION
 
 set "ROOT=%~dp0"
-set "EXE=%ROOT%dist\PavementLab\PavementLab.exe"
+set "EXE=%ROOT%dist\SamPave\SamPave.exe"
 
 if exist "%EXE%" (
-    echo Launching Pavement Lab...
+    echo Launching SamPave Engineering Suite...
     start "" "%EXE%"
     exit /b 0
 )
@@ -56,7 +56,7 @@ set "RC=%ERRORLEVEL%"
 popd
 if !RC! NEQ 0 (
     echo.
-    echo Pavement Lab exited with code !RC!.
+    echo SamPave exited with code !RC!.
     pause
 )
 exit /b !RC!

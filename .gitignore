@@ -8,10 +8,14 @@ build/test_charts/
 build/test_report.docx
 build/test_report_charts/
 build/pavement_lab/
+build/SamPave/
+build/pyinstaller/
 build/__pycache__/
 build/*.toc
 build/*.pkg
 dist/
+SamPave_Engineering_Suite_*.zip
+PavementLab-Windows.zip
 *.egg-info/
 .idea/
 .vscode/

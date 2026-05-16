@@ -75,8 +75,11 @@ def main() -> int:
     try:
         sys._MEIPASS = str(fake_bundle)
         frozen_root = cfg._resource_root()
-        assert Path(frozen_root) == fake_bundle, (frozen_root, fake_bundle)
-        print(f"  [PASS] _MEIPASS={fake_bundle} -> resource_root resolved to bundle")
+        # The PyInstaller spec bundles every data tree under "app/..." so
+        # APP_DIR resolves to sys._MEIPASS / "app" — semantically
+        # identical to source mode (where APP_DIR == .../app/).
+        assert Path(frozen_root) == fake_bundle / "app", (frozen_root, fake_bundle)
+        print(f"  [PASS] _MEIPASS={fake_bundle} -> resource_root resolved to bundle/app")
     finally:
         if prev_mei is None:
             del sys._MEIPASS  # type: ignore[attr-defined]

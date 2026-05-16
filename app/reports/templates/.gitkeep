@@ -1,0 +1,4 @@
+# Placeholder file so app/reports/templates/ ships in the PyInstaller
+# bundle. Phase 15 report renderers reference TEMPLATES_DIR but don't
+# require any specific template file yet; this directory exists so the
+# path resolves under the frozen build.
