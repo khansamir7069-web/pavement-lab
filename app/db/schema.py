@@ -57,6 +57,7 @@ class Project(Base):
     submitted_by: Mapped[Optional[str]] = mapped_column(String(200))
     mix_type: Mapped[Optional[str]] = mapped_column(String(20), default=None)   # DBM-II, BC-I, etc. (now optional)
     modules_json: Mapped[Optional[str]] = mapped_column(Text, default=None)     # {"mix_design":"complete", ...}
+    config_json: Mapped[Optional[str]] = mapped_column(Text, default=None)      # project-level workflow/profile config
     binder_grade: Mapped[Optional[str]] = mapped_column(String(40), default=None)        # VG-30, CRMB, …
     binder_properties_json: Mapped[Optional[str]] = mapped_column(Text, default=None)    # {"penetration":65, …}
     status: Mapped[str] = mapped_column(String(20), default="draft")

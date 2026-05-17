@@ -4,14 +4,21 @@ from __future__ import annotations
 import json
 from contextlib import contextmanager
 from dataclasses import asdict, is_dataclass
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterable, Optional
+from typing import Any, Iterable, Optional
 
 from sqlalchemy import create_engine, select, text
 from sqlalchemy.orm import Session, joinedload, sessionmaker
 
 from app.config import DB_PATH
 from app.core import MixDesignResult
+from app.core.config_profiles import (
+    ApplicationConfig,
+    ConfigValidationResult,
+    load_application_config,
+    validate_application_config,
+)
 
 from .schema import (
     AuditLog,
@@ -43,6 +50,49 @@ def _to_json_safe(obj):
     return obj
 
 
+def _utc_iso() -> str:
+    return (
+        datetime.now(timezone.utc)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
+
+
+def _json_mapping(raw: str | None) -> dict[str, Any] | None:
+    if not raw:
+        return None
+    try:
+        parsed = json.loads(raw)
+    except (TypeError, json.JSONDecodeError):
+        return None
+    return parsed if isinstance(parsed, dict) else None
+
+
+def _project_config_payload(
+    cfg: ApplicationConfig,
+    *,
+    created_at: str,
+    updated_at: str,
+) -> dict[str, Any]:
+    validation = validate_application_config(cfg)
+    return {
+        "profile": cfg.metadata.requested_profile or cfg.profile.key,
+        "resolved_profile": cfg.profile.key,
+        "schema_version": cfg.metadata.schema_version,
+        "config_version": cfg.metadata.schema_version,
+        "created_at": created_at,
+        "updated_at": updated_at,
+        "report_metadata_enabled": cfg.report_metadata_enabled,
+        "strict_engineering_mode": cfg.strict_engineering_mode,
+        "metadata": cfg.metadata.as_dict(),
+        "validation": {
+            "ok": validation.ok,
+            "issues": [i.as_dict() for i in validation.issues],
+        },
+    }
+
+
 class Database:
     """Thin façade. Owns the engine + sessionmaker."""
 
@@ -70,6 +120,8 @@ class Database:
             cols = {r[1] for r in conn.execute(text("PRAGMA table_info(projects)"))}
             if "modules_json" not in cols:
                 conn.execute(text("ALTER TABLE projects ADD COLUMN modules_json TEXT"))
+            if "config_json" not in cols:
+                conn.execute(text("ALTER TABLE projects ADD COLUMN config_json TEXT"))
             if "binder_grade" not in cols:
                 conn.execute(text("ALTER TABLE projects ADD COLUMN binder_grade VARCHAR(40)"))
             if "binder_properties_json" not in cols:
@@ -183,6 +235,69 @@ class Database:
                 return json.loads(p.modules_json)
             except json.JSONDecodeError:
                 return {}
+
+    def attach_project_config(
+        self,
+        project_id: int,
+        *,
+        profile_key: str | None = None,
+        config: ApplicationConfig | None = None,
+    ) -> ApplicationConfig | None:
+        """Persist project-level workflow/profile configuration metadata.
+
+        The stored payload is JSON-only and intentionally contains no
+        engineering calculation switches. Unknown profiles are resolved
+        through the central config helpers, which preserve fallback warning
+        metadata for auditability.
+        """
+        source = f"project:{project_id}"
+        cfg = config or load_application_config(
+            {"profile": profile_key or ""},
+            source=source,
+        )
+        with self.session() as s:
+            p = s.get(Project, project_id)
+            if not p:
+                return None
+            existing = _json_mapping(p.config_json)
+            now = _utc_iso()
+            created_at = (
+                existing.get("created_at")
+                if existing and isinstance(existing.get("created_at"), str)
+                else now
+            )
+            p.config_json = json.dumps(
+                _project_config_payload(
+                    cfg,
+                    created_at=created_at,
+                    updated_at=now,
+                ),
+                sort_keys=True,
+            )
+            s.flush()
+            return cfg
+
+    def load_project_config(self, project_id: int) -> ApplicationConfig:
+        """Return a resolved config for a project, defaulting safely.
+
+        Existing projects created before Phase 19 have ``config_json`` as
+        NULL; those load as the default profile without warning. Malformed
+        JSON payloads fall back to default with warning metadata.
+        """
+        source = f"project:{project_id}"
+        with self.session() as s:
+            p = s.get(Project, project_id)
+            raw = p.config_json if p else None
+        if not raw:
+            return load_application_config(None, source=source)
+        try:
+            payload = json.loads(raw)
+        except (TypeError, json.JSONDecodeError):
+            payload = "malformed-project-config"
+        return load_application_config(payload, source=source)
+
+    def validate_project_config(self, project_id: int) -> ConfigValidationResult:
+        return validate_application_config(self.load_project_config(project_id))
 
     # ---- Materials ------------------------------------------------------
     def list_materials(self) -> list[Material]:
