@@ -120,6 +120,23 @@ def add_kv_table(doc: Document, rows: Iterable[tuple[str, str]]) -> None:
     add_table(doc, ["Item", "Detail"], rows_l)
 
 
+def add_config_metadata(doc: Document, cfg, *, force: bool = False) -> bool:
+    """Optionally render central configuration/profile metadata.
+
+    Returns True when a section was written. The report layer stays opt-in:
+    callers decide whether to pass a resolved ApplicationConfig and whether
+    to force rendering for audit/debug outputs.
+    """
+    from app.core.config_profiles import config_report_rows
+
+    rows = config_report_rows(cfg, force=force)
+    if not rows:
+        return False
+    add_heading(doc, "Configuration Metadata", level=3)
+    add_kv_table(doc, rows)
+    return True
+
+
 def add_note(doc: Document, text: str) -> None:
     """Italic muted paragraph used for code-citation footnotes."""
     p = doc.add_paragraph()
