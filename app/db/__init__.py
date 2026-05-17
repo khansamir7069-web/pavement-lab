@@ -1,5 +1,18 @@
 from .schema import Base, Client, Project, Material, MixDesign, Report, StructuralDesign, User, AuditLog
 from .repository import Database, get_db
+from .project_exchange import (
+    PROJECT_EXPORT_FORMAT,
+    PROJECT_EXPORT_FORMAT_VERSION,
+    ProjectExchangeIssue,
+    ProjectExchangeValidationResult,
+    ProjectImportError,
+    ProjectImportResult,
+    export_project,
+    import_project,
+    read_project_export,
+    validate_project_export_payload,
+    write_project_export,
+)
 
 __all__ = [
     "Base",
@@ -13,4 +26,15 @@ __all__ = [
     "AuditLog",
     "Database",
     "get_db",
+    "PROJECT_EXPORT_FORMAT",
+    "PROJECT_EXPORT_FORMAT_VERSION",
+    "ProjectExchangeIssue",
+    "ProjectExchangeValidationResult",
+    "ProjectImportError",
+    "ProjectImportResult",
+    "export_project",
+    "import_project",
+    "read_project_export",
+    "validate_project_export_payload",
+    "write_project_export",
 ]
