@@ -109,6 +109,14 @@ from .production_readiness import (
     ProductionReadinessChecklist,
     build_production_readiness_checklist,
 )
+from .release_integrity import (
+    RELEASE_INTEGRITY_FORMAT,
+    RELEASE_INTEGRITY_VERSION,
+    REQUIRED_RELEASE_PHASE_SMOKES,
+    ReleaseIntegrityCheck,
+    ReleaseIntegrityChecklist,
+    build_release_integrity_checklist,
+)
 from .material_quantity import (
     LayerInput,
     LayerResult,
@@ -469,6 +477,12 @@ __all__ = [
     "ProductionReadinessCheck",
     "ProductionReadinessChecklist",
     "build_production_readiness_checklist",
+    "RELEASE_INTEGRITY_FORMAT",
+    "RELEASE_INTEGRITY_VERSION",
+    "REQUIRED_RELEASE_PHASE_SMOKES",
+    "ReleaseIntegrityCheck",
+    "ReleaseIntegrityChecklist",
+    "build_release_integrity_checklist",
     "LayerInput",
     "LayerResult",
     "MaterialQuantityInput",

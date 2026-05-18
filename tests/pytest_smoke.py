@@ -72,6 +72,7 @@ PHASE_SMOKES: tuple[str, ...] = (
     "tests._smoke_phase45_deployment_regression_gate",
     "tests._smoke_phase46_benchmark_dataset_readiness",
     "tests._smoke_phase47_production_readiness",
+    "tests._smoke_phase48_release_integrity",
 )
 
 
