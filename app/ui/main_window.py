@@ -30,7 +30,12 @@ from PySide6.QtWidgets import (
 
 from app import __app_name__, __version__
 from app.config import REPORTS_DIR
-from app.core import compute_material_calc, compute_mix_design
+from app.core import (
+    build_deployment_packaging_checklist,
+    compute_material_calc,
+    compute_mix_design,
+    format_deployment_checklist_item_text,
+)
 from app.core.import_summary import ImportedMixResult, parse_summary_excel
 from app.core.models import MixDesignInput, ProjectInfo
 from app.db import get_db
@@ -192,6 +197,15 @@ class MainWindow(QMainWindow):
         )
         self.btn_report_revisions.clicked.connect(self._on_report_revisions)
         sb_layout.addWidget(self.btn_report_revisions)
+
+        self.btn_deployment_diagnostics = QPushButton("Deployment Diagnostics")
+        self.btn_deployment_diagnostics.setObjectName("ImportBtn")
+        self.btn_deployment_diagnostics.setToolTip(
+            "Review local-only deployment packaging readiness diagnostics. "
+            "No installer, activation, licensing, or cloud deployment is performed."
+        )
+        self.btn_deployment_diagnostics.clicked.connect(self._on_deployment_diagnostics)
+        sb_layout.addWidget(self.btn_deployment_diagnostics)
 
         version_lbl = QLabel(f"v{__version__}")
         version_lbl.setObjectName("SidebarTag")
@@ -1101,6 +1115,57 @@ class MainWindow(QMainWindow):
         except Exception as e:
             log.exception("Report revision review failed")
             QMessageBox.critical(self, "Report revisions failed", str(e))
+
+    def _build_deployment_diagnostics_dialog(self, checklist):
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Deployment diagnostics")
+        dlg.resize(800, 560)
+        layout = QVBoxLayout(dlg)
+
+        summary = QLabel("\n".join(checklist.operator_summary))
+        summary.setWordWrap(True)
+        layout.addWidget(summary)
+
+        selector = QListWidget()
+        detail = QTextEdit()
+        detail.setReadOnly(True)
+        detail.setMinimumHeight(300)
+        layout.addWidget(selector)
+        layout.addWidget(detail, stretch=1)
+
+        by_key = {item.key: item for item in checklist.items}
+        for item in checklist.items:
+            row = QListWidgetItem(item.operator_line, selector)
+            row.setData(Qt.UserRole, item.key)
+
+        def _show_item(current, _previous=None):
+            if current is None:
+                detail.setPlainText("")
+                return
+            item = by_key.get(current.data(Qt.UserRole))
+            detail.setPlainText(format_deployment_checklist_item_text(item) if item else "")
+
+        selector.currentItemChanged.connect(_show_item)
+        if selector.count():
+            selector.setCurrentRow(0)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Close)
+        buttons.rejected.connect(dlg.reject)
+        layout.addWidget(buttons)
+        return dlg
+
+    def _on_deployment_diagnostics(self) -> None:
+        try:
+            checklist = build_deployment_packaging_checklist()
+            dlg = self._build_deployment_diagnostics_dialog(checklist)
+            self.statusBar().showMessage(
+                f"Deployment diagnostics loaded: {len(checklist.items)} check(s), "
+                f"status {checklist.status}."
+            )
+            dlg.exec()
+        except Exception as e:
+            log.exception("Deployment diagnostics review failed")
+            QMessageBox.critical(self, "Deployment diagnostics failed", str(e))
 
     # ----- compute -----
 

@@ -18,6 +18,7 @@ from typing import Any, Mapping
 
 from app import __app_name__, __product_id__, __product_name__, __version__
 from app.config import APP_DIR, REPORTS_DIR, USER_DATA_DIR
+from app.core.iitpave.discovery import bundled_iitpave_exe_path, discover_iitpave_executable
 
 
 DEPLOYMENT_MANIFEST_FORMAT = "sampave.deployment_manifest"
@@ -26,6 +27,10 @@ DEPLOYMENT_MANIFEST_VERSION = "1.0"
 DEPLOYMENT_SEVERITY_INFO = "info"
 DEPLOYMENT_SEVERITY_WARNING = "warning"
 DEPLOYMENT_SEVERITY_ERROR = "error"
+
+DEPLOYMENT_CHECK_PASS = "PASS"
+DEPLOYMENT_CHECK_WARN = "WARN"
+DEPLOYMENT_CHECK_FAIL = "FAIL"
 
 
 def _timestamp() -> str:
@@ -160,6 +165,96 @@ class DeploymentManifest:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class DeploymentChecklistItem:
+    key: str
+    label: str
+    status: str
+    message: str
+    details: Mapping[str, Any]
+
+    @property
+    def passed(self) -> bool:
+        return self.status == DEPLOYMENT_CHECK_PASS
+
+    @property
+    def warning(self) -> bool:
+        return self.status == DEPLOYMENT_CHECK_WARN
+
+    @property
+    def failed(self) -> bool:
+        return self.status == DEPLOYMENT_CHECK_FAIL
+
+    @property
+    def operator_line(self) -> str:
+        return f"{self.status} - {self.label}: {self.message}"
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "key": self.key,
+            "label": self.label,
+            "status": self.status,
+            "message": self.message,
+            "details": dict(self.details),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class DeploymentPackagingChecklist:
+    generated_at: str
+    manifest: DeploymentManifest
+    items: tuple[DeploymentChecklistItem, ...]
+
+    @property
+    def status(self) -> str:
+        if any(item.failed for item in self.items):
+            return DEPLOYMENT_CHECK_FAIL
+        if any(item.warning for item in self.items):
+            return DEPLOYMENT_CHECK_WARN
+        return DEPLOYMENT_CHECK_PASS
+
+    @property
+    def ok(self) -> bool:
+        return self.status != DEPLOYMENT_CHECK_FAIL
+
+    @property
+    def pass_count(self) -> int:
+        return sum(1 for item in self.items if item.passed)
+
+    @property
+    def warn_count(self) -> int:
+        return sum(1 for item in self.items if item.warning)
+
+    @property
+    def fail_count(self) -> int:
+        return sum(1 for item in self.items if item.failed)
+
+    @property
+    def operator_summary(self) -> tuple[str, ...]:
+        return (
+            f"Deployment packaging checklist status: {self.status}.",
+            (
+                f"{self.pass_count} PASS, {self.warn_count} WARN, "
+                f"{self.fail_count} FAIL item(s)."
+            ),
+            "Checklist is local-only, read-only, and diagnostics-only.",
+            "No installer, activation, licensing, or cloud deployment is performed.",
+        )
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "generated_at": self.generated_at,
+            "status": self.status,
+            "ok": self.ok,
+            "pass_count": self.pass_count,
+            "warn_count": self.warn_count,
+            "fail_count": self.fail_count,
+            "manifest": self.manifest.as_dict(),
+            "items": [item.as_dict() for item in self.items],
+            "operator_summary": list(self.operator_summary),
+        }
+
+
 def default_runtime_paths(
     *,
     user_data_dir: Path | None = None,
@@ -291,6 +386,214 @@ def build_deployment_manifest(
         diagnostics=diag,
         optional_metadata=dict(optional_metadata or {}),
     )
+
+
+def _check_status(*, ok: bool, warn: bool = False) -> str:
+    if not ok:
+        return DEPLOYMENT_CHECK_FAIL
+    if warn:
+        return DEPLOYMENT_CHECK_WARN
+    return DEPLOYMENT_CHECK_PASS
+
+
+def _runtime_item(check: RuntimePathCheck) -> DeploymentChecklistItem:
+    status = _check_status(ok=check.ok)
+    message = "Directory exists and is writable." if check.ok else check.issue
+    return DeploymentChecklistItem(
+        key=f"runtime_path.{check.key}",
+        label=f"{check.key.title()} runtime path",
+        status=status,
+        message=message or "Runtime path could not be validated.",
+        details=check.as_dict(),
+    )
+
+
+def _metadata_item(manifest_payload: Mapping[str, Any]) -> DeploymentChecklistItem:
+    app_meta = manifest_payload.get("application")
+    if not isinstance(app_meta, Mapping):
+        return DeploymentChecklistItem(
+            key="application_metadata",
+            label="Application version/build metadata",
+            status=DEPLOYMENT_CHECK_WARN,
+            message="Application metadata is incomplete; fallback manifest remains readable.",
+            details={"available": False},
+        )
+    missing = [
+        key for key in ("name", "product", "product_id", "version")
+        if not str(app_meta.get(key) or "").strip()
+    ]
+    return DeploymentChecklistItem(
+        key="application_metadata",
+        label="Application version/build metadata",
+        status=DEPLOYMENT_CHECK_WARN if missing else DEPLOYMENT_CHECK_PASS,
+        message=(
+            f"Missing metadata fields: {', '.join(missing)}."
+            if missing
+            else "Application version and product metadata are available."
+        ),
+        details={"application": dict(app_meta), "missing_fields": missing},
+    )
+
+
+def _runtime_metadata_item(manifest_payload: Mapping[str, Any]) -> DeploymentChecklistItem:
+    runtime = manifest_payload.get("runtime")
+    if not isinstance(runtime, Mapping):
+        return DeploymentChecklistItem(
+            key="runtime_metadata",
+            label="Python/runtime metadata",
+            status=DEPLOYMENT_CHECK_WARN,
+            message="Runtime metadata is incomplete; checklist remains readable.",
+            details={"available": False},
+        )
+    missing = [
+        key for key in ("python", "platform", "frozen")
+        if key not in runtime or runtime.get(key) in (None, "")
+    ]
+    return DeploymentChecklistItem(
+        key="runtime_metadata",
+        label="Python/runtime metadata",
+        status=DEPLOYMENT_CHECK_WARN if missing else DEPLOYMENT_CHECK_PASS,
+        message=(
+            f"Missing runtime metadata fields: {', '.join(missing)}."
+            if missing
+            else "Python and platform metadata are available."
+        ),
+        details={"runtime": dict(runtime), "missing_fields": missing},
+    )
+
+
+def _report_export_readiness_item(
+    diagnostics: DeploymentDiagnostics,
+) -> DeploymentChecklistItem:
+    checks = {
+        check.key: check for check in diagnostics.runtime_paths
+        if check.key in {"reports", "exports"}
+    }
+    missing = [key for key in ("reports", "exports") if key not in checks]
+    failed = [check.key for check in checks.values() if not check.ok]
+    status = (
+        DEPLOYMENT_CHECK_FAIL if failed
+        else DEPLOYMENT_CHECK_WARN if missing
+        else DEPLOYMENT_CHECK_PASS
+    )
+    if failed:
+        message = f"Report/export path checks failed: {', '.join(failed)}."
+    elif missing:
+        message = f"Report/export path checks missing: {', '.join(missing)}."
+    else:
+        message = "Report and export directories are ready for local deliverables."
+    return DeploymentChecklistItem(
+        key="report_export_readiness",
+        label="Report/export directory readiness",
+        status=status,
+        message=message,
+        details={
+            "reports": checks.get("reports").as_dict() if "reports" in checks else None,
+            "exports": checks.get("exports").as_dict() if "exports" in checks else None,
+            "missing_checks": missing,
+        },
+    )
+
+
+def _iitpave_discovery_item(
+    *,
+    app_dir: Path | str | None = None,
+    env: Mapping[str, str] | None = None,
+) -> DeploymentChecklistItem:
+    try:
+        candidates = discover_iitpave_executable(
+            env=env,
+            include_path_search=False,
+            app_dir=app_dir,
+        )
+    except Exception as exc:
+        return DeploymentChecklistItem(
+            key="iitpave_executable_discovery",
+            label="Optional IITPAVE executable discovery",
+            status=DEPLOYMENT_CHECK_WARN,
+            message=f"IITPAVE discovery metadata is unavailable: {exc}",
+            details={"available": False},
+        )
+
+    selected = next((candidate.path for candidate in candidates if candidate.is_file), None)
+    status = DEPLOYMENT_CHECK_PASS if selected is not None else DEPLOYMENT_CHECK_WARN
+    if selected is not None:
+        message = f"IITPAVE executable candidate is available: {selected}"
+    else:
+        expected = bundled_iitpave_exe_path(app_dir=app_dir)
+        message = (
+            "No usable IITPAVE executable was found. This is optional at packaging "
+            f"checklist time and execution remains blocked. Expected local bundle "
+            f"location: {expected}"
+        )
+    return DeploymentChecklistItem(
+        key="iitpave_executable_discovery",
+        label="Optional IITPAVE executable discovery",
+        status=status,
+        message=message,
+        details={
+            "ok": selected is not None,
+            "selected_path": str(selected) if selected else "",
+            "candidates": [candidate.as_dict() for candidate in candidates],
+            "execution_performed": False,
+        },
+    )
+
+
+def build_deployment_packaging_checklist(
+    *,
+    diagnostics: DeploymentDiagnostics | None = None,
+    manifest: DeploymentManifest | None = None,
+    optional_metadata: Mapping[str, Any] | None = None,
+    build_id: str | None = None,
+    include_iitpave_discovery: bool = True,
+    iitpave_env: Mapping[str, str] | None = None,
+    app_dir: Path | str | None = None,
+) -> DeploymentPackagingChecklist:
+    diag = diagnostics or validate_runtime_environment(create_missing=False)
+    man = manifest or build_deployment_manifest(
+        diagnostics=diag,
+        optional_metadata=optional_metadata,
+        build_id=build_id,
+    )
+    payload = man.as_dict()
+    items: list[DeploymentChecklistItem] = [
+        _runtime_item(check) for check in diag.runtime_paths
+    ]
+    items.extend([
+        _report_export_readiness_item(diag),
+        _metadata_item(payload),
+        _runtime_metadata_item(payload),
+    ])
+    if include_iitpave_discovery:
+        items.append(_iitpave_discovery_item(app_dir=app_dir or diag.app_dir, env=iitpave_env))
+    return DeploymentPackagingChecklist(
+        generated_at=_timestamp(),
+        manifest=man,
+        items=tuple(items),
+    )
+
+
+def format_deployment_checklist_item_text(item: DeploymentChecklistItem) -> str:
+    detail_text = json.dumps(item.details, indent=2, sort_keys=True, default=str)
+    return "\n".join([
+        f"Status: {item.status}",
+        f"Check: {item.label}",
+        f"Key: {item.key}",
+        f"Message: {item.message}",
+        "",
+        "Details:",
+        detail_text,
+    ])
+
+
+def format_deployment_packaging_checklist_text(
+    checklist: DeploymentPackagingChecklist,
+) -> str:
+    lines = list(checklist.operator_summary)
+    lines.append("")
+    lines.extend(item.operator_line for item in checklist.items)
+    return "\n".join(lines)
 
 
 def write_deployment_manifest(
