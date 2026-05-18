@@ -34,6 +34,7 @@ IITPAVE_SCHEMA_HISTORY_SELECTION_STATUS_NONE = "no_history_selected"
 IITPAVE_SCHEMA_HISTORY_SELECTION_STATUS_PARTIAL_UNKNOWN = "selection_contains_unknown_history"
 IITPAVE_SCHEMA_HISTORY_REPORT_STATUS_INCLUDED = "schema_history_report_included"
 IITPAVE_SCHEMA_HISTORY_REPORT_STATUS_EMPTY = "schema_history_report_empty"
+IITPAVE_SCHEMA_HISTORY_SELECTION_AUDIT_STATUS_RECORDED = "selection_audit_recorded"
 
 
 def _payload(raw: Any) -> dict[str, Any]:
@@ -56,6 +57,10 @@ def _dt_text(value: Any) -> str:
 
 def _row_id(row: Any) -> int:
     return int(getattr(row, "id", 0) or 0)
+
+
+def _ids_text(values: Sequence[int]) -> str:
+    return ", ".join(str(i) for i in values) if values else "None"
 
 
 def _diagnostic_rows(summary_payload: Mapping[str, Any]) -> tuple[dict[str, str], ...]:
@@ -200,6 +205,57 @@ class IITPaveSchemaHistoryInclusionSelection:
 
 
 @dataclass(frozen=True, slots=True)
+class IITPaveSchemaHistorySelectionAuditTrail:
+    project_id: int
+    report_path: str
+    decision_status: str
+    available_history_ids: tuple[int, ...] = ()
+    selected_history_ids: tuple[int, ...] = ()
+    skipped_unknown_history_ids: tuple[int, ...] = ()
+    included_history_count: int = 0
+    diagnostic_row_count: int = 0
+    engineering_calculations_allowed: bool = False
+
+    @property
+    def selected_count(self) -> int:
+        return len(self.selected_history_ids)
+
+    @property
+    def available_count(self) -> int:
+        return len(self.available_history_ids)
+
+    @property
+    def operator_summary(self) -> tuple[str, ...]:
+        return (
+            "Report-time IITPAVE schema history inclusion decision recorded.",
+            f"Selection status: {self.decision_status}.",
+            f"Available history IDs: {_ids_text(self.available_history_ids)}.",
+            f"Selected history IDs: {_ids_text(self.selected_history_ids)}.",
+            (
+                "Unknown requested history IDs ignored: "
+                f"{_ids_text(self.skipped_unknown_history_ids)}."
+            ),
+            f"Included history records: {self.included_history_count}.",
+            f"Propagated diagnostic rows: {self.diagnostic_row_count}.",
+            "Engineering calculations remain blocked.",
+        )
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "project_id": self.project_id,
+            "report_path": self.report_path,
+            "decision_status": self.decision_status,
+            "available_history_ids": list(self.available_history_ids),
+            "selected_history_ids": list(self.selected_history_ids),
+            "skipped_unknown_history_ids": list(self.skipped_unknown_history_ids),
+            "included_history_count": self.included_history_count,
+            "diagnostic_row_count": self.diagnostic_row_count,
+            "engineering_calculations_allowed": self.engineering_calculations_allowed,
+            "operator_summary": list(self.operator_summary),
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class IITPaveSchemaDiagnosticsHistoryReview:
     project_id: int
     status: str
@@ -267,6 +323,7 @@ class IITPaveSchemaHistoryReportSummary:
     included_history_count: int = 0
     diagnostic_row_count: int = 0
     selection: IITPaveSchemaHistoryInclusionSelection | None = None
+    selection_audit_trail: IITPaveSchemaHistorySelectionAuditTrail | None = None
 
     @property
     def ok(self) -> bool:
@@ -280,6 +337,10 @@ class IITPaveSchemaHistoryReportSummary:
             "included_history_count": self.included_history_count,
             "diagnostic_row_count": self.diagnostic_row_count,
             "selection": self.selection.as_dict() if self.selection else None,
+            "selection_audit_trail": (
+                self.selection_audit_trail.as_dict()
+                if self.selection_audit_trail else None
+            ),
             "review": self.review.as_dict(),
         }
 
@@ -402,8 +463,26 @@ def format_iitpave_schema_history_item_text(
 def build_iitpave_schema_history_report_summary(
     review: IITPaveSchemaDiagnosticsHistoryReview,
     selection: IITPaveSchemaHistoryInclusionSelection | None = None,
+    report_path: str | Path = "",
 ) -> IITPaveSchemaHistoryReportSummary:
     effective_selection = selection or review.selection
+    included_history_count = review.item_count
+    diagnostic_row_count = sum(len(item.diagnostic_rows) for item in review.items)
+    audit_trail = (
+        IITPaveSchemaHistorySelectionAuditTrail(
+            project_id=review.project_id,
+            report_path=str(report_path or ""),
+            decision_status=effective_selection.status,
+            available_history_ids=effective_selection.available_history_ids,
+            selected_history_ids=effective_selection.selected_history_ids,
+            skipped_unknown_history_ids=effective_selection.skipped_unknown_history_ids,
+            included_history_count=included_history_count,
+            diagnostic_row_count=diagnostic_row_count,
+            engineering_calculations_allowed=False,
+        )
+        if effective_selection is not None
+        else None
+    )
     return IITPaveSchemaHistoryReportSummary(
         review=review,
         status=(
@@ -412,9 +491,10 @@ def build_iitpave_schema_history_report_summary(
             else IITPAVE_SCHEMA_HISTORY_REPORT_STATUS_EMPTY
         ),
         engineering_calculations_allowed=False,
-        included_history_count=review.item_count,
-        diagnostic_row_count=sum(len(item.diagnostic_rows) for item in review.items),
+        included_history_count=included_history_count,
+        diagnostic_row_count=diagnostic_row_count,
         selection=effective_selection,
+        selection_audit_trail=audit_trail,
     )
 
 
@@ -465,9 +545,14 @@ def write_iitpave_schema_history_section(
     *,
     include_header: bool = True,
     selection: IITPaveSchemaHistoryInclusionSelection | None = None,
+    report_path: str | Path = "",
 ) -> IITPaveSchemaHistoryReportSummary:
     """Append audit-only recalled IITPAVE schema diagnostics history to a report."""
-    summary = build_iitpave_schema_history_report_summary(review, selection=selection)
+    summary = build_iitpave_schema_history_report_summary(
+        review,
+        selection=selection,
+        report_path=report_path,
+    )
 
     if include_header:
         add_heading(
@@ -514,6 +599,25 @@ def write_iitpave_schema_history_section(
             )),
         ))
         for line in summary.selection.operator_summary:
+            add_p(doc, line, size=9)
+    if summary.selection_audit_trail is not None:
+        add_heading(doc, "Report-Time Selection Audit Trail", level=3)
+        add_kv_table(doc, (
+            ("Audit status", IITPAVE_SCHEMA_HISTORY_SELECTION_AUDIT_STATUS_RECORDED),
+            ("Report path", summary.selection_audit_trail.report_path),
+            ("Decision status", summary.selection_audit_trail.decision_status),
+            ("Available history IDs", _ids_text(
+                summary.selection_audit_trail.available_history_ids
+            )),
+            ("Selected history IDs", _ids_text(
+                summary.selection_audit_trail.selected_history_ids
+            )),
+            ("Unknown requested history IDs", _ids_text(
+                summary.selection_audit_trail.skipped_unknown_history_ids
+            )),
+            ("Engineering calculations allowed", "No"),
+        ))
+        for line in summary.selection_audit_trail.operator_summary:
             add_p(doc, line, size=9)
 
     add_heading(doc, "Persisted History Records", level=2)
@@ -568,6 +672,7 @@ def build_iitpave_schema_history_docx(
         review,
         include_header=True,
         selection=selection,
+        report_path=out_path,
     )
     add_signature_block(doc)
     doc.save(out_path)

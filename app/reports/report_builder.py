@@ -87,6 +87,7 @@ from .structural_report import (
 )
 from .iitpave_schema_history import (
     IITPaveSchemaHistoryReportContext,
+    build_iitpave_schema_history_report_summary,
     build_iitpave_schema_history_review,
     write_iitpave_schema_history_section,
 )
@@ -468,6 +469,7 @@ def build_combined_report(
     add_table(doc, ["Section", "Governing Reference"], toc_rows)
 
     included: list[str] = []
+    schema_history_summary = None
 
     # ---- Mix design (uses existing word_report internals) ----
     if have_mix:
@@ -636,15 +638,30 @@ def build_combined_report(
     # ---- IITPAVE Schema Diagnostics History (audit-only recall) ----
     if schema_history_review.items:
         doc.add_page_break()
-        write_iitpave_schema_history_section(
+        schema_history_summary = write_iitpave_schema_history_section(
             doc,
             _schema_history_ctx(ctx),
             schema_history_review,
             include_header=True,
             selection=schema_history_review.selection,
+            report_path=out_path,
         )
         included.append("IITPAVE Schema Diagnostics History")
+    elif schema_history_review.selection and schema_history_review.selection.available_history_ids:
+        schema_history_summary = build_iitpave_schema_history_report_summary(
+            schema_history_review,
+            selection=schema_history_review.selection,
+            report_path=out_path,
+        )
 
     add_signature_block(doc)
     doc.save(out_path)
+    if schema_history_summary is not None and hasattr(
+        db, "save_iitpave_schema_history_selection_audit"
+    ):
+        db.save_iitpave_schema_history_selection_audit(
+            project_id=project_id,
+            report_path=str(out_path),
+            summary=schema_history_summary,
+        )
     return out_path, included

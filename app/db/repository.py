@@ -26,6 +26,7 @@ from .schema import (
     Client,
     ConditionSurvey,
     IITPaveSchemaDiagnosticsHistory,
+    IITPaveSchemaHistorySelectionAudit,
     MaintenanceDesign,
     Material,
     MaterialQuantityDesign,
@@ -658,6 +659,63 @@ class Database:
                 .order_by(
                     IITPaveSchemaDiagnosticsHistory.generated_at.desc(),
                     IITPaveSchemaDiagnosticsHistory.id.desc(),
+                )
+            ))
+
+    # ---- IITPAVE schema history report-selection audit (Phase 37) -----
+    def save_iitpave_schema_history_selection_audit(
+        self,
+        *,
+        project_id: int,
+        report_path: str,
+        summary,
+    ) -> IITPaveSchemaHistorySelectionAudit | None:
+        """Persist an audit-only report-time schema-history selection decision."""
+        audit_trail = getattr(summary, "selection_audit_trail", None)
+        if audit_trail is None:
+            return None
+        summary_dict = _to_json_safe(
+            summary.as_dict() if hasattr(summary, "as_dict") else summary
+        )
+        with self.session() as s:
+            row = IITPaveSchemaHistorySelectionAudit(
+                project_id=project_id,
+                report_path=report_path,
+                decision_status=getattr(audit_trail, "decision_status", "") or "",
+                available_history_ids_json=json.dumps(
+                    list(getattr(audit_trail, "available_history_ids", ()) or ())
+                ),
+                selected_history_ids_json=json.dumps(
+                    list(getattr(audit_trail, "selected_history_ids", ()) or ())
+                ),
+                skipped_unknown_history_ids_json=json.dumps(
+                    list(getattr(audit_trail, "skipped_unknown_history_ids", ()) or ())
+                ),
+                included_history_count=int(
+                    getattr(audit_trail, "included_history_count", 0) or 0
+                ),
+                diagnostic_row_count=int(
+                    getattr(audit_trail, "diagnostic_row_count", 0) or 0
+                ),
+                engineering_calculations_allowed=bool(
+                    getattr(audit_trail, "engineering_calculations_allowed", False)
+                ),
+                summary_json=json.dumps(summary_dict, sort_keys=True),
+            )
+            s.add(row)
+            s.flush()
+            return row
+
+    def list_iitpave_schema_history_selection_audits(
+        self, project_id: int,
+    ) -> list[IITPaveSchemaHistorySelectionAudit]:
+        with self.session() as s:
+            return list(s.scalars(
+                select(IITPaveSchemaHistorySelectionAudit)
+                .where(IITPaveSchemaHistorySelectionAudit.project_id == project_id)
+                .order_by(
+                    IITPaveSchemaHistorySelectionAudit.generated_at.desc(),
+                    IITPaveSchemaHistorySelectionAudit.id.desc(),
                 )
             ))
 

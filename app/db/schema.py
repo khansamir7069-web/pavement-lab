@@ -87,6 +87,9 @@ class Project(Base):
     iitpave_schema_diagnostics: Mapped[list["IITPaveSchemaDiagnosticsHistory"]] = relationship(
         back_populates="project", cascade="all, delete-orphan"
     )
+    iitpave_schema_history_selection_audits: Mapped[
+        list["IITPaveSchemaHistorySelectionAudit"]
+    ] = relationship(back_populates="project", cascade="all, delete-orphan")
 
 
 class MixDesign(Base):
@@ -278,6 +281,31 @@ class IITPaveSchemaDiagnosticsHistory(Base):
     generated_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
     project: Mapped[Project] = relationship(back_populates="iitpave_schema_diagnostics")
+
+
+class IITPaveSchemaHistorySelectionAudit(Base):
+    """Phase-37 report-time audit trail for schema-history inclusion choices.
+
+    This table stores only operator/report metadata. It deliberately carries no
+    strain, fatigue, rutting, or IRC compliance result columns.
+    """
+    __tablename__ = "iitpave_schema_history_selection_audits"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False)
+    report_path: Mapped[Optional[str]] = mapped_column(Text)
+    decision_status: Mapped[Optional[str]] = mapped_column(String(80))
+    available_history_ids_json: Mapped[Optional[str]] = mapped_column(JSON)
+    selected_history_ids_json: Mapped[Optional[str]] = mapped_column(JSON)
+    skipped_unknown_history_ids_json: Mapped[Optional[str]] = mapped_column(JSON)
+    included_history_count: Mapped[Optional[int]] = mapped_column(Integer)
+    diagnostic_row_count: Mapped[Optional[int]] = mapped_column(Integer)
+    engineering_calculations_allowed: Mapped[Optional[bool]] = mapped_column(Boolean)
+    summary_json: Mapped[Optional[str]] = mapped_column(JSON)
+    generated_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+    project: Mapped[Project] = relationship(
+        back_populates="iitpave_schema_history_selection_audits"
+    )
 
 
 class User(Base):

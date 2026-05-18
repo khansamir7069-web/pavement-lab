@@ -23,6 +23,7 @@ from .schema import (
     Client,
     ConditionSurvey,
     IITPaveSchemaDiagnosticsHistory,
+    IITPaveSchemaHistorySelectionAudit,
     MaintenanceDesign,
     MaterialQuantityDesign,
     MechanisticValidation,
@@ -224,6 +225,27 @@ _CHILD_SECTIONS: dict[str, tuple[type, tuple[str, ...], tuple[str, ...]]] = {
             "generated_at",
         ),
         ("summary_json",),
+    ),
+    "iitpave_schema_history_selection_audits": (
+        IITPaveSchemaHistorySelectionAudit,
+        (
+            "report_path",
+            "decision_status",
+            "available_history_ids_json",
+            "selected_history_ids_json",
+            "skipped_unknown_history_ids_json",
+            "included_history_count",
+            "diagnostic_row_count",
+            "engineering_calculations_allowed",
+            "summary_json",
+            "generated_at",
+        ),
+        (
+            "available_history_ids_json",
+            "selected_history_ids_json",
+            "skipped_unknown_history_ids_json",
+            "summary_json",
+        ),
     ),
 }
 
