@@ -23,6 +23,19 @@ from .input_builder import (
     INPUT_FORMAT_VERSION,
     build_iitpave_input,
 )
+from .discovery import (
+    DEFAULT_EXE_FILENAME_POSIX,
+    DEFAULT_EXE_FILENAME_WIN,
+    IITPAVE_EXECUTABLE_ENV_VAR,
+    IITPaveEnvironmentIssue,
+    IITPaveEnvironmentValidationResult,
+    IITPaveExecutableCandidate,
+    bundled_iitpave_dir,
+    bundled_iitpave_exe_candidates,
+    bundled_iitpave_exe_path,
+    discover_iitpave_executable,
+    validate_iitpave_environment,
+)
 from .parser import (
     is_known_stub_output,
     parse_iitpave_output,
@@ -66,6 +79,18 @@ __all__ = [
     "is_known_stub_output",
     "INPUT_FORMAT_VERSION",
     "STUB_OUTPUT_VERSION",
+    # discovery / environment validation
+    "DEFAULT_EXE_FILENAME_POSIX",
+    "DEFAULT_EXE_FILENAME_WIN",
+    "IITPAVE_EXECUTABLE_ENV_VAR",
+    "IITPaveEnvironmentIssue",
+    "IITPaveEnvironmentValidationResult",
+    "IITPaveExecutableCandidate",
+    "bundled_iitpave_dir",
+    "bundled_iitpave_exe_candidates",
+    "bundled_iitpave_exe_path",
+    "discover_iitpave_executable",
+    "validate_iitpave_environment",
     # results
     "PointResult",
     "MechanisticResult",

@@ -26,6 +26,8 @@ import tempfile
 from pathlib import Path
 from typing import Optional, Protocol
 
+from .discovery import bundled_iitpave_exe_path
+
 
 SOURCE_STUB: str = "stub"
 SOURCE_EXTERNAL: str = "external_exe"
@@ -148,15 +150,9 @@ class StubRunner:
 
 # Canonical bundle location for the IITPAVE executable. Phase 17 ships
 # the directory layout but NOT the binary (binary is licensed / placed
-# by the operator per build/installer/bundle_iitpave.md). The bundling
-# story stays out of the engine — this constant is the single point of
-# truth the runner uses to find the binary on disk.
-_BUNDLE_EXTERNAL_DIR_NAME: str = "external"
-_BUNDLE_IITPAVE_DIR_NAME: str = "iitpave"
-_DEFAULT_EXE_FILENAME_WIN: str = "IITPAVE.exe"
-_DEFAULT_EXE_FILENAME_POSIX: str = "iitpave"
-
-
+# by the operator per build/installer/bundle_iitpave.md). Phase 22 moves
+# path resolution into discovery.py so diagnostics and runner defaults
+# share the same filesystem contract.
 def default_iitpave_exe_path() -> Path:
     """Return the canonical bundled path for the IITPAVE executable.
 
@@ -165,17 +161,7 @@ def default_iitpave_exe_path() -> Path:
     returned path is honest about the canonical location even when no
     binary is present — caller checks ``.is_file()`` before invoking.
     """
-    # Lazy import to keep this module importable without a config.
-    from app.config import APP_DIR
-    base = APP_DIR / _BUNDLE_EXTERNAL_DIR_NAME / _BUNDLE_IITPAVE_DIR_NAME
-    # Prefer a Windows filename when one is present; otherwise fall
-    # back to the POSIX-style binary name. Either way, the path is
-    # canonical: callers raise FileNotFoundError if neither exists.
-    for name in (_DEFAULT_EXE_FILENAME_WIN, _DEFAULT_EXE_FILENAME_POSIX):
-        candidate = base / name
-        if candidate.is_file():
-            return candidate
-    return base / _DEFAULT_EXE_FILENAME_WIN
+    return bundled_iitpave_exe_path()
 
 
 class ExternalExeRunner:

@@ -49,6 +49,21 @@ rather than `None`.
 `exe_path=...` to point at an out-of-tree binary (test harnesses do
 this; production builds should not).
 
+Phase 22 adds a structured diagnostics layer in
+`app.core.iitpave.discovery`. It validates, without executing the binary,
+these candidate sources in order:
+
+1. caller-supplied `configured_path`;
+2. `SAMPAVE_IITPAVE_EXE`;
+3. the bundled drop-in directory shown above;
+4. optional `PATH` search when explicitly requested.
+
+`validate_iitpave_environment(...)` returns typed candidates, the selected
+path when one exists, and structured `info` / `warning` / `error` issues
+that can be serialized into audit logs or shown in the UI. It does not
+claim IITPAVE version compliance; it only validates filesystem
+configuration.
+
 ---
 
 ## 3. Toggling between StubRunner and ExternalExeRunner
