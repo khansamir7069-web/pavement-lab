@@ -1,7 +1,7 @@
 """Guarded IITPAVE verified-fixture schema mapping layer.
 
-Phase 28 maps only reviewed fixture structure exposed by the conservative
-parser-contract layer. It does not extract strains, stresses, layer values,
+Phases 28-29 map only reviewed fixture structure exposed by the conservative
+parser-contract layer. They do not extract strains, stresses, layer values,
 fatigue life, rutting life, or IRC compliance conclusions.
 """
 from __future__ import annotations
@@ -38,7 +38,15 @@ IITPAVE_SCHEMA_SECTION_STRESS_STRAIN_TABLE_CANDIDATE = (
     "stress_strain_table_candidate"
 )
 
+IITPAVE_SCHEMA_FAMILY_UNKNOWN = "unknown_schema_family"
+IITPAVE_SCHEMA_FAMILY_DIRECT_STRESS_STRAIN_TABLE = "direct_stress_strain_table"
+IITPAVE_SCHEMA_FAMILY_ELASTIC_LAYER_STRESS_STRAIN_TABLE = (
+    "elastic_layer_stress_strain_table"
+)
+
 _STRESS_STRAIN_MARKERS = ("stress", "strain")
+_ELASTIC_LAYER_MARKERS = ("elastic layer", "elastic-layer", "elastic layered")
+_MAX_CONTEXT_TABLE_LINE_GAP = 8
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,6 +81,8 @@ class IITPaveVerifiedFixtureSchemaMappingResult:
     status: str
     blocked: bool
     blocked_reason: str = ""
+    schema_family: str = IITPAVE_SCHEMA_FAMILY_UNKNOWN
+    classification_markers: tuple[str, ...] = ()
     mappings: tuple[IITPaveSchemaSectionMapping, ...] = ()
     engineering_values_extracted: bool = False
     issues: tuple[IITPaveEnvironmentIssue, ...] = ()
@@ -87,6 +97,8 @@ class IITPaveVerifiedFixtureSchemaMappingResult:
             "status": self.status,
             "blocked": self.blocked,
             "blocked_reason": self.blocked_reason,
+            "schema_family": self.schema_family,
+            "classification_markers": list(self.classification_markers),
             "mapping_count": len(self.mappings),
             "engineering_values_extracted": self.engineering_values_extracted,
             "parser_contract": self.parser_contract.as_dict(),
@@ -105,6 +117,8 @@ def _blocked(
     status: str,
     reason: str,
     issues: list[IITPaveEnvironmentIssue],
+    schema_family: str = IITPAVE_SCHEMA_FAMILY_UNKNOWN,
+    classification_markers: tuple[str, ...] = (),
     mappings: tuple[IITPaveSchemaSectionMapping, ...] = (),
 ) -> IITPaveVerifiedFixtureSchemaMappingResult:
     issues.append(_issue(VALIDATION_ERROR, "schema_mapping", reason))
@@ -113,6 +127,8 @@ def _blocked(
         status=status,
         blocked=True,
         blocked_reason=reason,
+        schema_family=schema_family,
+        classification_markers=classification_markers,
         mappings=mappings,
         engineering_values_extracted=False,
         issues=tuple(issues),
@@ -135,17 +151,65 @@ def _mapping(
     )
 
 
+def _section_text(section: IITPaveParserContractSection) -> str:
+    return " ".join((
+        section.marker,
+        section.label,
+        *section.evidence_preview,
+    )).lower()
+
+
 def _is_stress_strain_context(section: IITPaveParserContractSection) -> bool:
-    marker = section.marker.lower()
-    label = section.label.lower()
-    return any(m in marker or m in label for m in _STRESS_STRAIN_MARKERS)
+    text = _section_text(section)
+    return any(m in text for m in _STRESS_STRAIN_MARKERS)
 
 
-def _has_prior_stress_strain_context(
+def _nearest_prior_stress_strain_context(
     table: IITPaveParserContractSection,
     contexts: tuple[IITPaveParserContractSection, ...],
-) -> bool:
-    return any(c.start_line_index <= table.start_line_index for c in contexts)
+) -> IITPaveParserContractSection | None:
+    candidates = tuple(
+        c for c in contexts
+        if c.end_line_index <= table.start_line_index
+        and table.start_line_index - c.end_line_index <= _MAX_CONTEXT_TABLE_LINE_GAP
+    )
+    if not candidates:
+        return None
+    return max(candidates, key=lambda c: c.end_line_index)
+
+
+def _classification_markers(
+    mappings: tuple[IITPaveSchemaSectionMapping, ...],
+) -> tuple[str, ...]:
+    text = " ".join(
+        _section_text(m.source_section) if m.source_section else m.source_label.lower()
+        for m in mappings
+    )
+    markers: list[str] = []
+    if any(marker in text for marker in _ELASTIC_LAYER_MARKERS):
+        markers.append("elastic_layer_context")
+    if "stress" in text:
+        markers.append("stress_context")
+    if "strain" in text:
+        markers.append("strain_context")
+    if any(
+        m.schema_role == IITPAVE_SCHEMA_SECTION_STRESS_STRAIN_TABLE_CANDIDATE
+        for m in mappings
+    ):
+        markers.append("table_candidate")
+    return tuple(markers)
+
+
+def _schema_family(
+    mappings: tuple[IITPaveSchemaSectionMapping, ...],
+) -> tuple[str, tuple[str, ...]]:
+    markers = _classification_markers(mappings)
+    marker_set = set(markers)
+    if "table_candidate" not in marker_set or "strain_context" not in marker_set:
+        return IITPAVE_SCHEMA_FAMILY_UNKNOWN, markers
+    if "elastic_layer_context" in marker_set:
+        return IITPAVE_SCHEMA_FAMILY_ELASTIC_LAYER_STRESS_STRAIN_TABLE, markers
+    return IITPAVE_SCHEMA_FAMILY_DIRECT_STRESS_STRAIN_TABLE, markers
 
 
 def _schema_mappings(
@@ -171,7 +235,8 @@ def _schema_mappings(
             mappings.append(_mapping(section, role))
         elif (
             section.section_type == IITPAVE_SECTION_TABLE_LIKE
-            and _has_prior_stress_strain_context(section, stress_strain_contexts)
+            and _nearest_prior_stress_strain_context(section, stress_strain_contexts)
+            is not None
         ):
             mappings.append(
                 _mapping(section, IITPAVE_SCHEMA_SECTION_STRESS_STRAIN_TABLE_CANDIDATE)
@@ -214,6 +279,7 @@ def map_iitpave_verified_fixture_schema(
         )
 
     mappings = _schema_mappings(parser_contract.sections)
+    schema_family, classification_markers = _schema_family(mappings)
     roles = {m.schema_role for m in mappings}
     required_roles = {
         IITPAVE_SCHEMA_SECTION_OUTPUT_HEADER,
@@ -231,18 +297,36 @@ def map_iitpave_verified_fixture_schema(
             status=IITPAVE_SCHEMA_MAPPING_STATUS_UNKNOWN,
             reason=reason,
             issues=issues,
+            schema_family=schema_family,
+            classification_markers=classification_markers,
+            mappings=mappings,
+        )
+    if schema_family == IITPAVE_SCHEMA_FAMILY_UNKNOWN:
+        reason = (
+            "IITPAVE fixture schema mapping is recognized structurally, but no "
+            "reviewed schema family could be classified safely."
+        )
+        return _blocked(
+            parser_contract,
+            status=IITPAVE_SCHEMA_MAPPING_STATUS_UNKNOWN,
+            reason=reason,
+            issues=issues,
+            schema_family=schema_family,
+            classification_markers=classification_markers,
             mappings=mappings,
         )
 
     issues.append(_issue(
         VALIDATION_INFO,
         "schema_mapping",
-        "Verified fixture schema sections were mapped; engineering parsing remains disabled.",
+        "Verified fixture schema sections were classified; engineering parsing remains disabled.",
     ))
     return IITPaveVerifiedFixtureSchemaMappingResult(
         parser_contract=parser_contract,
         status=IITPAVE_SCHEMA_MAPPING_STATUS_MAPPED,
         blocked=False,
+        schema_family=schema_family,
+        classification_markers=classification_markers,
         mappings=mappings,
         engineering_values_extracted=False,
         issues=tuple(issues),
