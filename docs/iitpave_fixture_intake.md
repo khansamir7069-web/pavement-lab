@@ -153,3 +153,18 @@ It continues to serialize `engineering_calculations_allowed=false` and does not
 authorize parser output, strain extraction, mechanistic calculations,
 fatigue/rutting checks, IRC compliance conclusions, or engineering
 recommendations.
+
+## Phase 36 Report Inclusion Selection
+
+`IITPaveSchemaHistoryInclusionSelection` records which persisted schema
+diagnostics history IDs are available and which IDs are selected for report
+inclusion. `build_combined_report(...)` remains backward compatible: when no
+selection is supplied, all available history records are included as before.
+
+The desktop combined-report workflow now prompts the operator with a checkable
+list of persisted schema diagnostics history records before the report is
+rendered. The selected IDs are passed to the report builder in deterministic
+history order. Unknown requested IDs are ignored and surfaced in the typed
+selection summary. Selection affects report inclusion only; it does not enable
+parser output, strain extraction, mechanistic calculations, compliance
+conclusions, or recommendations.

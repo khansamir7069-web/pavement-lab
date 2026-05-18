@@ -588,6 +588,53 @@ class MainWindow(QMainWindow):
             log.exception("Material-qty export failed")
             QMessageBox.critical(self, "Export failed", str(e))
 
+    def _select_iitpave_schema_history_for_report(
+        self,
+        project_id: int,
+    ) -> tuple[bool, tuple[int, ...] | None]:
+        rows = self.db.list_iitpave_schema_diagnostics(project_id)
+        review = build_iitpave_schema_history_review(project_id, rows)
+        if not review.items:
+            return True, None
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Select IITPAVE schema history")
+        dlg.resize(620, 420)
+        layout = QVBoxLayout(dlg)
+        label = QLabel(
+            "Select persisted IITPAVE schema diagnostics history records to "
+            "include in the combined report."
+        )
+        label.setWordWrap(True)
+        layout.addWidget(label)
+
+        selector = QListWidget()
+        for item in review.items:
+            row = QListWidgetItem(item.label, selector)
+            row.setData(Qt.UserRole, item.id)
+            row.setFlags(row.flags() | Qt.ItemIsUserCheckable)
+            row.setCheckState(Qt.Checked)
+        layout.addWidget(selector, stretch=1)
+
+        note = QLabel("Selection is audit-only; engineering calculations remain blocked.")
+        note.setWordWrap(True)
+        layout.addWidget(note)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(dlg.accept)
+        buttons.rejected.connect(dlg.reject)
+        layout.addWidget(buttons)
+
+        if dlg.exec() != QDialog.Accepted:
+            return False, None
+
+        selected: list[int] = []
+        for idx in range(selector.count()):
+            row = selector.item(idx)
+            if row.checkState() == Qt.Checked:
+                selected.append(int(row.data(Qt.UserRole)))
+        return True, tuple(selected)
+
     def _on_export_combined_report(self, project_id: int) -> None:
         """Hub 'Reports' tile — module-aware combined Word output."""
         default = REPORTS_DIR / f"PavementReport_{project_id}.docx"
@@ -605,6 +652,11 @@ class MainWindow(QMainWindow):
                 binder_grade=(p.binder_grade if (p and p.binder_grade) else ""),
                 mix_type_key=(p.mix_type if (p and p.mix_type) else ""),
             )
+            ok, schema_history_ids = self._select_iitpave_schema_history_for_report(
+                project_id
+            )
+            if not ok:
+                return
             # Pass live mix-design only if it belongs to this project
             mix_live = None
             chart_set = None
@@ -619,6 +671,7 @@ class MainWindow(QMainWindow):
                 mix_result_live=mix_live,
                 mix_chart_set=chart_set,
                 mix_material_calc=mat_calc,
+                schema_history_selection_ids=schema_history_ids,
             )
             QMessageBox.information(
                 self, "Combined report exported",

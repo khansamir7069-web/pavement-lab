@@ -26,7 +26,7 @@ import json
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Mapping, Optional
+from typing import Mapping, Optional, Sequence
 
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 
@@ -345,6 +345,7 @@ def build_combined_report(
     mix_result_live: "MixDesignResult | ImportedMixResult | None" = None,
     mix_chart_set: Optional[MarshallChartSet] = None,
     mix_material_calc=None,
+    schema_history_selection_ids: Sequence[int] | None = None,
 ) -> tuple[Path, list[str]]:
     """Build a single Word document for every module that has saved data.
 
@@ -378,6 +379,7 @@ def build_combined_report(
     schema_history_review = build_iitpave_schema_history_review(
         project_id,
         db.list_iitpave_schema_diagnostics(project_id),
+        selected_history_ids=schema_history_selection_ids,
     )
 
     have_mix = mix_result_live is not None
@@ -639,6 +641,7 @@ def build_combined_report(
             _schema_history_ctx(ctx),
             schema_history_review,
             include_header=True,
+            selection=schema_history_review.selection,
         )
         included.append("IITPAVE Schema Diagnostics History")
 
