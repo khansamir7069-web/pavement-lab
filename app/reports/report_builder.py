@@ -23,13 +23,16 @@ user saw at save time. No state escapes the engine.
 from __future__ import annotations
 
 import json
+import platform
+import sys
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Mapping, Optional, Sequence
+from typing import Any, Mapping, Optional, Sequence
 
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 
+from app import __product_name__, __version__
 from app.core import (
     ColdMixInput,
     ConditionSurveyInput,
@@ -50,6 +53,7 @@ from app.core import (
     compute_traffic_analysis,
 )
 from app.core.import_summary import ImportedMixResult
+from app.db.project_exchange import PROJECT_EXPORT_FORMAT, PROJECT_EXPORT_FORMAT_VERSION
 from app.graphs import MarshallChartSet, build_chart_set
 
 from ._docx_common import (
@@ -113,9 +117,72 @@ class CombinedReportContext:
     mix_type_key: str = ""
 
 
+@dataclass(frozen=True, slots=True)
+class CombinedReportProvenanceSummary:
+    generated_at: str
+    operator_identifier: str
+    report_path: str
+    project_id: int
+    project_work_name: str
+    schema_history_selection_status: str
+    schema_history_available_ids: tuple[int, ...] = ()
+    schema_history_selected_ids: tuple[int, ...] = ()
+    schema_history_unknown_ids: tuple[int, ...] = ()
+    schema_history_included_count: int = 0
+    schema_history_diagnostic_row_count: int = 0
+    validation_warnings: tuple[str, ...] = ()
+    export_provenance: tuple[str, ...] = ()
+    environment_metadata: tuple[str, ...] = ()
+    engineering_calculations_allowed: bool = False
+
+    @property
+    def operator_summary(self) -> tuple[str, ...]:
+        warnings = self.validation_warnings or (
+            "No report-time validation warnings recorded.",
+        )
+        return (
+            f"Report generated at: {self.generated_at}.",
+            f"Operator identifier: {self.operator_identifier}.",
+            f"Project ID: {self.project_id}.",
+            f"Project work name: {self.project_work_name}.",
+            f"IITPAVE schema-history selection status: {self.schema_history_selection_status}.",
+            f"Selected schema history IDs: {_ids_text(self.schema_history_selected_ids)}.",
+            f"Available schema history IDs: {_ids_text(self.schema_history_available_ids)}.",
+            f"Unknown requested schema history IDs: {_ids_text(self.schema_history_unknown_ids)}.",
+            f"Included schema history records: {self.schema_history_included_count}.",
+            f"Propagated schema diagnostic rows: {self.schema_history_diagnostic_row_count}.",
+            *warnings,
+            "Engineering calculations remain blocked for IITPAVE schema audit content.",
+        )
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "generated_at": self.generated_at,
+            "operator_identifier": self.operator_identifier,
+            "report_path": self.report_path,
+            "project_id": self.project_id,
+            "project_work_name": self.project_work_name,
+            "schema_history_selection_status": self.schema_history_selection_status,
+            "schema_history_available_ids": list(self.schema_history_available_ids),
+            "schema_history_selected_ids": list(self.schema_history_selected_ids),
+            "schema_history_unknown_ids": list(self.schema_history_unknown_ids),
+            "schema_history_included_count": self.schema_history_included_count,
+            "schema_history_diagnostic_row_count": self.schema_history_diagnostic_row_count,
+            "validation_warnings": list(self.validation_warnings),
+            "export_provenance": list(self.export_provenance),
+            "environment_metadata": list(self.environment_metadata),
+            "engineering_calculations_allowed": self.engineering_calculations_allowed,
+            "operator_summary": list(self.operator_summary),
+        }
+
+
 # ---------------------------------------------------------------------------
 # Re-hydrate persisted module rows via the deterministic engines
 # ---------------------------------------------------------------------------
+
+def _ids_text(values: Sequence[int]) -> str:
+    return ", ".join(str(i) for i in values) if values else "None"
+
 
 def _coerce_tuple(v) -> tuple:
     return tuple(v) if isinstance(v, list) else v
@@ -333,6 +400,138 @@ def _schema_history_ctx(ctx: CombinedReportContext) -> IITPaveSchemaHistoryRepor
     )
 
 
+def _project_validation_warnings(db, project_id: int) -> tuple[str, ...]:
+    if not hasattr(db, "validate_project_config"):
+        return ()
+    try:
+        validation = db.validate_project_config(project_id)
+    except Exception:
+        return ("Project configuration validation metadata could not be loaded.",)
+    warnings: list[str] = []
+    for issue in getattr(validation, "issues", ()) or ():
+        severity = str(getattr(issue, "severity", "") or "warning")
+        field = str(getattr(issue, "field", "") or "project.config")
+        message = str(getattr(issue, "message", "") or "Validation metadata unavailable.")
+        warnings.append(f"{severity}: {field}: {message}")
+    return tuple(warnings)
+
+
+def build_combined_report_provenance_summary(
+    *,
+    db,
+    project_id: int,
+    project,
+    ctx: CombinedReportContext,
+    out_path: Path,
+    schema_history_summary=None,
+) -> CombinedReportProvenanceSummary:
+    selection = getattr(schema_history_summary, "selection", None)
+    validation_warnings = list(_project_validation_warnings(db, project_id))
+    if selection is not None and selection.skipped_unknown_history_ids:
+        validation_warnings.append(
+            "warning: iitpave_schema_history_selection: "
+            "unknown requested history IDs were ignored: "
+            f"{_ids_text(selection.skipped_unknown_history_ids)}."
+        )
+    return CombinedReportProvenanceSummary(
+        generated_at=datetime.now().replace(microsecond=0).isoformat(sep=" "),
+        operator_identifier=(ctx.submitted_by or "Not recorded"),
+        report_path=str(out_path),
+        project_id=project_id,
+        project_work_name=(
+            ctx.work_name
+            or getattr(project, "work_name", "")
+            or "Not recorded"
+        ),
+        schema_history_selection_status=(
+            selection.status if selection is not None else "No schema-history selection metadata."
+        ),
+        schema_history_available_ids=(
+            selection.available_history_ids if selection is not None else ()
+        ),
+        schema_history_selected_ids=(
+            selection.selected_history_ids if selection is not None else ()
+        ),
+        schema_history_unknown_ids=(
+            selection.skipped_unknown_history_ids if selection is not None else ()
+        ),
+        schema_history_included_count=int(
+            getattr(schema_history_summary, "included_history_count", 0) or 0
+        ),
+        schema_history_diagnostic_row_count=int(
+            getattr(schema_history_summary, "diagnostic_row_count", 0) or 0
+        ),
+        validation_warnings=tuple(validation_warnings),
+        export_provenance=(
+            f"Project exchange format: {PROJECT_EXPORT_FORMAT} "
+            f"v{PROJECT_EXPORT_FORMAT_VERSION}.",
+            "Project import creates new local rows; source record IDs are preserved only as provenance.",
+            "Imported IITPAVE schema-history audit IDs are shown exactly as recorded and are not remapped.",
+        ),
+        environment_metadata=(
+            f"Application: {__product_name__} v{__version__}.",
+            f"Runtime: Python {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}.",
+            f"Platform family: {platform.system() or 'Not recorded'} {platform.release() or ''}".strip(),
+        ),
+        engineering_calculations_allowed=False,
+    )
+
+
+def write_combined_report_provenance_section(
+    doc,
+    summary: CombinedReportProvenanceSummary,
+) -> None:
+    add_heading(
+        doc,
+        "REPORT PROVENANCE AND TRACEABILITY",
+        level=1,
+        align=WD_ALIGN_PARAGRAPH.CENTER,
+    )
+    add_heading(doc, "Generation Metadata", level=2)
+    add_kv_table(doc, (
+        ("Report generated at", summary.generated_at),
+        ("Operator identifier", summary.operator_identifier),
+        ("Project ID", str(summary.project_id)),
+        ("Project work name", summary.project_work_name),
+        ("Report path", summary.report_path),
+    ))
+
+    add_heading(doc, "IITPAVE Schema-History Selection Summary", level=2)
+    add_kv_table(doc, (
+        ("Selection status", summary.schema_history_selection_status),
+        ("Available candidate IDs", _ids_text(summary.schema_history_available_ids)),
+        ("Selected history IDs", _ids_text(summary.schema_history_selected_ids)),
+        ("Unknown requested IDs", _ids_text(summary.schema_history_unknown_ids)),
+        ("Included history records", str(summary.schema_history_included_count)),
+        ("Propagated diagnostic rows", str(summary.schema_history_diagnostic_row_count)),
+        ("Engineering calculations allowed", "No"),
+    ))
+
+    add_heading(doc, "Validation Warning Summary", level=2)
+    for line in summary.validation_warnings or (
+        "No report-time validation warnings recorded.",
+    ):
+        add_p(doc, line, size=10)
+
+    add_heading(doc, "Export And Import Provenance", level=2)
+    for line in summary.export_provenance:
+        add_p(doc, line, size=10)
+
+    add_heading(doc, "Report Environment Metadata", level=2)
+    for line in summary.environment_metadata:
+        add_p(doc, line, size=10)
+
+    add_p(
+        doc,
+        "This provenance section is read-only audit metadata. It does not "
+        "extract IITPAVE strains, run mechanistic calculations, evaluate "
+        "fatigue or rutting, make IRC compliance claims, or issue engineering "
+        "recommendations.",
+        size=9,
+        italic=True,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Public entry point
 # ---------------------------------------------------------------------------
@@ -381,6 +580,11 @@ def build_combined_report(
         project_id,
         db.list_iitpave_schema_diagnostics(project_id),
         selected_history_ids=schema_history_selection_ids,
+    )
+    schema_history_provenance_summary = build_iitpave_schema_history_report_summary(
+        schema_history_review,
+        selection=schema_history_review.selection,
+        report_path=out_path,
     )
 
     have_mix = mix_result_live is not None
@@ -442,6 +646,10 @@ def build_combined_report(
             "IITPAVE Schema Diagnostics History",
             "Audit-only parser/fixture traceability; calculations blocked",
         ])
+    toc_rows.append([
+        "Report Provenance and Traceability",
+        "Audit metadata; no engineering calculations",
+    ])
     # Phase 12 synthesis — derived on-demand from the rehydrated
     # condition + traffic + maintenance results. Not persisted (no DB
     # schema change in Phase 15 P2).
@@ -470,6 +678,17 @@ def build_combined_report(
 
     included: list[str] = []
     schema_history_summary = None
+
+    provenance_summary = build_combined_report_provenance_summary(
+        db=db,
+        project_id=project_id,
+        project=p,
+        ctx=ctx,
+        out_path=out_path,
+        schema_history_summary=schema_history_provenance_summary,
+    )
+    doc.add_page_break()
+    write_combined_report_provenance_section(doc, provenance_summary)
 
     # ---- Mix design (uses existing word_report internals) ----
     if have_mix:

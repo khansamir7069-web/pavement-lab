@@ -86,7 +86,10 @@ from .rehab_report import (
 )
 from .report_builder import (
     CombinedReportContext,
+    CombinedReportProvenanceSummary,
     build_combined_report,
+    build_combined_report_provenance_summary,
+    write_combined_report_provenance_section,
 )
 
 __all__ = [
@@ -101,7 +104,10 @@ __all__ = [
     "write_cold_mix_section",
     "write_micro_surfacing_section",
     "CombinedReportContext",
+    "CombinedReportProvenanceSummary",
     "build_combined_report",
+    "build_combined_report_provenance_summary",
+    "write_combined_report_provenance_section",
     "MaterialQuantityReportContext",
     "build_material_quantity_docx",
     "write_material_quantity_section",
