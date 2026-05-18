@@ -35,6 +35,7 @@ def _complete_repo_tree(root: Path) -> None:
         root / "app" / "core" / "benchmark_datasets.py",
         root / "app" / "core" / "production_readiness.py",
         root / "app" / "core" / "release_integrity.py",
+        root / "app" / "core" / "final_release.py",
     ):
         _write(path)
     aggregate_source = "\n".join(REQUIRED_RELEASE_PHASE_SMOKES)
@@ -94,7 +95,8 @@ def main() -> int:
     for module_name in REQUIRED_RELEASE_PHASE_SMOKES:
         assert module_name in PHASE_SMOKES
     assert "tests._smoke_phase48_release_integrity" in PHASE_SMOKES
-    print("  [PASS] Phase 41-48 smoke modules are present and aggregated")
+    assert "tests._smoke_phase49_final_release" in PHASE_SMOKES
+    print("  [PASS] Phase 41-49 smoke modules are present and aggregated")
 
     print("\n=== 4) Release-integrity payload remains local/offline/read-only ===")
     payload_text = _safe_text(repo_checklist.as_dict())

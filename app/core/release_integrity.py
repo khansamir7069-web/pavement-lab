@@ -32,6 +32,7 @@ REQUIRED_RELEASE_PHASE_SMOKES: tuple[str, ...] = (
     "tests._smoke_phase46_benchmark_dataset_readiness",
     "tests._smoke_phase47_production_readiness",
     "tests._smoke_phase48_release_integrity",
+    "tests._smoke_phase49_final_release",
 )
 
 _FORBIDDEN_ENABLED_MARKERS = (
@@ -189,7 +190,7 @@ def _phase_smoke_files_check(repo_root: Path) -> ReleaseIntegrityCheck:
     message = (
         f"Missing release-phase smoke module file(s): {', '.join(missing)}."
         if missing else
-        "Phase 41-48 release/professionalization smoke module files are present."
+        "Phase 41-49 release/professionalization smoke module files are present."
     )
     return ReleaseIntegrityCheck(
         key="release_phase_smoke_files",
@@ -249,7 +250,7 @@ def _aggregate_registration_check(
     message = (
         f"{len(issues)} aggregate smoke registration issue(s) found."
         if issues else
-        "Phase 41-48 release/professionalization smokes are registered once and in order."
+        "Phase 41-49 release/professionalization smokes are registered once and in order."
     )
     return ReleaseIntegrityCheck(
         key="aggregate_smoke_registration",
@@ -310,6 +311,7 @@ def _diagnostic_source_continuity_check(repo_root: Path) -> ReleaseIntegrityChec
         repo_root / "app" / "core" / "benchmark_datasets.py",
         repo_root / "app" / "core" / "production_readiness.py",
         repo_root / "app" / "core" / "release_integrity.py",
+        repo_root / "app" / "core" / "final_release.py",
     )
     missing = [str(path) for path in required if not path.is_file()]
     unreadable: list[str] = []
@@ -323,7 +325,7 @@ def _diagnostic_source_continuity_check(repo_root: Path) -> ReleaseIntegrityChec
     message = (
         "One or more release-readiness diagnostic source files are unavailable."
         if status == DEPLOYMENT_CHECK_FAIL else
-        "Deployment, dataset, production, and release-integrity diagnostics are readable."
+        "Deployment, dataset, production, release-integrity, and final-release diagnostics are readable."
     )
     return ReleaseIntegrityCheck(
         key="diagnostic_source_continuity",
@@ -345,10 +347,12 @@ def _offline_integrity_marker_check(repo_root: Path) -> ReleaseIntegrityCheck:
         repo_root / "app" / "core" / "benchmark_datasets.py",
         repo_root / "app" / "core" / "production_readiness.py",
         repo_root / "app" / "core" / "release_integrity.py",
+        repo_root / "app" / "core" / "final_release.py",
         repo_root / "tests" / "_smoke_phase45_deployment_regression_gate.py",
         repo_root / "tests" / "_smoke_phase46_benchmark_dataset_readiness.py",
         repo_root / "tests" / "_smoke_phase47_production_readiness.py",
         repo_root / "tests" / "_smoke_phase48_release_integrity.py",
+        repo_root / "tests" / "_smoke_phase49_final_release.py",
     )
     hits: list[str] = []
     unreadable: list[str] = []
