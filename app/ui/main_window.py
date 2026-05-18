@@ -33,6 +33,13 @@ from app.core import compute_material_calc, compute_mix_design
 from app.core.import_summary import ImportedMixResult, parse_summary_excel
 from app.core.models import MixDesignInput, ProjectInfo
 from app.db import get_db
+from app.db.project_exchange import (
+    ProjectImportError,
+    export_project,
+    import_project,
+    read_project_export,
+    write_project_export,
+)
 from app.graphs import build_chart_set
 from app.reports import (
     CombinedReportContext,
@@ -208,6 +215,8 @@ class MainWindow(QMainWindow):
         self.dashboard.new_project.connect(self._on_new_project)
         self.dashboard.open_project.connect(self._on_open_project)
         self.dashboard.delete_project.connect(self._on_delete_project)
+        self.dashboard.export_project.connect(self._on_export_project)
+        self.dashboard.import_project.connect(self._on_import_project_export)
         self.project_form.saved.connect(self._on_project_saved)
         self.hub.module_selected.connect(self._on_module_selected)
         self.structural.saved.connect(self._on_structural_saved)
@@ -613,6 +622,101 @@ class MainWindow(QMainWindow):
         else:
             QMessageBox.warning(self, "Delete failed",
                                 f"Project #{project_id} could not be deleted.")
+
+    # ----- Phase 21 project exchange UI --------------------------------
+
+    def _project_exchange_issue_text(self, issues) -> str:
+        if not issues:
+            return ""
+        lines = []
+        for issue in issues:
+            if isinstance(issue, dict):
+                severity = str(issue.get("severity") or "warning")
+                field_name = str(issue.get("field") or "")
+                message = str(issue.get("message") or "")
+            else:
+                severity = str(issue.severity)
+                field_name = str(issue.field or "")
+                message = str(issue.message)
+            prefix = severity.upper()
+            field = f" ({field_name})" if field_name else ""
+            lines.append(f"{prefix}{field}: {message}")
+        return "\n".join(lines)
+
+    def _on_export_project(self, project_id: int) -> None:
+        p = self.db.get_project(project_id)
+        if p is None:
+            QMessageBox.warning(
+                self, "Export failed", f"Project #{project_id} was not found."
+            )
+            return
+        safe_name = "".join(
+            ch if ch.isalnum() or ch in ("-", "_") else "_"
+            for ch in (p.work_name or f"Project_{project_id}")
+        ).strip("_") or f"Project_{project_id}"
+        default = REPORTS_DIR / f"{safe_name}_project_export.json"
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save Project Export",
+            str(default),
+            "SamPave Project Export (*.json);;JSON Files (*.json);;All Files (*)",
+        )
+        if not path:
+            return
+        try:
+            payload = export_project(self.db, project_id)
+            out = write_project_export(payload, Path(path))
+            issue_text = self._project_exchange_issue_text(
+                payload.get("validation", {}).get("issues", ())
+            )
+            msg = f"Project export saved to:\n{out}"
+            if issue_text:
+                msg += f"\n\nValidation notes:\n{issue_text}"
+            QMessageBox.information(self, "Project exported", msg)
+            self.statusBar().showMessage(f"Project export saved: {out}")
+        except Exception as e:
+            log.exception("Project export failed")
+            QMessageBox.critical(self, "Export failed", str(e))
+
+    def _on_import_project_export(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Open Project Export",
+            "",
+            "SamPave Project Export (*.json);;JSON Files (*.json);;All Files (*)",
+        )
+        if not path:
+            return
+        try:
+            payload = read_project_export(Path(path))
+            result = import_project(self.db, payload)
+            self._current_project_id = result.project_id
+            self.project_form.load_project(result.project_id)
+            self.dashboard.refresh()
+            self._refresh_hub()
+            self._show_page("hub")
+
+            issue_text = self._project_exchange_issue_text(result.issues)
+            msg = (
+                f"Imported as project #{result.project_id}:\n"
+                f"{result.work_name}"
+            )
+            if issue_text:
+                msg += f"\n\nValidation notes:\n{issue_text}"
+            QMessageBox.information(self, "Project imported", msg)
+            self.statusBar().showMessage(
+                f"Project import complete: #{result.project_id}"
+            )
+        except ProjectImportError as e:
+            issue_text = self._project_exchange_issue_text(e.result.issues)
+            QMessageBox.critical(
+                self,
+                "Import rejected",
+                issue_text or str(e),
+            )
+        except Exception as e:
+            log.exception("Project import failed")
+            QMessageBox.critical(self, "Import failed", str(e))
 
     # ----- compute -----
 

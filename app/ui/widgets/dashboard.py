@@ -25,6 +25,8 @@ class Dashboard(QWidget):
     new_project = Signal()
     open_project = Signal(int)        # project_id
     delete_project = Signal(int)      # project_id
+    export_project = Signal(int)      # project_id
+    import_project = Signal()
 
     def __init__(self, db, parent=None):
         super().__init__(parent)
@@ -40,6 +42,12 @@ class Dashboard(QWidget):
         self.btn_new = styled_button("+ New Project")
         self.btn_new.clicked.connect(self.new_project.emit)
         header.add_action(self.btn_new)
+        self.btn_import_project = styled_button("Import Project Export", "secondary")
+        self.btn_import_project.setToolTip(
+            "Import a validated SamPave project-export JSON file as a new project."
+        )
+        self.btn_import_project.clicked.connect(self.import_project.emit)
+        header.add_action(self.btn_import_project)
         layout.addWidget(header)
 
         body = QWidget()
@@ -63,12 +71,14 @@ class Dashboard(QWidget):
         cl.setContentsMargins(20, 16, 20, 16)
         cl.addWidget(QLabel("<b>Recent Projects</b>"))
 
-        self.table = QTableWidget(0, 6)
+        self.table = QTableWidget(0, 7)
         self.table.setHorizontalHeaderLabels(
-            ["ID", "Work Name", "Mix Type", "Modules", "Updated", ""])
+            ["ID", "Work Name", "Mix Type", "Modules", "Updated", "Export", ""])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.table.horizontalHeader().setSectionResizeMode(5, QHeaderView.Fixed)
         self.table.setColumnWidth(5, 90)
+        self.table.horizontalHeader().setSectionResizeMode(6, QHeaderView.Fixed)
+        self.table.setColumnWidth(6, 90)
         self.table.verticalHeader().setVisible(False)
         self.table.itemDoubleClicked.connect(self._on_row_open)
         cl.addWidget(self.table)
@@ -111,14 +121,21 @@ class Dashboard(QWidget):
             for c in range(5):
                 if self.table.item(r, c):
                     self.table.item(r, c).setTextAlignment(Qt.AlignCenter)
-            # Delete button in col 5
+            export_btn = QPushButton("Export")
+            export_btn.setProperty("class", "Secondary")
+            export_btn.clicked.connect(
+                lambda _=False, pid=p.id: self.export_project.emit(pid)
+            )
+            self.table.setCellWidget(r, 5, export_btn)
+
+            # Delete button in final column
             del_btn = QPushButton("Delete")
             del_btn.setProperty("class", "Danger")
             del_btn.setStyleSheet(
                 "background:#c04545; color:white; border:none; padding:4px 10px; border-radius:3px;"
             )
             del_btn.clicked.connect(lambda _=False, pid=p.id, name=p.work_name: self._on_delete(pid, name))
-            self.table.setCellWidget(r, 5, del_btn)
+            self.table.setCellWidget(r, 6, del_btn)
         self.kpi_projects[1].setText(str(len(projects)))
         self.kpi_clients[1].setText(str(len(self.db.list_clients())))
         n_reports = 0
