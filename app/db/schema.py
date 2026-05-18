@@ -90,6 +90,9 @@ class Project(Base):
     iitpave_schema_history_selection_audits: Mapped[
         list["IITPaveSchemaHistorySelectionAudit"]
     ] = relationship(back_populates="project", cascade="all, delete-orphan")
+    report_revision_snapshots: Mapped[list["ReportRevisionSnapshotRecord"]] = relationship(
+        back_populates="project", cascade="all, delete-orphan"
+    )
 
 
 class MixDesign(Base):
@@ -306,6 +309,29 @@ class IITPaveSchemaHistorySelectionAudit(Base):
     project: Mapped[Project] = relationship(
         back_populates="iitpave_schema_history_selection_audits"
     )
+
+
+class ReportRevisionSnapshotRecord(Base):
+    """Phase-40 audit snapshots for generated consultancy reports.
+
+    This table stores revision metadata only. It deliberately carries no
+    strain, fatigue, rutting, or IRC compliance result columns.
+    """
+    __tablename__ = "report_revision_snapshots"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False)
+    report_identifier: Mapped[Optional[str]] = mapped_column(String(120))
+    revision_label: Mapped[Optional[str]] = mapped_column(String(40))
+    report_path: Mapped[Optional[str]] = mapped_column(Text)
+    provenance_fingerprint: Mapped[Optional[str]] = mapped_column(String(80))
+    validation_warnings_json: Mapped[Optional[str]] = mapped_column(JSON)
+    schema_history_selection_json: Mapped[Optional[str]] = mapped_column(JSON)
+    export_provenance_json: Mapped[Optional[str]] = mapped_column(JSON)
+    summary_json: Mapped[Optional[str]] = mapped_column(JSON)
+    engineering_calculations_allowed: Mapped[Optional[bool]] = mapped_column(Boolean)
+    generated_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+    project: Mapped[Project] = relationship(back_populates="report_revision_snapshots")
 
 
 class User(Base):

@@ -60,8 +60,10 @@ from app.reports import (
     build_traffic_docx,
     build_iitpave_schema_history_review,
     build_iitpave_schema_history_selection_audit_review,
+    build_report_revision_history_review,
     format_iitpave_schema_history_item_text,
     format_iitpave_schema_history_selection_audit_item_text,
+    format_report_revision_snapshot_text,
     run_iitpave_schema_diagnostics_workflow,
 )
 from app.reports.word_report import export_to_pdf
@@ -182,6 +184,14 @@ class MainWindow(QMainWindow):
             self._on_iitpave_schema_report_audit
         )
         sb_layout.addWidget(self.btn_iitpave_schema_report_audit)
+
+        self.btn_report_revisions = QPushButton("Report Revisions")
+        self.btn_report_revisions.setObjectName("ImportBtn")
+        self.btn_report_revisions.setToolTip(
+            "Review read-only report revision snapshots for the active project."
+        )
+        self.btn_report_revisions.clicked.connect(self._on_report_revisions)
+        sb_layout.addWidget(self.btn_report_revisions)
 
         version_lbl = QLabel(f"v{__version__}")
         version_lbl.setObjectName("SidebarTag")
@@ -1017,6 +1027,80 @@ class MainWindow(QMainWindow):
         except Exception as e:
             log.exception("IITPAVE report audit review failed")
             QMessageBox.critical(self, "Report audit failed", str(e))
+
+    def _build_report_revisions_dialog(self, review):
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Report revision snapshots")
+        dlg.resize(780, 540)
+        layout = QVBoxLayout(dlg)
+
+        summary = QLabel("\n".join(review.operator_summary))
+        summary.setWordWrap(True)
+        layout.addWidget(summary)
+
+        selector = QListWidget()
+        detail = QTextEdit()
+        detail.setReadOnly(True)
+        detail.setMinimumHeight(280)
+        layout.addWidget(selector)
+        layout.addWidget(detail, stretch=1)
+
+        by_label = {item.revision_label: item for item in review.items}
+        for item in review.items:
+            row = QListWidgetItem(
+                f"{item.revision_label or 'Revision'} | {item.generated_at} | "
+                f"{item.fingerprint_short}",
+                selector,
+            )
+            row.setData(Qt.UserRole, item.revision_label)
+
+        def _show_item(current, _previous=None):
+            if current is None:
+                detail.setPlainText("")
+                return
+            item = by_label.get(current.data(Qt.UserRole))
+            detail.setPlainText(format_report_revision_snapshot_text(item) if item else "")
+
+        selector.currentItemChanged.connect(_show_item)
+        if selector.count():
+            selector.setCurrentRow(0)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Close)
+        buttons.rejected.connect(dlg.reject)
+        layout.addWidget(buttons)
+        return dlg
+
+    def _on_report_revisions(self) -> None:
+        if self._current_project_id is None:
+            QMessageBox.warning(
+                self,
+                "Report revisions",
+                "Select or create a project before reviewing report revisions.",
+            )
+            return
+
+        try:
+            rows = self.db.list_report_revision_snapshots(self._current_project_id)
+            review = build_report_revision_history_review(
+                self._current_project_id,
+                rows,
+            )
+            if not review.items:
+                QMessageBox.information(
+                    self,
+                    "Report revisions",
+                    "\n".join(review.operator_summary),
+                )
+                self.statusBar().showMessage("No report revision snapshots found.")
+                return
+            dlg = self._build_report_revisions_dialog(review)
+            self.statusBar().showMessage(
+                f"Report revision snapshots loaded: {review.item_count} record(s)."
+            )
+            dlg.exec()
+        except Exception as e:
+            log.exception("Report revision review failed")
+            QMessageBox.critical(self, "Report revisions failed", str(e))
 
     # ----- compute -----
 

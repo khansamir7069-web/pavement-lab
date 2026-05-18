@@ -85,6 +85,7 @@ from .rehab_report import (
     RehabReportContext,
     write_rehab_section,
 )
+from .report_revision import ReportRevisionSnapshot
 from .structural_report import (
     StructuralReportContext,
     write_structural_section,
@@ -882,5 +883,13 @@ def build_combined_report(
             project_id=project_id,
             report_path=str(out_path),
             summary=schema_history_summary,
+        )
+    if hasattr(db, "save_report_revision_snapshot"):
+        db.save_report_revision_snapshot(
+            project_id=project_id,
+            snapshot=ReportRevisionSnapshot.from_provenance(
+                provenance_summary,
+                report_identifier=f"combined_report:{project_id}:{out_path.name}",
+            ),
         )
     return out_path, included

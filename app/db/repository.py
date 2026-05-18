@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Optional
 
-from sqlalchemy import create_engine, select, text
+from sqlalchemy import create_engine, func, select, text
 from sqlalchemy.orm import Session, joinedload, sessionmaker
 
 from app.config import DB_PATH
@@ -34,6 +34,7 @@ from .schema import (
     MixDesign,
     Project,
     Report,
+    ReportRevisionSnapshotRecord,
     StructuralDesign,
     TrafficAnalysis,
     User,
@@ -716,6 +717,80 @@ class Database:
                 .order_by(
                     IITPaveSchemaHistorySelectionAudit.generated_at.desc(),
                     IITPaveSchemaHistorySelectionAudit.id.desc(),
+                )
+            ))
+
+    # ---- Report revision snapshots (Phase 40) -------------------------
+    def save_report_revision_snapshot(
+        self,
+        *,
+        project_id: int,
+        snapshot,
+    ) -> ReportRevisionSnapshotRecord:
+        """Persist an audit-only generated-report revision snapshot."""
+        with self.session() as s:
+            count = s.scalar(
+                select(func.count(ReportRevisionSnapshotRecord.id))
+                .where(ReportRevisionSnapshotRecord.project_id == project_id)
+            )
+            revision_label = getattr(snapshot, "revision_label", "") or f"R{int(count or 0) + 1:03d}"
+            summary_dict = _to_json_safe(
+                snapshot.as_dict() if hasattr(snapshot, "as_dict") else snapshot
+            )
+            if isinstance(summary_dict, dict):
+                summary_dict["revision_label"] = revision_label
+            selection_payload = {
+                "status": getattr(snapshot, "schema_history_selection_status", "") or "",
+                "available_history_ids": list(
+                    getattr(snapshot, "schema_history_available_ids", ()) or ()
+                ),
+                "selected_history_ids": list(
+                    getattr(snapshot, "schema_history_selected_ids", ()) or ()
+                ),
+                "unknown_history_ids": list(
+                    getattr(snapshot, "schema_history_unknown_ids", ()) or ()
+                ),
+                "included_history_count": int(
+                    getattr(snapshot, "schema_history_included_count", 0) or 0
+                ),
+                "diagnostic_row_count": int(
+                    getattr(snapshot, "schema_history_diagnostic_row_count", 0) or 0
+                ),
+            }
+            row = ReportRevisionSnapshotRecord(
+                project_id=project_id,
+                report_identifier=getattr(snapshot, "report_identifier", "") or "",
+                revision_label=revision_label,
+                report_path=getattr(snapshot, "report_path", "") or "",
+                provenance_fingerprint=getattr(
+                    snapshot, "provenance_fingerprint", ""
+                ) or "",
+                validation_warnings_json=json.dumps(
+                    list(getattr(snapshot, "validation_warnings", ()) or ())
+                ),
+                schema_history_selection_json=json.dumps(selection_payload, sort_keys=True),
+                export_provenance_json=json.dumps(
+                    list(getattr(snapshot, "export_provenance", ()) or ())
+                ),
+                summary_json=json.dumps(summary_dict, sort_keys=True),
+                engineering_calculations_allowed=bool(
+                    getattr(snapshot, "engineering_calculations_allowed", False)
+                ),
+            )
+            s.add(row)
+            s.flush()
+            return row
+
+    def list_report_revision_snapshots(
+        self, project_id: int,
+    ) -> list[ReportRevisionSnapshotRecord]:
+        with self.session() as s:
+            return list(s.scalars(
+                select(ReportRevisionSnapshotRecord)
+                .where(ReportRevisionSnapshotRecord.project_id == project_id)
+                .order_by(
+                    ReportRevisionSnapshotRecord.generated_at.desc(),
+                    ReportRevisionSnapshotRecord.id.desc(),
                 )
             ))
 

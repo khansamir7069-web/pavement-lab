@@ -91,6 +91,15 @@ from .report_builder import (
     build_combined_report_provenance_summary,
     write_combined_report_provenance_section,
 )
+from .report_revision import (
+    REPORT_REVISION_HISTORY_STATUS_AVAILABLE,
+    REPORT_REVISION_HISTORY_STATUS_EMPTY,
+    ReportRevisionHistoryReview,
+    ReportRevisionSnapshot,
+    build_report_revision_history_review,
+    build_report_revision_snapshot_item,
+    format_report_revision_snapshot_text,
+)
 
 __all__ = [
     "build_mix_design_docx",
@@ -108,6 +117,13 @@ __all__ = [
     "build_combined_report",
     "build_combined_report_provenance_summary",
     "write_combined_report_provenance_section",
+    "REPORT_REVISION_HISTORY_STATUS_AVAILABLE",
+    "REPORT_REVISION_HISTORY_STATUS_EMPTY",
+    "ReportRevisionHistoryReview",
+    "ReportRevisionSnapshot",
+    "build_report_revision_history_review",
+    "build_report_revision_snapshot_item",
+    "format_report_revision_snapshot_text",
     "MaterialQuantityReportContext",
     "build_material_quantity_docx",
     "write_material_quantity_section",
