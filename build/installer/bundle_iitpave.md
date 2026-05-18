@@ -78,6 +78,15 @@ directory, return code, and stdout/stderr previews for audit only. It still
 does not build IITPAVE input, parse engineering output, compute strains, or
 claim IRC:37 compliance.
 
+Phase 25 adds `app.core.iitpave.output_contract.inspect_iitpave_output_contract(...)`.
+It inspects raw output text/files before any parser is used. The only
+recognized parseable contract today is SamPave's own Phase-13 stub marker
+(`PHASE13_STUB_V1`), which remains placeholder-only. Real IITPAVE-looking
+output is classified as `real_contract_pending` and blocked until a verified
+real IITPAVE output schema/fixture is added. Unknown, missing, empty, or
+unreadable output is also blocked; no default strain/stress values are
+invented.
+
 ---
 
 ## 3. Toggling between StubRunner and ExternalExeRunner

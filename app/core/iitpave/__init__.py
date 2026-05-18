@@ -41,6 +41,19 @@ from .dry_run import (
     IITPaveDryRunResult,
     check_iitpave_dry_run_readiness,
 )
+from .output_contract import (
+    IITPAVE_OUTPUT_FORMAT_REAL_PENDING,
+    IITPAVE_OUTPUT_FORMAT_STUB,
+    IITPAVE_OUTPUT_FORMAT_UNKNOWN,
+    IITPAVE_OUTPUT_STATUS_EMPTY,
+    IITPAVE_OUTPUT_STATUS_MISSING,
+    IITPAVE_OUTPUT_STATUS_REAL_CONTRACT_PENDING,
+    IITPAVE_OUTPUT_STATUS_STUB_CONTRACT,
+    IITPAVE_OUTPUT_STATUS_UNREADABLE,
+    IITPAVE_OUTPUT_STATUS_UNSUPPORTED,
+    IITPaveOutputContractResult,
+    inspect_iitpave_output_contract,
+)
 from .parser import (
     is_known_stub_output,
     parse_iitpave_output,
@@ -109,6 +122,18 @@ __all__ = [
     "IITPaveDryRunConfig",
     "IITPaveDryRunResult",
     "check_iitpave_dry_run_readiness",
+    # output contract / parser guardrails
+    "IITPAVE_OUTPUT_FORMAT_REAL_PENDING",
+    "IITPAVE_OUTPUT_FORMAT_STUB",
+    "IITPAVE_OUTPUT_FORMAT_UNKNOWN",
+    "IITPAVE_OUTPUT_STATUS_EMPTY",
+    "IITPAVE_OUTPUT_STATUS_MISSING",
+    "IITPAVE_OUTPUT_STATUS_REAL_CONTRACT_PENDING",
+    "IITPAVE_OUTPUT_STATUS_STUB_CONTRACT",
+    "IITPAVE_OUTPUT_STATUS_UNREADABLE",
+    "IITPAVE_OUTPUT_STATUS_UNSUPPORTED",
+    "IITPaveOutputContractResult",
+    "inspect_iitpave_output_contract",
     # results
     "PointResult",
     "MechanisticResult",
