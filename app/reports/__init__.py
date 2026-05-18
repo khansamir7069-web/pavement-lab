@@ -100,6 +100,14 @@ from .report_revision import (
     build_report_revision_snapshot_item,
     format_report_revision_snapshot_text,
 )
+from .export_bundle import (
+    REPORT_EXPORT_BUNDLE_FORMAT,
+    REPORT_EXPORT_BUNDLE_VERSION,
+    ReportBundleArtifact,
+    ReportExportBundleManifest,
+    ReportExportBundleResult,
+    build_report_export_bundle,
+)
 
 __all__ = [
     "build_mix_design_docx",
@@ -124,6 +132,12 @@ __all__ = [
     "build_report_revision_history_review",
     "build_report_revision_snapshot_item",
     "format_report_revision_snapshot_text",
+    "REPORT_EXPORT_BUNDLE_FORMAT",
+    "REPORT_EXPORT_BUNDLE_VERSION",
+    "ReportBundleArtifact",
+    "ReportExportBundleManifest",
+    "ReportExportBundleResult",
+    "build_report_export_bundle",
     "MaterialQuantityReportContext",
     "build_material_quantity_docx",
     "write_material_quantity_section",
