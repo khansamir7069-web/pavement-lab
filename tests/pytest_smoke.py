@@ -55,6 +55,7 @@ PHASE_SMOKES: tuple[str, ...] = (
     "tests._smoke_phase28_iitpave_schema_mapping",
     "tests._smoke_phase29_iitpave_schema_corpus",
     "tests._smoke_phase30_iitpave_schema_manifest",
+    "tests._smoke_phase31_iitpave_schema_report",
 )
 
 

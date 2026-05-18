@@ -20,6 +20,9 @@ It is a metadata and contract-review workflow only.
 - Phase 30 can build an audit manifest summarizing reviewed schema family
   coverage, blocked schema counts, unsupported counts, and operator-readable
   parser readiness status.
+- Phase 31 can render that manifest through report diagnostics so operators
+  can review parser readiness, blocked schemas, and unsupported fixtures in a
+  Word-report section.
 
 ## What This Does Not Do
 
@@ -86,3 +89,14 @@ fixtures in the folder map to reviewed schema families. This is an audit status
 only. It still returns `engineering_calculations_allowed=false`, and no
 stress/strain extraction, fatigue/rutting computation, or IRC:37 compliance
 claim is enabled.
+
+## Phase 31 Report Diagnostics
+
+`app.reports.iitpave_schema_report` converts a Phase-30 manifest into typed
+report diagnostics and can render a Word section titled `IITPAVE FIXTURE SCHEMA
+DIAGNOSTICS`.
+
+The report section is operator-facing but remains audit-only. It summarizes
+parser readiness, schema family coverage, fixture-level blocked status, and
+blocking diagnostics. It does not run IITPAVE, does not parse output values,
+does not compute mechanistic checks, and does not make compliance conclusions.

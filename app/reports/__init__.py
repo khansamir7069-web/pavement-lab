@@ -31,6 +31,16 @@ from .mechanistic_report import (
     build_mechanistic_docx,
     write_mechanistic_section,
 )
+from .iitpave_schema_report import (
+    IITPAVE_SCHEMA_REPORT_STATUS_AUDIT_READY,
+    IITPAVE_SCHEMA_REPORT_STATUS_BLOCKED,
+    IITPaveSchemaDiagnosticRow,
+    IITPaveSchemaReportContext,
+    IITPaveSchemaReportSummary,
+    build_iitpave_schema_manifest_docx,
+    build_iitpave_schema_report_summary,
+    write_iitpave_schema_manifest_section,
+)
 from .rehab_report import (
     RehabReportContext,
     build_rehab_docx,
@@ -66,6 +76,14 @@ __all__ = [
     "MechanisticReportContext",
     "build_mechanistic_docx",
     "write_mechanistic_section",
+    "IITPAVE_SCHEMA_REPORT_STATUS_AUDIT_READY",
+    "IITPAVE_SCHEMA_REPORT_STATUS_BLOCKED",
+    "IITPaveSchemaDiagnosticRow",
+    "IITPaveSchemaReportContext",
+    "IITPaveSchemaReportSummary",
+    "build_iitpave_schema_manifest_docx",
+    "build_iitpave_schema_report_summary",
+    "write_iitpave_schema_manifest_section",
     "RehabReportContext",
     "build_rehab_docx",
     "write_rehab_section",
