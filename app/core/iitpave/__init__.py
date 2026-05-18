@@ -98,6 +98,16 @@ from .schema_mapping import (
     IITPaveVerifiedFixtureSchemaMappingResult,
     map_iitpave_verified_fixture_schema,
 )
+from .schema_manifest import (
+    IITPAVE_SCHEMA_MANIFEST_STATUS_AUDIT_READY,
+    IITPAVE_SCHEMA_MANIFEST_STATUS_BLOCKED_UNKNOWN_SCHEMA,
+    IITPAVE_SCHEMA_MANIFEST_STATUS_NO_FIXTURES,
+    IITPAVE_SCHEMA_MANIFEST_STATUS_NO_VERIFIED_FIXTURES,
+    IITPaveFixtureSchemaManifest,
+    IITPaveFixtureSchemaManifestEntry,
+    IITPaveSchemaFamilyCoverage,
+    build_iitpave_fixture_schema_manifest,
+)
 from .parser import (
     is_known_stub_output,
     parse_iitpave_output,
@@ -219,6 +229,15 @@ __all__ = [
     "IITPaveSchemaSectionMapping",
     "IITPaveVerifiedFixtureSchemaMappingResult",
     "map_iitpave_verified_fixture_schema",
+    # verified fixture schema manifest / audit summary
+    "IITPAVE_SCHEMA_MANIFEST_STATUS_AUDIT_READY",
+    "IITPAVE_SCHEMA_MANIFEST_STATUS_BLOCKED_UNKNOWN_SCHEMA",
+    "IITPAVE_SCHEMA_MANIFEST_STATUS_NO_FIXTURES",
+    "IITPAVE_SCHEMA_MANIFEST_STATUS_NO_VERIFIED_FIXTURES",
+    "IITPaveFixtureSchemaManifest",
+    "IITPaveFixtureSchemaManifestEntry",
+    "IITPaveSchemaFamilyCoverage",
+    "build_iitpave_fixture_schema_manifest",
     # results
     "PointResult",
     "MechanisticResult",

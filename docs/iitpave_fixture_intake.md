@@ -15,6 +15,11 @@ It is a metadata and contract-review workflow only.
 - Phase 27 can inspect `verified_contract_sample` fixtures and expose only
   conservative section metadata: header ranges, table-like line ranges,
   recognized labeled blocks, and marker line indexes.
+- Phases 28 and 29 can map reviewed section structures into guarded schema
+  families for regression coverage, while leaving real parsing blocked.
+- Phase 30 can build an audit manifest summarizing reviewed schema family
+  coverage, blocked schema counts, unsupported counts, and operator-readable
+  parser readiness status.
 
 ## What This Does Not Do
 
@@ -26,6 +31,8 @@ It is a metadata and contract-review workflow only.
 - It does not perform fatigue, rutting, layer recommendation, or any other
   engineering calculation.
 - It does not make IRC:37 compliance claims.
+- It does not treat schema coverage as permission to run real engineering
+  calculations.
 
 ## Safe Fixture Workflow
 
@@ -61,3 +68,21 @@ The layer rejects unverified records, unsupported formats, missing markers, and
 incomplete contracts. When accepted, it reports structural section metadata only
 and always records `engineering_values_extracted=false`. The returned sections
 are audit aids for future parser work, not mechanistic results.
+
+## Phase 30 Schema Manifest
+
+`app.core.iitpave.schema_manifest.build_iitpave_fixture_schema_manifest(...)`
+scans a fixture folder and returns a typed audit summary. It reports:
+
+- total and verified fixture counts;
+- reviewed schema family coverage;
+- blocked, unknown, unsupported, pending-review, and rejected counts;
+- diagnostic issues propagated from intake, parser-contract inspection, and
+  schema mapping;
+- operator-readable audit summary lines.
+
+The manifest may report `audit_ready_calculations_blocked` when all verified
+fixtures in the folder map to reviewed schema families. This is an audit status
+only. It still returns `engineering_calculations_allowed=false`, and no
+stress/strain extraction, fatigue/rutting computation, or IRC:37 compliance
+claim is enabled.
