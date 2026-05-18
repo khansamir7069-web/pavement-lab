@@ -84,6 +84,9 @@ class Project(Base):
     mechanistic_validations: Mapped[list["MechanisticValidation"]] = relationship(
         back_populates="project", cascade="all, delete-orphan"
     )
+    iitpave_schema_diagnostics: Mapped[list["IITPaveSchemaDiagnosticsHistory"]] = relationship(
+        back_populates="project", cascade="all, delete-orphan"
+    )
 
 
 class MixDesign(Base):
@@ -247,6 +250,34 @@ class MechanisticValidation(Base):
     computed_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
     project: Mapped[Project] = relationship(back_populates="mechanistic_validations")
+
+
+class IITPaveSchemaDiagnosticsHistory(Base):
+    """Phase-33 audit history for guarded IITPAVE schema diagnostics.
+
+    This table stores workflow summaries only. It deliberately carries no
+    strain, fatigue, rutting, or IRC compliance result columns.
+    """
+    __tablename__ = "iitpave_schema_diagnostics_history"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False)
+    fixture_dir: Mapped[Optional[str]] = mapped_column(Text)
+    report_path: Mapped[Optional[str]] = mapped_column(Text)
+    workflow_status: Mapped[Optional[str]] = mapped_column(String(80))
+    manifest_status: Mapped[Optional[str]] = mapped_column(String(80))
+    parser_audit_ready: Mapped[Optional[bool]] = mapped_column(Boolean)
+    engineering_calculations_allowed: Mapped[Optional[bool]] = mapped_column(Boolean)
+    total_fixture_count: Mapped[Optional[int]] = mapped_column(Integer)
+    verified_fixture_count: Mapped[Optional[int]] = mapped_column(Integer)
+    mapped_schema_count: Mapped[Optional[int]] = mapped_column(Integer)
+    blocked_schema_count: Mapped[Optional[int]] = mapped_column(Integer)
+    unknown_schema_count: Mapped[Optional[int]] = mapped_column(Integer)
+    unsupported_schema_count: Mapped[Optional[int]] = mapped_column(Integer)
+    summary_json: Mapped[Optional[str]] = mapped_column(JSON)
+    operator_message: Mapped[Optional[str]] = mapped_column(Text)
+    generated_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+    project: Mapped[Project] = relationship(back_populates="iitpave_schema_diagnostics")
 
 
 class User(Base):

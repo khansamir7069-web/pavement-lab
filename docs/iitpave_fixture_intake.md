@@ -114,3 +114,16 @@ The desktop UI exposes this as `IITPAVE Schema Diagnostics` in the sidebar. The
 operator selects a local fixture folder, then selects a Word report path. The
 workflow validates the output path extension, propagates all diagnostics, and
 always reports `engineering_calculations_allowed=false`.
+
+## Phase 33 Persistence History
+
+When the Phase-32 workflow runs with an active project, the desktop UI records
+an audit-only history row in `iitpave_schema_diagnostics_history`. The persisted
+record stores the fixture folder, report path, workflow/manifest statuses,
+reviewed schema counts, diagnostics summary JSON, and operator message.
+
+The persisted row is included in project export/import records under
+`iitpave_schema_diagnostics` for traceability. It is not a calculation record:
+there are no strain, fatigue, rutting, IRC compliance, or recommendation fields,
+and the serialized workflow payload continues to report
+`engineering_calculations_allowed=false`.

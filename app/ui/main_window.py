@@ -771,19 +771,24 @@ class MainWindow(QMainWindow):
                 report_path=Path(report_path),
                 context=ctx,
             )
+            history_row = None
+            if self._current_project_id is not None:
+                history_row = self.db.save_iitpave_schema_diagnostics(
+                    project_id=self._current_project_id,
+                    result=result,
+                )
             QMessageBox.information(
                 self,
                 "IITPAVE schema diagnostics",
                 result.operator_message,
             )
             if result.report_written:
-                self.statusBar().showMessage(
-                    f"IITPAVE schema diagnostics saved: {result.report_path}"
-                )
+                msg = f"IITPAVE schema diagnostics saved: {result.report_path}"
             else:
-                self.statusBar().showMessage(
-                    "IITPAVE schema diagnostics summary generated; report not written."
-                )
+                msg = "IITPAVE schema diagnostics summary generated; report not written."
+            if history_row is not None:
+                msg = f"{msg} History #{history_row.id} recorded."
+            self.statusBar().showMessage(msg)
         except Exception as e:
             log.exception("IITPAVE schema diagnostics failed")
             QMessageBox.critical(self, "Schema diagnostics failed", str(e))

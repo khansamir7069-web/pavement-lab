@@ -22,6 +22,7 @@ from .repository import Database
 from .schema import (
     Client,
     ConditionSurvey,
+    IITPaveSchemaDiagnosticsHistory,
     MaintenanceDesign,
     MaterialQuantityDesign,
     MechanisticValidation,
@@ -202,6 +203,27 @@ _CHILD_SECTIONS: dict[str, tuple[type, tuple[str, ...], tuple[str, ...]]] = {
             "computed_at",
         ),
         ("inputs_json", "summary_json"),
+    ),
+    "iitpave_schema_diagnostics": (
+        IITPaveSchemaDiagnosticsHistory,
+        (
+            "fixture_dir",
+            "report_path",
+            "workflow_status",
+            "manifest_status",
+            "parser_audit_ready",
+            "engineering_calculations_allowed",
+            "total_fixture_count",
+            "verified_fixture_count",
+            "mapped_schema_count",
+            "blocked_schema_count",
+            "unknown_schema_count",
+            "unsupported_schema_count",
+            "summary_json",
+            "operator_message",
+            "generated_at",
+        ),
+        ("summary_json",),
     ),
 }
 

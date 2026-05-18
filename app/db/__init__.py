@@ -1,4 +1,15 @@
-from .schema import Base, Client, Project, Material, MixDesign, Report, StructuralDesign, User, AuditLog
+from .schema import (
+    AuditLog,
+    Base,
+    Client,
+    IITPaveSchemaDiagnosticsHistory,
+    Material,
+    MixDesign,
+    Project,
+    Report,
+    StructuralDesign,
+    User,
+)
 from .repository import Database, get_db
 from .project_exchange import (
     PROJECT_EXPORT_FORMAT,
@@ -17,6 +28,7 @@ from .project_exchange import (
 __all__ = [
     "Base",
     "Client",
+    "IITPaveSchemaDiagnosticsHistory",
     "Project",
     "Material",
     "MixDesign",

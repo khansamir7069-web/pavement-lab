@@ -25,6 +25,7 @@ from .schema import (
     Base,
     Client,
     ConditionSurvey,
+    IITPaveSchemaDiagnosticsHistory,
     MaintenanceDesign,
     Material,
     MaterialQuantityDesign,
@@ -578,6 +579,66 @@ class Database:
                 .limit(1)
             )
             return s.scalars(stmt).first()
+
+    # ---- IITPAVE schema diagnostics history (Phase 33) ----------------
+    def save_iitpave_schema_diagnostics(
+        self,
+        *,
+        project_id: int,
+        result,
+    ) -> IITPaveSchemaDiagnosticsHistory:
+        """Persist an audit-only IITPAVE schema diagnostics workflow result."""
+        summary_dict = _to_json_safe(
+            result.as_dict() if hasattr(result, "as_dict") else result
+        )
+        manifest = getattr(result, "manifest", None)
+        with self.session() as s:
+            row = IITPaveSchemaDiagnosticsHistory(
+                project_id=project_id,
+                fixture_dir=getattr(result, "fixture_dir", "") or "",
+                report_path=getattr(result, "report_path", "") or "",
+                workflow_status=getattr(result, "status", "") or "",
+                manifest_status=getattr(manifest, "status", "") or "",
+                parser_audit_ready=bool(getattr(manifest, "parser_audit_ready", False)),
+                engineering_calculations_allowed=bool(
+                    getattr(result, "engineering_calculations_allowed", False)
+                ),
+                total_fixture_count=int(getattr(manifest, "total_fixture_count", 0) or 0),
+                verified_fixture_count=int(getattr(manifest, "verified_fixture_count", 0) or 0),
+                mapped_schema_count=int(getattr(manifest, "mapped_schema_count", 0) or 0),
+                blocked_schema_count=int(getattr(manifest, "blocked_schema_count", 0) or 0),
+                unknown_schema_count=int(getattr(manifest, "unknown_schema_count", 0) or 0),
+                unsupported_schema_count=int(
+                    getattr(manifest, "unsupported_schema_count", 0) or 0
+                ),
+                summary_json=json.dumps(summary_dict),
+                operator_message=getattr(result, "operator_message", "") or "",
+            )
+            s.add(row)
+            s.flush()
+            return row
+
+    def latest_iitpave_schema_diagnostics(
+        self, project_id: int,
+    ) -> IITPaveSchemaDiagnosticsHistory | None:
+        with self.session() as s:
+            stmt = (
+                select(IITPaveSchemaDiagnosticsHistory)
+                .where(IITPaveSchemaDiagnosticsHistory.project_id == project_id)
+                .order_by(IITPaveSchemaDiagnosticsHistory.generated_at.desc())
+                .limit(1)
+            )
+            return s.scalars(stmt).first()
+
+    def list_iitpave_schema_diagnostics(
+        self, project_id: int,
+    ) -> list[IITPaveSchemaDiagnosticsHistory]:
+        with self.session() as s:
+            return list(s.scalars(
+                select(IITPaveSchemaDiagnosticsHistory)
+                .where(IITPaveSchemaDiagnosticsHistory.project_id == project_id)
+                .order_by(IITPaveSchemaDiagnosticsHistory.generated_at.desc())
+            ))
 
     # ---- Reports --------------------------------------------------------
     def record_report(self, *, mix_design_id: int, file_path: str,
