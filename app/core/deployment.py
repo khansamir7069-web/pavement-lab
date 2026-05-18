@@ -23,6 +23,8 @@ from app.core.iitpave.discovery import bundled_iitpave_exe_path, discover_iitpav
 
 DEPLOYMENT_MANIFEST_FORMAT = "sampave.deployment_manifest"
 DEPLOYMENT_MANIFEST_VERSION = "1.0"
+LOCAL_INSTALLER_PREPARATION_FORMAT = "sampave.local_installer_preparation"
+LOCAL_INSTALLER_PREPARATION_VERSION = "1.0"
 
 DEPLOYMENT_SEVERITY_INFO = "info"
 DEPLOYMENT_SEVERITY_WARNING = "warning"
@@ -255,6 +257,118 @@ class DeploymentPackagingChecklist:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class LocalInstallerAssetCheck:
+    key: str
+    label: str
+    path: str
+    expected_type: str
+    required: bool
+    present: bool
+    is_file: bool
+    is_directory: bool
+    readable: bool
+    status: str
+    message: str
+
+    @property
+    def passed(self) -> bool:
+        return self.status == DEPLOYMENT_CHECK_PASS
+
+    @property
+    def warning(self) -> bool:
+        return self.status == DEPLOYMENT_CHECK_WARN
+
+    @property
+    def failed(self) -> bool:
+        return self.status == DEPLOYMENT_CHECK_FAIL
+
+    @property
+    def operator_line(self) -> str:
+        return f"{self.status} - {self.label}: {self.message}"
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "key": self.key,
+            "label": self.label,
+            "path": self.path,
+            "expected_type": self.expected_type,
+            "required": self.required,
+            "present": self.present,
+            "is_file": self.is_file,
+            "is_directory": self.is_directory,
+            "readable": self.readable,
+            "status": self.status,
+            "message": self.message,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class LocalInstallerPreparationChecklist:
+    generated_at: str
+    repo_root: str
+    assets: tuple[LocalInstallerAssetCheck, ...]
+    build_executed: bool = False
+    installer_created: bool = False
+    cloud_deployment_enabled: bool = False
+    online_activation_enabled: bool = False
+
+    @property
+    def status(self) -> str:
+        if any(item.failed for item in self.assets):
+            return DEPLOYMENT_CHECK_FAIL
+        if any(item.warning for item in self.assets):
+            return DEPLOYMENT_CHECK_WARN
+        return DEPLOYMENT_CHECK_PASS
+
+    @property
+    def ok(self) -> bool:
+        return self.status != DEPLOYMENT_CHECK_FAIL
+
+    @property
+    def pass_count(self) -> int:
+        return sum(1 for item in self.assets if item.passed)
+
+    @property
+    def warn_count(self) -> int:
+        return sum(1 for item in self.assets if item.warning)
+
+    @property
+    def fail_count(self) -> int:
+        return sum(1 for item in self.assets if item.failed)
+
+    @property
+    def operator_summary(self) -> tuple[str, ...]:
+        return (
+            f"Local installer preparation status: {self.status}.",
+            (
+                f"{self.pass_count} PASS, {self.warn_count} WARN, "
+                f"{self.fail_count} FAIL asset check(s)."
+            ),
+            "Checklist is read-only and source-tree based.",
+            "No build, installer creation, activation, licensing, or cloud deployment is performed.",
+        )
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "format": LOCAL_INSTALLER_PREPARATION_FORMAT,
+            "format_version": LOCAL_INSTALLER_PREPARATION_VERSION,
+            "generated_at": self.generated_at,
+            "repo_root": self.repo_root,
+            "status": self.status,
+            "ok": self.ok,
+            "pass_count": self.pass_count,
+            "warn_count": self.warn_count,
+            "fail_count": self.fail_count,
+            "build_executed": self.build_executed,
+            "installer_created": self.installer_created,
+            "cloud_deployment_enabled": self.cloud_deployment_enabled,
+            "online_activation_enabled": self.online_activation_enabled,
+            "assets": [item.as_dict() for item in self.assets],
+            "operator_summary": list(self.operator_summary),
+        }
+
+
 def default_runtime_paths(
     *,
     user_data_dir: Path | None = None,
@@ -462,6 +576,167 @@ def _runtime_metadata_item(manifest_payload: Mapping[str, Any]) -> DeploymentChe
     )
 
 
+def _default_repo_root(*, app_dir: Path | str | None = None) -> Path:
+    root = Path(app_dir) if app_dir is not None else APP_DIR
+    return root.parent if root.name == "app" else root
+
+
+def _asset_readable(path: Path) -> bool:
+    if not path.exists():
+        return False
+    try:
+        path.stat()
+        if path.is_file():
+            with path.open("rb") as fh:
+                fh.read(1)
+        elif path.is_dir():
+            next(path.iterdir(), None)
+        return True
+    except StopIteration:
+        return True
+    except Exception:
+        return False
+
+
+def _installer_asset_specs() -> tuple[tuple[str, str, str, str, bool], ...]:
+    return (
+        ("entrypoint", "Application entry point", "run.py", "file", True),
+        ("requirements", "Python dependency manifest", "requirements.txt", "file", True),
+        ("launch_batch", "Local launch batch file", "Launch.bat", "file", True),
+        ("setup_batch", "Local setup batch file", "Setup.bat", "file", True),
+        ("build_batch", "Local build batch file", "Build.bat", "file", True),
+        (
+            "v1_pyinstaller_spec",
+            "V1 PyInstaller spec",
+            "build/installer/pyinstaller.spec",
+            "file",
+            True,
+        ),
+        (
+            "iitpave_bundling_instruction",
+            "IITPAVE bundling instruction",
+            "build/installer/bundle_iitpave.md",
+            "file",
+            True,
+        ),
+        ("application_package", "Application package", "app", "directory", True),
+        ("engineering_data", "Engineering data directory", "app/data", "directory", True),
+        (
+            "external_binary_dropin",
+            "External binary drop-in directory",
+            "app/external",
+            "directory",
+            True,
+        ),
+        (
+            "report_template_dir",
+            "Report template directory",
+            "app/reports/templates",
+            "directory",
+            True,
+        ),
+        ("legacy_pyinstaller_spec", "Legacy PyInstaller spec", "build/pavement_lab.spec", "file", False),
+        ("inno_setup_script", "Local installer script", "build/installer.iss", "file", False),
+        ("build_powershell", "PowerShell build script", "build/build_exe.ps1", "file", False),
+    )
+
+
+def _check_local_installer_asset(
+    *,
+    repo_root: Path,
+    key: str,
+    label: str,
+    relative_path: str,
+    expected_type: str,
+    required: bool,
+) -> LocalInstallerAssetCheck:
+    path = repo_root / relative_path
+    present = path.exists()
+    is_file = path.is_file() if present else False
+    is_directory = path.is_dir() if present else False
+    readable = _asset_readable(path)
+    type_ok = (
+        (expected_type == "file" and is_file)
+        or (expected_type == "directory" and is_directory)
+    )
+
+    if not present:
+        status = DEPLOYMENT_CHECK_FAIL if required else DEPLOYMENT_CHECK_WARN
+        message = "Required local packaging asset is missing." if required else (
+            "Optional local packaging asset is missing."
+        )
+    elif not type_ok:
+        status = DEPLOYMENT_CHECK_FAIL if required else DEPLOYMENT_CHECK_WARN
+        message = f"Asset exists but is not a {expected_type}."
+    elif not readable:
+        status = DEPLOYMENT_CHECK_FAIL if required else DEPLOYMENT_CHECK_WARN
+        message = "Asset exists but could not be read."
+    else:
+        status = DEPLOYMENT_CHECK_PASS
+        message = f"{expected_type.title()} is present and readable."
+
+    return LocalInstallerAssetCheck(
+        key=key,
+        label=label,
+        path=str(path),
+        expected_type=expected_type,
+        required=required,
+        present=present,
+        is_file=is_file,
+        is_directory=is_directory,
+        readable=readable,
+        status=status,
+        message=message,
+    )
+
+
+def build_local_installer_preparation_checklist(
+    *,
+    repo_root: Path | str | None = None,
+    app_dir: Path | str | None = None,
+) -> LocalInstallerPreparationChecklist:
+    """Inspect source-tree installer inputs without running a build."""
+    root = Path(repo_root) if repo_root is not None else _default_repo_root(app_dir=app_dir)
+    assets = tuple(
+        _check_local_installer_asset(
+            repo_root=root,
+            key=key,
+            label=label,
+            relative_path=relative_path,
+            expected_type=expected_type,
+            required=required,
+        )
+        for key, label, relative_path, expected_type, required in _installer_asset_specs()
+    )
+    return LocalInstallerPreparationChecklist(
+        generated_at=_timestamp(),
+        repo_root=str(root),
+        assets=assets,
+        build_executed=False,
+        installer_created=False,
+        cloud_deployment_enabled=False,
+        online_activation_enabled=False,
+    )
+
+
+def _installer_preparation_item(
+    checklist: LocalInstallerPreparationChecklist,
+) -> DeploymentChecklistItem:
+    if checklist.fail_count:
+        message = f"Local installer preparation has {checklist.fail_count} blocking asset issue(s)."
+    elif checklist.warn_count:
+        message = f"Local installer preparation has {checklist.warn_count} advisory asset warning(s)."
+    else:
+        message = "Local installer preparation assets are present and readable."
+    return DeploymentChecklistItem(
+        key="local_installer_preparation",
+        label="Local installer preparation assets",
+        status=checklist.status,
+        message=message,
+        details=checklist.as_dict(),
+    )
+
+
 def _report_export_readiness_item(
     diagnostics: DeploymentDiagnostics,
 ) -> DeploymentChecklistItem:
@@ -547,6 +822,8 @@ def build_deployment_packaging_checklist(
     optional_metadata: Mapping[str, Any] | None = None,
     build_id: str | None = None,
     include_iitpave_discovery: bool = True,
+    include_installer_preparation: bool = False,
+    installer_repo_root: Path | str | None = None,
     iitpave_env: Mapping[str, str] | None = None,
     app_dir: Path | str | None = None,
 ) -> DeploymentPackagingChecklist:
@@ -567,6 +844,12 @@ def build_deployment_packaging_checklist(
     ])
     if include_iitpave_discovery:
         items.append(_iitpave_discovery_item(app_dir=app_dir or diag.app_dir, env=iitpave_env))
+    if include_installer_preparation:
+        installer_checklist = build_local_installer_preparation_checklist(
+            repo_root=installer_repo_root,
+            app_dir=app_dir or diag.app_dir,
+        )
+        items.append(_installer_preparation_item(installer_checklist))
     return DeploymentPackagingChecklist(
         generated_at=_timestamp(),
         manifest=man,

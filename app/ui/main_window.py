@@ -1156,7 +1156,9 @@ class MainWindow(QMainWindow):
 
     def _on_deployment_diagnostics(self) -> None:
         try:
-            checklist = build_deployment_packaging_checklist()
+            checklist = build_deployment_packaging_checklist(
+                include_installer_preparation=True,
+            )
             dlg = self._build_deployment_diagnostics_dialog(checklist)
             self.statusBar().showMessage(
                 f"Deployment diagnostics loaded: {len(checklist.items)} check(s), "
