@@ -23,6 +23,8 @@ It is a metadata and contract-review workflow only.
 - Phase 31 can render that manifest through report diagnostics so operators
   can review parser readiness, blocked schemas, and unsupported fixtures in a
   Word-report section.
+- Phase 32 adds a guarded operator workflow entry point for selecting a local
+  fixture folder and writing the schema diagnostics report.
 
 ## What This Does Not Do
 
@@ -100,3 +102,15 @@ The report section is operator-facing but remains audit-only. It summarizes
 parser readiness, schema family coverage, fixture-level blocked status, and
 blocking diagnostics. It does not run IITPAVE, does not parse output values,
 does not compute mechanistic checks, and does not make compliance conclusions.
+
+## Phase 32 Fixture-Folder Workflow
+
+`app.reports.iitpave_schema_workflow.run_iitpave_schema_diagnostics_workflow(...)`
+is the typed entry point used by the desktop UI. It accepts a local fixture
+folder, builds the Phase-30 manifest, builds the Phase-31 report diagnostics
+summary, and optionally writes a `.docx` diagnostics report.
+
+The desktop UI exposes this as `IITPAVE Schema Diagnostics` in the sidebar. The
+operator selects a local fixture folder, then selects a Word report path. The
+workflow validates the output path extension, propagates all diagnostics, and
+always reports `engineering_calculations_allowed=false`.

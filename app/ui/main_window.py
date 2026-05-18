@@ -51,11 +51,13 @@ from app.reports import (
     TrafficReportContext,
     build_combined_report,
     build_condition_docx,
+    IITPaveSchemaReportContext,
     build_maintenance_docx,
     build_material_quantity_docx,
     build_mix_design_docx,
     build_structural_docx,
     build_traffic_docx,
+    run_iitpave_schema_diagnostics_workflow,
 )
 from app.reports.word_report import export_to_pdf
 
@@ -145,6 +147,16 @@ class MainWindow(QMainWindow):
         )
         self.btn_import.clicked.connect(self._on_import_summary)
         sb_layout.addWidget(self.btn_import)
+
+        self.btn_iitpave_schema = QPushButton("IITPAVE Schema Diagnostics")
+        self.btn_iitpave_schema.setObjectName("ImportBtn")
+        self.btn_iitpave_schema.setToolTip(
+            "Select a local IITPAVE output fixture folder and generate an "
+            "audit-only schema diagnostics report. No engineering calculations "
+            "are performed."
+        )
+        self.btn_iitpave_schema.clicked.connect(self._on_iitpave_schema_diagnostics)
+        sb_layout.addWidget(self.btn_iitpave_schema)
 
         version_lbl = QLabel(f"v{__version__}")
         version_lbl.setObjectName("SidebarTag")
@@ -717,6 +729,64 @@ class MainWindow(QMainWindow):
         except Exception as e:
             log.exception("Project import failed")
             QMessageBox.critical(self, "Import failed", str(e))
+
+    # ----- Phase 32 IITPAVE schema diagnostics workflow -----------------
+
+    def _on_iitpave_schema_diagnostics(self) -> None:
+        fixture_dir = QFileDialog.getExistingDirectory(
+            self,
+            "Select IITPAVE Fixture Folder",
+            "",
+        )
+        if not fixture_dir:
+            return
+
+        default_name = "IITPAVE_Schema_Diagnostics"
+        if self._current_project_id is not None:
+            p = self.db.get_project(self._current_project_id)
+            if p and p.work_name:
+                default_name = "".join(
+                    ch if ch.isalnum() or ch in ("-", "_") else "_"
+                    for ch in p.work_name
+                ).strip("_") or default_name
+        default = REPORTS_DIR / f"{default_name}_schema_diagnostics.docx"
+        report_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save IITPAVE Schema Diagnostics Report",
+            str(default),
+            "Word Document (*.docx)",
+        )
+        if not report_path:
+            return
+
+        try:
+            meta = (
+                self._project_meta_for_report(self._current_project_id)
+                if self._current_project_id is not None
+                else {}
+            )
+            ctx = IITPaveSchemaReportContext(**meta)
+            result = run_iitpave_schema_diagnostics_workflow(
+                Path(fixture_dir),
+                report_path=Path(report_path),
+                context=ctx,
+            )
+            QMessageBox.information(
+                self,
+                "IITPAVE schema diagnostics",
+                result.operator_message,
+            )
+            if result.report_written:
+                self.statusBar().showMessage(
+                    f"IITPAVE schema diagnostics saved: {result.report_path}"
+                )
+            else:
+                self.statusBar().showMessage(
+                    "IITPAVE schema diagnostics summary generated; report not written."
+                )
+        except Exception as e:
+            log.exception("IITPAVE schema diagnostics failed")
+            QMessageBox.critical(self, "Schema diagnostics failed", str(e))
 
     # ----- compute -----
 
