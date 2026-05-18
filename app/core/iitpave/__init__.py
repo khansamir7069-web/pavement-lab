@@ -41,6 +41,21 @@ from .dry_run import (
     IITPaveDryRunResult,
     check_iitpave_dry_run_readiness,
 )
+from .fixture_intake import (
+    DEFAULT_FIXTURE_MANIFEST,
+    DEFAULT_OUTPUT_SUFFIXES,
+    FIXTURE_STATUS_OPERATOR_PENDING,
+    FIXTURE_STATUS_REJECTED,
+    FIXTURE_STATUS_UNVERIFIED,
+    FIXTURE_STATUS_VERIFIED,
+    SUPPORTED_FIXTURE_STATUSES,
+    IITPaveFixtureIntakeResult,
+    IITPaveFixtureRecord,
+    IITPaveParserContractHarnessResult,
+    intake_iitpave_fixture_folder,
+    intake_iitpave_output_fixture,
+    run_iitpave_parser_contract_harness,
+)
 from .output_contract import (
     IITPAVE_OUTPUT_FORMAT_REAL_PENDING,
     IITPAVE_OUTPUT_FORMAT_STUB,
@@ -122,6 +137,20 @@ __all__ = [
     "IITPaveDryRunConfig",
     "IITPaveDryRunResult",
     "check_iitpave_dry_run_readiness",
+    # fixture intake / parser contract harness
+    "DEFAULT_FIXTURE_MANIFEST",
+    "DEFAULT_OUTPUT_SUFFIXES",
+    "FIXTURE_STATUS_OPERATOR_PENDING",
+    "FIXTURE_STATUS_REJECTED",
+    "FIXTURE_STATUS_UNVERIFIED",
+    "FIXTURE_STATUS_VERIFIED",
+    "SUPPORTED_FIXTURE_STATUSES",
+    "IITPaveFixtureIntakeResult",
+    "IITPaveFixtureRecord",
+    "IITPaveParserContractHarnessResult",
+    "intake_iitpave_fixture_folder",
+    "intake_iitpave_output_fixture",
+    "run_iitpave_parser_contract_harness",
     # output contract / parser guardrails
     "IITPAVE_OUTPUT_FORMAT_REAL_PENDING",
     "IITPAVE_OUTPUT_FORMAT_STUB",

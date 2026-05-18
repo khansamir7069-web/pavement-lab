@@ -87,6 +87,13 @@ real IITPAVE output schema/fixture is added. Unknown, missing, empty, or
 unreadable output is also blocked; no default strain/stress values are
 invented.
 
+Phase 26 adds `app.core.iitpave.fixture_intake` for operator-provided output
+sample intake. It records filename, byte size, line count, detected markers,
+SHA-256, timestamp, and review status. The parser-contract harness blocks
+safely when no `verified_contract_sample` is available, and even verified
+metadata does not enable real parsing until a later phase implements a
+reviewed output schema. See `docs/iitpave_fixture_intake.md`.
+
 ---
 
 ## 3. Toggling between StubRunner and ExternalExeRunner
