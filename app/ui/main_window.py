@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QStackedWidget,
     QStatusBar,
+    QTextEdit,
     QVBoxLayout,
     QWidget,
 )
@@ -57,6 +58,8 @@ from app.reports import (
     build_mix_design_docx,
     build_structural_docx,
     build_traffic_docx,
+    build_iitpave_schema_history_review,
+    format_iitpave_schema_history_item_text,
     run_iitpave_schema_diagnostics_workflow,
 )
 from app.reports.word_report import export_to_pdf
@@ -157,6 +160,15 @@ class MainWindow(QMainWindow):
         )
         self.btn_iitpave_schema.clicked.connect(self._on_iitpave_schema_diagnostics)
         sb_layout.addWidget(self.btn_iitpave_schema)
+
+        self.btn_iitpave_schema_history = QPushButton("IITPAVE Schema History")
+        self.btn_iitpave_schema_history.setObjectName("ImportBtn")
+        self.btn_iitpave_schema_history.setToolTip(
+            "Review persisted IITPAVE schema diagnostics history for the "
+            "active project. No engineering calculations are performed."
+        )
+        self.btn_iitpave_schema_history.clicked.connect(self._on_iitpave_schema_history)
+        sb_layout.addWidget(self.btn_iitpave_schema_history)
 
         version_lbl = QLabel(f"v{__version__}")
         version_lbl.setObjectName("SidebarTag")
@@ -792,6 +804,75 @@ class MainWindow(QMainWindow):
         except Exception as e:
             log.exception("IITPAVE schema diagnostics failed")
             QMessageBox.critical(self, "Schema diagnostics failed", str(e))
+
+    def _build_iitpave_schema_history_dialog(self, review):
+        dlg = QDialog(self)
+        dlg.setWindowTitle("IITPAVE schema diagnostics history")
+        dlg.resize(760, 520)
+        layout = QVBoxLayout(dlg)
+
+        summary = QLabel("\n".join(review.operator_summary))
+        summary.setWordWrap(True)
+        layout.addWidget(summary)
+
+        selector = QListWidget()
+        detail = QTextEdit()
+        detail.setReadOnly(True)
+        detail.setMinimumHeight(260)
+        layout.addWidget(selector)
+        layout.addWidget(detail, stretch=1)
+
+        by_id = {item.id: item for item in review.items}
+        for item in review.items:
+            row = QListWidgetItem(item.label, selector)
+            row.setData(Qt.UserRole, item.id)
+
+        def _show_item(current, _previous=None):
+            if current is None:
+                detail.setPlainText("")
+                return
+            item = by_id.get(current.data(Qt.UserRole))
+            detail.setPlainText(
+                format_iitpave_schema_history_item_text(item) if item else ""
+            )
+
+        selector.currentItemChanged.connect(_show_item)
+        if selector.count():
+            selector.setCurrentRow(0)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Close)
+        buttons.rejected.connect(dlg.reject)
+        layout.addWidget(buttons)
+        return dlg
+
+    def _on_iitpave_schema_history(self) -> None:
+        if self._current_project_id is None:
+            QMessageBox.warning(
+                self,
+                "IITPAVE schema history",
+                "Select or create a project before reviewing schema diagnostics history.",
+            )
+            return
+
+        try:
+            rows = self.db.list_iitpave_schema_diagnostics(self._current_project_id)
+            review = build_iitpave_schema_history_review(self._current_project_id, rows)
+            if not review.items:
+                QMessageBox.information(
+                    self,
+                    "IITPAVE schema history",
+                    "\n".join(review.operator_summary),
+                )
+                self.statusBar().showMessage("No IITPAVE schema diagnostics history found.")
+                return
+            dlg = self._build_iitpave_schema_history_dialog(review)
+            self.statusBar().showMessage(
+                f"IITPAVE schema diagnostics history loaded: {review.item_count} record(s)."
+            )
+            dlg.exec()
+        except Exception as e:
+            log.exception("IITPAVE schema history review failed")
+            QMessageBox.critical(self, "Schema history failed", str(e))
 
     # ----- compute -----
 

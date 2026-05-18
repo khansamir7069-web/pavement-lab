@@ -625,7 +625,25 @@ class Database:
             stmt = (
                 select(IITPaveSchemaDiagnosticsHistory)
                 .where(IITPaveSchemaDiagnosticsHistory.project_id == project_id)
-                .order_by(IITPaveSchemaDiagnosticsHistory.generated_at.desc())
+                .order_by(
+                    IITPaveSchemaDiagnosticsHistory.generated_at.desc(),
+                    IITPaveSchemaDiagnosticsHistory.id.desc(),
+                )
+                .limit(1)
+            )
+            return s.scalars(stmt).first()
+
+    def get_iitpave_schema_diagnostics(
+        self,
+        *,
+        project_id: int,
+        history_id: int,
+    ) -> IITPaveSchemaDiagnosticsHistory | None:
+        with self.session() as s:
+            stmt = (
+                select(IITPaveSchemaDiagnosticsHistory)
+                .where(IITPaveSchemaDiagnosticsHistory.project_id == project_id)
+                .where(IITPaveSchemaDiagnosticsHistory.id == history_id)
                 .limit(1)
             )
             return s.scalars(stmt).first()
@@ -637,7 +655,10 @@ class Database:
             return list(s.scalars(
                 select(IITPaveSchemaDiagnosticsHistory)
                 .where(IITPaveSchemaDiagnosticsHistory.project_id == project_id)
-                .order_by(IITPaveSchemaDiagnosticsHistory.generated_at.desc())
+                .order_by(
+                    IITPaveSchemaDiagnosticsHistory.generated_at.desc(),
+                    IITPaveSchemaDiagnosticsHistory.id.desc(),
+                )
             ))
 
     # ---- Reports --------------------------------------------------------

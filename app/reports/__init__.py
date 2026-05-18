@@ -48,6 +48,15 @@ from .iitpave_schema_workflow import (
     IITPaveSchemaDiagnosticsWorkflowResult,
     run_iitpave_schema_diagnostics_workflow,
 )
+from .iitpave_schema_history import (
+    IITPAVE_SCHEMA_HISTORY_STATUS_AVAILABLE,
+    IITPAVE_SCHEMA_HISTORY_STATUS_EMPTY,
+    IITPaveSchemaDiagnosticsHistoryItem,
+    IITPaveSchemaDiagnosticsHistoryReview,
+    build_iitpave_schema_history_item,
+    build_iitpave_schema_history_review,
+    format_iitpave_schema_history_item_text,
+)
 from .rehab_report import (
     RehabReportContext,
     build_rehab_docx,
@@ -96,6 +105,13 @@ __all__ = [
     "IITPAVE_SCHEMA_WORKFLOW_STATUS_SUMMARY_ONLY",
     "IITPaveSchemaDiagnosticsWorkflowResult",
     "run_iitpave_schema_diagnostics_workflow",
+    "IITPAVE_SCHEMA_HISTORY_STATUS_AVAILABLE",
+    "IITPAVE_SCHEMA_HISTORY_STATUS_EMPTY",
+    "IITPaveSchemaDiagnosticsHistoryItem",
+    "IITPaveSchemaDiagnosticsHistoryReview",
+    "build_iitpave_schema_history_item",
+    "build_iitpave_schema_history_review",
+    "format_iitpave_schema_history_item_text",
     "RehabReportContext",
     "build_rehab_docx",
     "write_rehab_section",

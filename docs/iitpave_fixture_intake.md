@@ -127,3 +127,15 @@ The persisted row is included in project export/import records under
 there are no strain, fatigue, rutting, IRC compliance, or recommendation fields,
 and the serialized workflow payload continues to report
 `engineering_calculations_allowed=false`.
+
+## Phase 34 History Review
+
+`app.reports.iitpave_schema_history` converts persisted history rows into typed
+operator-review summaries. The desktop UI exposes these records through
+`IITPAVE Schema History` for the active project.
+
+The review workflow recalls stored fixture/report paths, workflow and manifest
+statuses, schema counts, propagated diagnostics, and the original operator
+message. It is read-only and audit-only: recalled history cannot trigger
+strain extraction, mechanistic calculations, fatigue/rutting checks, IRC
+compliance conclusions, or recommendation logic.
