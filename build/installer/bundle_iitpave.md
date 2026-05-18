@@ -94,6 +94,12 @@ safely when no `verified_contract_sample` is available, and even verified
 metadata does not enable real parsing until a later phase implements a
 reviewed output schema. See `docs/iitpave_fixture_intake.md`.
 
+Phase 27 adds `app.core.iitpave.parser_contract` for conservative inspection of
+verified fixture records only. It can expose header regions, table-like line
+ranges, recognized labeled blocks, and marker locations for audit/review. It
+does not extract stress or strain values, compute mechanistic responses, perform
+fatigue/rutting checks, recommend layers, or claim IRC:37 compliance.
+
 ---
 
 ## 3. Toggling between StubRunner and ExternalExeRunner

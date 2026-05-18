@@ -69,6 +69,20 @@ from .output_contract import (
     IITPaveOutputContractResult,
     inspect_iitpave_output_contract,
 )
+from .parser_contract import (
+    IITPAVE_PARSER_CONTRACT_STATUS_BLOCKED,
+    IITPAVE_PARSER_CONTRACT_STATUS_INCOMPLETE,
+    IITPAVE_PARSER_CONTRACT_STATUS_PARTIAL,
+    IITPAVE_PARSER_CONTRACT_STATUS_SECTIONS_DETECTED,
+    IITPAVE_PARSER_CONTRACT_STATUS_UNSUPPORTED,
+    IITPAVE_SECTION_HEADER,
+    IITPAVE_SECTION_LABELED_BLOCK,
+    IITPAVE_SECTION_TABLE_LIKE,
+    IITPaveParserContractMarker,
+    IITPaveParserContractSection,
+    IITPaveVerifiedParserContractResult,
+    inspect_iitpave_verified_parser_contract,
+)
 from .parser import (
     is_known_stub_output,
     parse_iitpave_output,
@@ -163,6 +177,19 @@ __all__ = [
     "IITPAVE_OUTPUT_STATUS_UNSUPPORTED",
     "IITPaveOutputContractResult",
     "inspect_iitpave_output_contract",
+    # verified parser contract section metadata
+    "IITPAVE_PARSER_CONTRACT_STATUS_BLOCKED",
+    "IITPAVE_PARSER_CONTRACT_STATUS_INCOMPLETE",
+    "IITPAVE_PARSER_CONTRACT_STATUS_PARTIAL",
+    "IITPAVE_PARSER_CONTRACT_STATUS_SECTIONS_DETECTED",
+    "IITPAVE_PARSER_CONTRACT_STATUS_UNSUPPORTED",
+    "IITPAVE_SECTION_HEADER",
+    "IITPAVE_SECTION_LABELED_BLOCK",
+    "IITPAVE_SECTION_TABLE_LIKE",
+    "IITPaveParserContractMarker",
+    "IITPaveParserContractSection",
+    "IITPaveVerifiedParserContractResult",
+    "inspect_iitpave_verified_parser_contract",
     # results
     "PointResult",
     "MechanisticResult",
