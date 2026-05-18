@@ -7,6 +7,7 @@ calculation inputs.
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence as SequenceABC
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -35,6 +36,10 @@ IITPAVE_SCHEMA_HISTORY_SELECTION_STATUS_PARTIAL_UNKNOWN = "selection_contains_un
 IITPAVE_SCHEMA_HISTORY_REPORT_STATUS_INCLUDED = "schema_history_report_included"
 IITPAVE_SCHEMA_HISTORY_REPORT_STATUS_EMPTY = "schema_history_report_empty"
 IITPAVE_SCHEMA_HISTORY_SELECTION_AUDIT_STATUS_RECORDED = "selection_audit_recorded"
+IITPAVE_SCHEMA_HISTORY_SELECTION_AUDIT_REVIEW_STATUS_EMPTY = "selection_audit_history_empty"
+IITPAVE_SCHEMA_HISTORY_SELECTION_AUDIT_REVIEW_STATUS_AVAILABLE = (
+    "selection_audit_history_available"
+)
 
 
 def _payload(raw: Any) -> dict[str, Any]:
@@ -61,6 +66,23 @@ def _row_id(row: Any) -> int:
 
 def _ids_text(values: Sequence[int]) -> str:
     return ", ".join(str(i) for i in values) if values else "None"
+
+
+def _ids_payload(raw: Any) -> tuple[int, ...]:
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except (TypeError, json.JSONDecodeError):
+            return ()
+    if not isinstance(raw, SequenceABC) or isinstance(raw, (bytes, bytearray, str)):
+        return ()
+    ids: list[int] = []
+    for item in raw:
+        try:
+            ids.append(int(item))
+        except (TypeError, ValueError):
+            continue
+    return tuple(ids)
 
 
 def _diagnostic_rows(summary_payload: Mapping[str, Any]) -> tuple[dict[str, str], ...]:
@@ -256,6 +278,120 @@ class IITPaveSchemaHistorySelectionAuditTrail:
 
 
 @dataclass(frozen=True, slots=True)
+class IITPaveSchemaHistorySelectionAuditReviewItem:
+    id: int
+    project_id: int
+    generated_at: str
+    report_path: str
+    decision_status: str
+    available_history_ids: tuple[int, ...] = ()
+    selected_history_ids: tuple[int, ...] = ()
+    skipped_unknown_history_ids: tuple[int, ...] = ()
+    included_history_count: int = 0
+    diagnostic_row_count: int = 0
+    engineering_calculations_allowed: bool = False
+    persisted_operator_summary: tuple[str, ...] = ()
+
+    @property
+    def label(self) -> str:
+        return (
+            f"Audit #{self.id} | {self.generated_at} | "
+            f"{self.decision_status or 'status_unknown'}"
+        )
+
+    @property
+    def warning_summary(self) -> tuple[str, ...]:
+        if not self.skipped_unknown_history_ids:
+            return ()
+        return (
+            "Warning: the original report request contained unknown history IDs "
+            f"that were ignored: {_ids_text(self.skipped_unknown_history_ids)}.",
+        )
+
+    @property
+    def operator_summary(self) -> tuple[str, ...]:
+        lines = [
+            f"Selection audit #{self.id} generated {self.generated_at}.",
+            f"Decision status: {self.decision_status or 'status_unknown'}.",
+            f"Report path: {self.report_path or 'Not recorded'}.",
+            f"Available candidate history IDs: {_ids_text(self.available_history_ids)}.",
+            f"Selected schema history IDs: {_ids_text(self.selected_history_ids)}.",
+            f"Included history records: {self.included_history_count}.",
+            f"Propagated diagnostic rows: {self.diagnostic_row_count}.",
+            "Historical IDs are shown exactly as recorded; imported audit records are not remapped.",
+            "Engineering calculations remain blocked.",
+        ]
+        lines.extend(self.warning_summary)
+        if self.persisted_operator_summary:
+            lines.append("Persisted report metadata:")
+            lines.extend(self.persisted_operator_summary)
+        return tuple(lines)
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "project_id": self.project_id,
+            "generated_at": self.generated_at,
+            "report_path": self.report_path,
+            "decision_status": self.decision_status,
+            "available_history_ids": list(self.available_history_ids),
+            "selected_history_ids": list(self.selected_history_ids),
+            "skipped_unknown_history_ids": list(self.skipped_unknown_history_ids),
+            "included_history_count": self.included_history_count,
+            "diagnostic_row_count": self.diagnostic_row_count,
+            "engineering_calculations_allowed": self.engineering_calculations_allowed,
+            "warning_summary": list(self.warning_summary),
+            "operator_summary": list(self.operator_summary),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class IITPaveSchemaHistorySelectionAuditReview:
+    project_id: int
+    status: str
+    engineering_calculations_allowed: bool
+    items: tuple[IITPaveSchemaHistorySelectionAuditReviewItem, ...] = ()
+
+    @property
+    def ok(self) -> bool:
+        return self.status == IITPAVE_SCHEMA_HISTORY_SELECTION_AUDIT_REVIEW_STATUS_AVAILABLE
+
+    @property
+    def item_count(self) -> int:
+        return len(self.items)
+
+    @property
+    def latest_item(self) -> IITPaveSchemaHistorySelectionAuditReviewItem | None:
+        return self.items[0] if self.items else None
+
+    @property
+    def operator_summary(self) -> tuple[str, ...]:
+        if not self.items:
+            return (
+                "No report-time IITPAVE schema history selection audit records are available for this project.",
+                "Engineering calculations remain blocked.",
+            )
+        latest = self.latest_item
+        return (
+            f"{len(self.items)} report-time IITPAVE schema history selection audit record(s) available.",
+            f"Latest selection audit id: {latest.id if latest else ''}.",
+            "Review is read-only; historical selected IDs are not edited or remapped.",
+            "Engineering calculations remain blocked.",
+        )
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "project_id": self.project_id,
+            "ok": self.ok,
+            "status": self.status,
+            "engineering_calculations_allowed": self.engineering_calculations_allowed,
+            "item_count": self.item_count,
+            "operator_summary": list(self.operator_summary),
+            "items": [item.as_dict() for item in self.items],
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class IITPaveSchemaDiagnosticsHistoryReview:
     project_id: int
     status: str
@@ -370,6 +506,62 @@ def build_iitpave_schema_history_item(row: Any) -> IITPaveSchemaDiagnosticsHisto
     )
 
 
+def build_iitpave_schema_history_selection_audit_item(
+    row: Any,
+) -> IITPaveSchemaHistorySelectionAuditReviewItem:
+    summary_payload = _payload(getattr(row, "summary_json", None))
+    audit_payload = summary_payload.get("selection_audit_trail")
+    if not isinstance(audit_payload, Mapping):
+        audit_payload = {}
+    persisted_summary = audit_payload.get("operator_summary")
+    if not isinstance(persisted_summary, SequenceABC) or isinstance(
+        persisted_summary, (bytes, bytearray, str)
+    ):
+        persisted_summary = ()
+    return IITPaveSchemaHistorySelectionAuditReviewItem(
+        id=int(getattr(row, "id", 0) or 0),
+        project_id=int(getattr(row, "project_id", 0) or 0),
+        generated_at=_dt_text(getattr(row, "generated_at", "")),
+        report_path=str(getattr(row, "report_path", "") or ""),
+        decision_status=str(getattr(row, "decision_status", "") or ""),
+        available_history_ids=_ids_payload(
+            getattr(row, "available_history_ids_json", None)
+            or audit_payload.get("available_history_ids")
+        ),
+        selected_history_ids=_ids_payload(
+            getattr(row, "selected_history_ids_json", None)
+            or audit_payload.get("selected_history_ids")
+        ),
+        skipped_unknown_history_ids=_ids_payload(
+            getattr(row, "skipped_unknown_history_ids_json", None)
+            or audit_payload.get("skipped_unknown_history_ids")
+        ),
+        included_history_count=int(getattr(row, "included_history_count", 0) or 0),
+        diagnostic_row_count=int(getattr(row, "diagnostic_row_count", 0) or 0),
+        engineering_calculations_allowed=bool(
+            getattr(row, "engineering_calculations_allowed", False)
+        ),
+        persisted_operator_summary=tuple(str(item) for item in persisted_summary),
+    )
+
+
+def build_iitpave_schema_history_selection_audit_review(
+    project_id: int,
+    rows: tuple[Any, ...] | list[Any],
+) -> IITPaveSchemaHistorySelectionAuditReview:
+    items = tuple(build_iitpave_schema_history_selection_audit_item(row) for row in rows)
+    return IITPaveSchemaHistorySelectionAuditReview(
+        project_id=project_id,
+        status=(
+            IITPAVE_SCHEMA_HISTORY_SELECTION_AUDIT_REVIEW_STATUS_AVAILABLE
+            if items
+            else IITPAVE_SCHEMA_HISTORY_SELECTION_AUDIT_REVIEW_STATUS_EMPTY
+        ),
+        engineering_calculations_allowed=False,
+        items=items,
+    )
+
+
 def build_iitpave_schema_history_inclusion_selection(
     project_id: int,
     rows: tuple[Any, ...] | list[Any],
@@ -458,6 +650,12 @@ def format_iitpave_schema_history_item_text(
     if diagnostics:
         blocks.append("Diagnostics:\n" + "\n".join(diagnostics))
     return "\n\n".join(blocks)
+
+
+def format_iitpave_schema_history_selection_audit_item_text(
+    item: IITPaveSchemaHistorySelectionAuditReviewItem,
+) -> str:
+    return "\n".join(item.operator_summary)
 
 
 def build_iitpave_schema_history_report_summary(

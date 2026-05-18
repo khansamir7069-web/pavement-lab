@@ -59,7 +59,9 @@ from app.reports import (
     build_structural_docx,
     build_traffic_docx,
     build_iitpave_schema_history_review,
+    build_iitpave_schema_history_selection_audit_review,
     format_iitpave_schema_history_item_text,
+    format_iitpave_schema_history_selection_audit_item_text,
     run_iitpave_schema_diagnostics_workflow,
 )
 from app.reports.word_report import export_to_pdf
@@ -169,6 +171,17 @@ class MainWindow(QMainWindow):
         )
         self.btn_iitpave_schema_history.clicked.connect(self._on_iitpave_schema_history)
         sb_layout.addWidget(self.btn_iitpave_schema_history)
+
+        self.btn_iitpave_schema_report_audit = QPushButton("IITPAVE Report Audit")
+        self.btn_iitpave_schema_report_audit.setObjectName("ImportBtn")
+        self.btn_iitpave_schema_report_audit.setToolTip(
+            "Review report-time IITPAVE schema-history selection audit records "
+            "for the active project. Records are read-only."
+        )
+        self.btn_iitpave_schema_report_audit.clicked.connect(
+            self._on_iitpave_schema_report_audit
+        )
+        sb_layout.addWidget(self.btn_iitpave_schema_report_audit)
 
         version_lbl = QLabel(f"v{__version__}")
         version_lbl.setObjectName("SidebarTag")
@@ -926,6 +939,84 @@ class MainWindow(QMainWindow):
         except Exception as e:
             log.exception("IITPAVE schema history review failed")
             QMessageBox.critical(self, "Schema history failed", str(e))
+
+    def _build_iitpave_schema_report_audit_dialog(self, review):
+        dlg = QDialog(self)
+        dlg.setWindowTitle("IITPAVE schema-history report audit")
+        dlg.resize(780, 540)
+        layout = QVBoxLayout(dlg)
+
+        summary = QLabel("\n".join(review.operator_summary))
+        summary.setWordWrap(True)
+        layout.addWidget(summary)
+
+        selector = QListWidget()
+        detail = QTextEdit()
+        detail.setReadOnly(True)
+        detail.setMinimumHeight(280)
+        layout.addWidget(selector)
+        layout.addWidget(detail, stretch=1)
+
+        by_id = {item.id: item for item in review.items}
+        for item in review.items:
+            row = QListWidgetItem(item.label, selector)
+            row.setData(Qt.UserRole, item.id)
+
+        def _show_item(current, _previous=None):
+            if current is None:
+                detail.setPlainText("")
+                return
+            item = by_id.get(current.data(Qt.UserRole))
+            detail.setPlainText(
+                format_iitpave_schema_history_selection_audit_item_text(item)
+                if item else ""
+            )
+
+        selector.currentItemChanged.connect(_show_item)
+        if selector.count():
+            selector.setCurrentRow(0)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Close)
+        buttons.rejected.connect(dlg.reject)
+        layout.addWidget(buttons)
+        return dlg
+
+    def _on_iitpave_schema_report_audit(self) -> None:
+        if self._current_project_id is None:
+            QMessageBox.warning(
+                self,
+                "IITPAVE report audit",
+                "Select or create a project before reviewing schema-history report audits.",
+            )
+            return
+
+        try:
+            rows = self.db.list_iitpave_schema_history_selection_audits(
+                self._current_project_id
+            )
+            review = build_iitpave_schema_history_selection_audit_review(
+                self._current_project_id,
+                rows,
+            )
+            if not review.items:
+                QMessageBox.information(
+                    self,
+                    "IITPAVE report audit",
+                    "\n".join(review.operator_summary),
+                )
+                self.statusBar().showMessage(
+                    "No IITPAVE schema-history report audit records found."
+                )
+                return
+            dlg = self._build_iitpave_schema_report_audit_dialog(review)
+            self.statusBar().showMessage(
+                "IITPAVE schema-history report audit loaded: "
+                f"{review.item_count} record(s)."
+            )
+            dlg.exec()
+        except Exception as e:
+            log.exception("IITPAVE report audit review failed")
+            QMessageBox.critical(self, "Report audit failed", str(e))
 
     # ----- compute -----
 
