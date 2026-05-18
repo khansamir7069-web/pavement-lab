@@ -71,6 +71,13 @@ executable path is missing, invalid, a directory, unreadable, empty, or lacks
 execute permission where the platform exposes that signal. The selector does
 not run IITPAVE and does not parse IITPAVE output.
 
+Phase 24 adds `app.core.iitpave.dry_run.check_iitpave_dry_run_readiness(...)`.
+It consumes a Phase-23 runner-selection result and can perform a bounded,
+no-engineering-input subprocess launch probe. It records command, working
+directory, return code, and stdout/stderr previews for audit only. It still
+does not build IITPAVE input, parse engineering output, compute strains, or
+claim IRC:37 compliance.
+
 ---
 
 ## 3. Toggling between StubRunner and ExternalExeRunner

@@ -36,6 +36,11 @@ from .discovery import (
     discover_iitpave_executable,
     validate_iitpave_environment,
 )
+from .dry_run import (
+    IITPaveDryRunConfig,
+    IITPaveDryRunResult,
+    check_iitpave_dry_run_readiness,
+)
 from .parser import (
     is_known_stub_output,
     parse_iitpave_output,
@@ -100,6 +105,10 @@ __all__ = [
     "bundled_iitpave_exe_path",
     "discover_iitpave_executable",
     "validate_iitpave_environment",
+    # dry-run readiness
+    "IITPaveDryRunConfig",
+    "IITPaveDryRunResult",
+    "check_iitpave_dry_run_readiness",
     # results
     "PointResult",
     "MechanisticResult",
