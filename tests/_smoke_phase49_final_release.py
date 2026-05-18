@@ -39,6 +39,29 @@ def _sample_payload(name: str) -> dict:
     }
 
 
+def _aligned_installer_script() -> str:
+    return """; Inno Setup script for SAMPAVE.
+#define MyAppName "SAMPAVE"
+#define MyAppVersion "1.0.0"
+#define MyAppPublisher "SAMPAVE"
+#define MyAppExeName "SamPave.exe"
+
+[Setup]
+AppName={#MyAppName}
+AppVersion={#MyAppVersion}
+AppPublisher={#MyAppPublisher}
+DefaultDirName={autopf}\\SAMPAVE
+DefaultGroupName=SAMPAVE
+OutputBaseFilename=SAMPAVE-Setup
+
+[Files]
+Source: "..\\dist\\SamPave\\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+[Icons]
+Name: "{group}\\{#MyAppName}"; Filename: "{app}\\{#MyAppExeName}"
+"""
+
+
 def _complete_repo_tree(root: Path) -> None:
     for rel in (
         "run.py",
@@ -65,7 +88,10 @@ def _complete_repo_tree(root: Path) -> None:
         "tests/validation_harness.py",
         "docs/validation.md",
     ):
-        _write(root / rel)
+        if rel == "build/installer.iss":
+            _write(root / rel, _aligned_installer_script())
+        else:
+            _write(root / rel)
     for rel in (
         "app",
         "app/data",
@@ -129,7 +155,28 @@ def main() -> int:
                for item in incomplete.checks)
     print("  [PASS] missing required packaging files block final release readiness")
 
-    print("\n=== 3) Current repository final V1 readiness has no blocking failures ===")
+    print("\n=== 3) Installer script mismatch fails explicitly ===")
+    mismatch_root = _tmp / "mismatch_repo"
+    _complete_repo_tree(mismatch_root)
+    _write(
+        mismatch_root / "build" / "installer.iss",
+        """#define MyAppName "Pavement Lab"
+#define MyAppExeName "PavementLab.exe"
+OutputBaseFilename=PavementLab-Setup
+Source: "..\\dist\\PavementLab\\*"; DestDir: "{app}"
+""",
+    )
+    mismatch = build_final_release_readiness_checklist(
+        repo_root=mismatch_root,
+        phase_smokes=REQUIRED_RELEASE_PHASE_SMOKES,
+    )
+    assert mismatch.status == DEPLOYMENT_CHECK_FAIL
+    assert any(item.key == "release_packaging_assets" and item.failed
+               for item in mismatch.checks)
+    assert "pavementlab" in _safe_text(mismatch.as_dict())
+    print("  [PASS] old PavementLab installer metadata blocks final release readiness")
+
+    print("\n=== 4) Current repository final V1 readiness has no blocking failures ===")
     repo_checklist = build_final_release_readiness_checklist(
         repo_root=_repo_root(),
         phase_smokes=PHASE_SMOKES,
@@ -149,7 +196,7 @@ def main() -> int:
         assert any(item.key == key for item in repo_checklist.checks)
     print("  [PASS] final release checklist covers packaging, manifests, and readiness rollups")
 
-    print("\n=== 4) Final release payload remains local/offline/read-only ===")
+    print("\n=== 5) Final release payload remains local/offline/read-only ===")
     payload_text = _safe_text(repo_checklist.as_dict())
     for marker in (
         "build_executed",

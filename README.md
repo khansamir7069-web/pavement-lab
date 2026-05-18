@@ -1,4 +1,4 @@
-# SamPave Engineering Suite
+# SAMPAVE
 
 A commercial-grade desktop application for **flexible-pavement engineering** —
 Marshall Mix Design (DBM, BC, SDAC, BM), structural design (IRC:37-2018),
@@ -23,14 +23,14 @@ Nothing else needs installing.
 
 1. Open `dist\SamPave\` and double-click **`SamPave.exe`**,
 2. Or double-click **`Launch.bat`** in the project root,
-3. Or open the **SamPave** shortcut that was placed on your Desktop.
+3. Or open the **SAMPAVE** shortcut that was placed on your Desktop.
 
 ### Option B — Hand the build to another Windows PC
 
 The V1 redistributable archive is generated at the repo root as:
 
 ```
-SamPave_Engineering_Suite_V1_Windows.zip
+SAMPAVE_V1_Windows.zip
 ```
 
 Copy that zip to the target PC, unzip it anywhere, open the `SamPave\` folder,
@@ -94,12 +94,13 @@ pavement_lab/
 │   ├── test_excel_parity.py    ← 12 cell-by-cell asserts against source .xlsm
 │   └── golden/                  ← extracted fixture from the source workbook
 ├── build/
-│   ├── pavement_lab.spec        ← PyInstaller one-folder spec
-│   ├── build_exe.ps1            ← Windows build script (used by Build.bat)
+│   ├── installer/
+│   │   └── pyinstaller.spec     ← V1 PyInstaller one-folder spec
+│   ├── build_exe.ps1            ← Windows build script
 │   └── installer.iss            ← Inno Setup installer script
 └── dist/
-    └── PavementLab/
-        ├── PavementLab.exe      ← THE STANDALONE APP (31 MB)
+    └── SamPave/
+        ├── SamPave.exe          ← THE STANDALONE APP
         └── _internal/           ← embedded Python + libraries
 ```
 
@@ -131,13 +132,13 @@ Sample run (current workbook):
 
 ## Building a real installer (.msi-style single-file installer)
 
-The `dist\PavementLab\` folder works as-is. If you want a single setup wizard
-(`PavementLab-Setup.exe`):
+The `dist\SamPave\` folder works as-is. If you want a single setup wizard
+(`SAMPAVE-Setup.exe`):
 
-1. Run `Setup.bat` or `Build.bat` to produce `dist\PavementLab\`.
+1. Run `Setup.bat` or `Build.bat` to produce `dist\SamPave\`.
 2. Install **Inno Setup** from https://jrsoftware.org/isinfo.php (free).
 3. Open `build\installer.iss` in Inno Setup and click **Compile**.
-4. `PavementLab-Setup.exe` appears in `build\` — distribute that single file.
+4. `SAMPAVE-Setup.exe` appears in `build\` — distribute that single file.
 
 ---
 
@@ -163,7 +164,7 @@ The code is organised so each piece is replaceable without rewiring the rest.
 - **New calculation panel** — add a `QTableWidget`-based tab to
   `app/ui/widgets/inputs_panel.py`, add a `collect()` method that returns an
   engine dataclass, and reference it from `MainWindow._on_compute`.
-- **After any change**, run `Build.bat` to rebuild `PavementLab.exe`.
+- **After any change**, run `Build.bat` to rebuild `SamPave.exe`.
 
 ---
 

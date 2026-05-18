@@ -1,5 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
-# Pavement Lab — V1 installer spec (Phase 17).
+# SAMPAVE — V1 installer spec (Phase 17).
 #
 # Build from the project root with:
 #

@@ -33,6 +33,23 @@ from app.core.release_integrity import build_release_integrity_checklist
 FINAL_RELEASE_READINESS_FORMAT = "sampave.final_release_readiness"
 FINAL_RELEASE_READINESS_VERSION = "1.0"
 
+_INNO_INSTALLER_REQUIRED_MARKERS = (
+    '#define MyAppName "SAMPAVE"',
+    '#define MyAppPublisher "SAMPAVE"',
+    '#define MyAppExeName "SamPave.exe"',
+    "DefaultDirName={autopf}\\SAMPAVE",
+    "DefaultGroupName=SAMPAVE",
+    "OutputBaseFilename=SAMPAVE-Setup",
+    'Source: "..\\dist\\SamPave\\*"',
+)
+
+_INNO_INSTALLER_FORBIDDEN_MARKERS = (
+    "Pavement Lab",
+    "PavementLab.exe",
+    "PavementLab-Setup",
+    "dist\\PavementLab",
+)
+
 
 def _timestamp() -> str:
     return datetime.now().replace(microsecond=0).isoformat(sep=" ")
@@ -192,6 +209,31 @@ def _release_packaging_assets_check(repo_root: Path) -> FinalReleaseCheck:
             present.append(rel)
         else:
             issues.append(f"{rel}: {issue}")
+    installer_script = repo_root / "build" / "installer.iss"
+    if installer_script.is_file():
+        try:
+            installer_text = installer_script.read_text(encoding="utf-8")
+        except Exception as exc:
+            issues.append(f"build/installer.iss: installer script could not be read: {exc}")
+        else:
+            missing_markers = [
+                marker for marker in _INNO_INSTALLER_REQUIRED_MARKERS
+                if marker not in installer_text
+            ]
+            forbidden_markers = [
+                marker for marker in _INNO_INSTALLER_FORBIDDEN_MARKERS
+                if marker in installer_text
+            ]
+            if missing_markers:
+                issues.append(
+                    "build/installer.iss: missing SAMPAVE packaging marker(s): "
+                    + ", ".join(missing_markers)
+                )
+            if forbidden_markers:
+                issues.append(
+                    "build/installer.iss: old PavementLab packaging marker(s) remain: "
+                    + ", ".join(forbidden_markers)
+                )
     status = DEPLOYMENT_CHECK_FAIL if issues else DEPLOYMENT_CHECK_PASS
     message = (
         f"{len(issues)} required local release packaging asset issue(s) found."
@@ -207,6 +249,8 @@ def _release_packaging_assets_check(repo_root: Path) -> FinalReleaseCheck:
         details={
             "required_assets": list(required),
             "present_assets": present,
+            "installer_script_required_markers": list(_INNO_INSTALLER_REQUIRED_MARKERS),
+            "installer_script_forbidden_markers": list(_INNO_INSTALLER_FORBIDDEN_MARKERS),
             "issues": issues,
             "build_executed": False,
             "installer_created": False,

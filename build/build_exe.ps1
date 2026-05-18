@@ -1,4 +1,4 @@
-# Build script for Pavement Lab (Windows PowerShell).
+# Build script for SAMPAVE (Windows PowerShell).
 # Run from the project root:
 #     powershell -ExecutionPolicy Bypass -File build/build_exe.ps1
 
@@ -15,9 +15,9 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "==> Building executable with PyInstaller"
-pyinstaller build/pavement_lab.spec --clean --noconfirm
+python -m PyInstaller build/installer/pyinstaller.spec --clean --noconfirm
 
 Write-Host ""
 Write-Host "==> Build complete."
-Write-Host "Output: $(Resolve-Path dist/PavementLab)"
-Write-Host "Launch: dist/PavementLab/PavementLab.exe"
+Write-Host "Output: $(Resolve-Path dist/SamPave)"
+Write-Host "Launch: dist/SamPave/SamPave.exe"

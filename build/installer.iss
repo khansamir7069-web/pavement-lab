@@ -1,25 +1,23 @@
-; Inno Setup script for Pavement Lab.
+; Inno Setup script for SAMPAVE.
 ; Open this file in Inno Setup Compiler (https://jrsoftware.org/isinfo.php)
-; after running build/build_exe.ps1 and click "Compile".
+; after running Build.bat and click "Compile".
 ;
-; Produces: PavementLab-Setup.exe
+; Produces: SAMPAVE-Setup.exe
 
-#define MyAppName "Pavement Lab"
+#define MyAppName "SAMPAVE"
 #define MyAppVersion "1.0.0"
-#define MyAppPublisher "Pavement Lab"
-#define MyAppURL "https://example.com/"
-#define MyAppExeName "PavementLab.exe"
+#define MyAppPublisher "SAMPAVE"
+#define MyAppExeName "SamPave.exe"
 
 [Setup]
 AppId={{B4A41D78-7E40-4F40-8C40-3D5A7AE3B777}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
-AppPublisherURL={#MyAppURL}
-DefaultDirName={autopf}\PavementLab
-DefaultGroupName=Pavement Lab
+DefaultDirName={autopf}\SAMPAVE
+DefaultGroupName=SAMPAVE
 DisableProgramGroupPage=yes
-OutputBaseFilename=PavementLab-Setup
+OutputBaseFilename=SAMPAVE-Setup
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
@@ -34,7 +32,7 @@ Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription:
 
 [Files]
 ; The PyInstaller --onedir output. Adjust the source path if your repo is elsewhere.
-Source: "..\dist\PavementLab\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\dist\SamPave\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
