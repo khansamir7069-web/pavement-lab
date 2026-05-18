@@ -54,6 +54,7 @@ class IITPaveExecutableCandidate:
     path: Path
     exists: bool
     is_file: bool
+    probe_error: str = ""
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -61,6 +62,7 @@ class IITPaveExecutableCandidate:
             "path": str(self.path),
             "exists": self.exists,
             "is_file": self.is_file,
+            "probe_error": self.probe_error,
         }
 
 
@@ -135,11 +137,25 @@ def bundled_iitpave_exe_path(*, app_dir: Path | str | None = None) -> Path:
 
 
 def _candidate(source: str, path: Path) -> IITPaveExecutableCandidate:
+    probe_error = ""
+    if "\0" in str(path):
+        exists = False
+        is_file = False
+        probe_error = "embedded null byte"
+    else:
+        try:
+            exists = path.exists()
+            is_file = path.is_file()
+        except (OSError, ValueError) as e:
+            exists = False
+            is_file = False
+            probe_error = str(e)
     return IITPaveExecutableCandidate(
         source=source,
         path=path,
-        exists=path.exists(),
-        is_file=path.is_file(),
+        exists=exists,
+        is_file=is_file,
+        probe_error=probe_error,
     )
 
 
@@ -170,8 +186,9 @@ def discover_iitpave_executable(
         add(SOURCE_BUNDLED, path)
 
     if include_path_search:
+        search_path = env_map.get("PATH") if env is not None else None
         for name in (DEFAULT_EXE_FILENAME_WIN, DEFAULT_EXE_FILENAME_POSIX):
-            found = shutil.which(name)
+            found = shutil.which(name, path=search_path)
             add(SOURCE_PATH, Path(found) if found else None)
 
     return tuple(out)
@@ -202,7 +219,14 @@ def validate_iitpave_environment(
                 if candidate.source == SOURCE_CONFIGURED
                 else IITPAVE_EXECUTABLE_ENV_VAR
             )
-            if not candidate.exists:
+            if candidate.probe_error:
+                issues.append(_issue(
+                    VALIDATION_ERROR,
+                    field,
+                    f"IITPAVE executable path is invalid or inaccessible: "
+                    f"{candidate.path} ({candidate.probe_error})",
+                ))
+            elif not candidate.exists:
                 issues.append(_issue(
                     VALIDATION_ERROR,
                     field,

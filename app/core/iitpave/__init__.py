@@ -63,6 +63,15 @@ from .runner import (
     StubRunner,
     default_iitpave_exe_path,
 )
+from .runner_config import (
+    IITPAVE_RUNNER_EXTERNAL,
+    IITPAVE_RUNNER_STUB,
+    SUPPORTED_IITPAVE_RUNNER_MODES,
+    IITPaveRunnerConfig,
+    IITPaveRunnerSelectionResult,
+    iitpave_runner_config_from_mapping,
+    select_iitpave_runner,
+)
 
 __all__ = [
     # structure / load / points
@@ -102,4 +111,12 @@ __all__ = [
     "default_iitpave_exe_path",
     "SOURCE_STUB",
     "SOURCE_EXTERNAL",
+    # runner selection
+    "IITPAVE_RUNNER_EXTERNAL",
+    "IITPAVE_RUNNER_STUB",
+    "SUPPORTED_IITPAVE_RUNNER_MODES",
+    "IITPaveRunnerConfig",
+    "IITPaveRunnerSelectionResult",
+    "iitpave_runner_config_from_mapping",
+    "select_iitpave_runner",
 ]

@@ -64,6 +64,13 @@ that can be serialized into audit logs or shown in the UI. It does not
 claim IITPAVE version compliance; it only validates filesystem
 configuration.
 
+Phase 23 adds `app.core.iitpave.runner_config.select_iitpave_runner(...)`.
+The default mode is still `stub`. Selecting `external_exe` now goes through
+the diagnostics layer first and returns an explicit blocked result when the
+executable path is missing, invalid, a directory, unreadable, empty, or lacks
+execute permission where the platform exposes that signal. The selector does
+not run IITPAVE and does not parse IITPAVE output.
+
 ---
 
 ## 3. Toggling between StubRunner and ExternalExeRunner
