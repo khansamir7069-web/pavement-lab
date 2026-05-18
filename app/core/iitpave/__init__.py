@@ -83,6 +83,18 @@ from .parser_contract import (
     IITPaveVerifiedParserContractResult,
     inspect_iitpave_verified_parser_contract,
 )
+from .schema_mapping import (
+    IITPAVE_SCHEMA_MAPPING_STATUS_BLOCKED,
+    IITPAVE_SCHEMA_MAPPING_STATUS_MAPPED,
+    IITPAVE_SCHEMA_MAPPING_STATUS_UNKNOWN,
+    IITPAVE_SCHEMA_SECTION_CONTEXT_BLOCK,
+    IITPAVE_SCHEMA_SECTION_OUTPUT_HEADER,
+    IITPAVE_SCHEMA_SECTION_STRESS_STRAIN_CONTEXT,
+    IITPAVE_SCHEMA_SECTION_STRESS_STRAIN_TABLE_CANDIDATE,
+    IITPaveSchemaSectionMapping,
+    IITPaveVerifiedFixtureSchemaMappingResult,
+    map_iitpave_verified_fixture_schema,
+)
 from .parser import (
     is_known_stub_output,
     parse_iitpave_output,
@@ -190,6 +202,17 @@ __all__ = [
     "IITPaveParserContractSection",
     "IITPaveVerifiedParserContractResult",
     "inspect_iitpave_verified_parser_contract",
+    # verified fixture schema mapping
+    "IITPAVE_SCHEMA_MAPPING_STATUS_BLOCKED",
+    "IITPAVE_SCHEMA_MAPPING_STATUS_MAPPED",
+    "IITPAVE_SCHEMA_MAPPING_STATUS_UNKNOWN",
+    "IITPAVE_SCHEMA_SECTION_CONTEXT_BLOCK",
+    "IITPAVE_SCHEMA_SECTION_OUTPUT_HEADER",
+    "IITPAVE_SCHEMA_SECTION_STRESS_STRAIN_CONTEXT",
+    "IITPAVE_SCHEMA_SECTION_STRESS_STRAIN_TABLE_CANDIDATE",
+    "IITPaveSchemaSectionMapping",
+    "IITPaveVerifiedFixtureSchemaMappingResult",
+    "map_iitpave_verified_fixture_schema",
     # results
     "PointResult",
     "MechanisticResult",
