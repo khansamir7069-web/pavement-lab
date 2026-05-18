@@ -139,3 +139,17 @@ statuses, schema counts, propagated diagnostics, and the original operator
 message. It is read-only and audit-only: recalled history cannot trigger
 strain extraction, mechanistic calculations, fatigue/rutting checks, IRC
 compliance conclusions, or recommendation logic.
+
+## Phase 35 Consultancy Report Inclusion
+
+`app.reports.iitpave_schema_history.write_iitpave_schema_history_section(...)`
+adds recalled schema diagnostics history to Word reports as an audit-only
+section. The combined report builder includes this section when a project has
+persisted IITPAVE schema diagnostics history.
+
+The section lists persisted history records, the latest recalled fixture/report
+paths, schema counts, propagated diagnostics, and the original operator message.
+It continues to serialize `engineering_calculations_allowed=false` and does not
+authorize parser output, strain extraction, mechanistic calculations,
+fatigue/rutting checks, IRC compliance conclusions, or engineering
+recommendations.

@@ -9,11 +9,27 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Mapping
+
+from docx import Document
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+
+from ._docx_common import (
+    add_heading,
+    add_kv_table,
+    add_note,
+    add_p,
+    add_signature_block,
+    add_table,
+    new_portrait_document,
+)
 
 
 IITPAVE_SCHEMA_HISTORY_STATUS_EMPTY = "history_empty"
 IITPAVE_SCHEMA_HISTORY_STATUS_AVAILABLE = "history_available_calculations_blocked"
+IITPAVE_SCHEMA_HISTORY_REPORT_STATUS_INCLUDED = "schema_history_report_included"
+IITPAVE_SCHEMA_HISTORY_REPORT_STATUS_EMPTY = "schema_history_report_empty"
 
 
 def _payload(raw: Any) -> dict[str, Any]:
@@ -174,6 +190,42 @@ class IITPaveSchemaDiagnosticsHistoryReview:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class IITPaveSchemaHistoryReportContext:
+    project_title: str = ""
+    work_name: str = ""
+    work_order_no: str = ""
+    work_order_date: str = ""
+    client: str = ""
+    agency: str = ""
+    submitted_by: str = ""
+    lab_name: str = "Pavement Laboratory"
+    report_date: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class IITPaveSchemaHistoryReportSummary:
+    review: IITPaveSchemaDiagnosticsHistoryReview
+    status: str
+    engineering_calculations_allowed: bool
+    included_history_count: int = 0
+    diagnostic_row_count: int = 0
+
+    @property
+    def ok(self) -> bool:
+        return self.status == IITPAVE_SCHEMA_HISTORY_REPORT_STATUS_INCLUDED
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "ok": self.ok,
+            "status": self.status,
+            "engineering_calculations_allowed": self.engineering_calculations_allowed,
+            "included_history_count": self.included_history_count,
+            "diagnostic_row_count": self.diagnostic_row_count,
+            "review": self.review.as_dict(),
+        }
+
+
 def build_iitpave_schema_history_item(row: Any) -> IITPaveSchemaDiagnosticsHistoryItem:
     summary_payload = _payload(getattr(row, "summary_json", None))
     return IITPaveSchemaDiagnosticsHistoryItem(
@@ -228,3 +280,152 @@ def format_iitpave_schema_history_item_text(
     if diagnostics:
         blocks.append("Diagnostics:\n" + "\n".join(diagnostics))
     return "\n\n".join(blocks)
+
+
+def build_iitpave_schema_history_report_summary(
+    review: IITPaveSchemaDiagnosticsHistoryReview,
+) -> IITPaveSchemaHistoryReportSummary:
+    return IITPaveSchemaHistoryReportSummary(
+        review=review,
+        status=(
+            IITPAVE_SCHEMA_HISTORY_REPORT_STATUS_INCLUDED
+            if review.items
+            else IITPAVE_SCHEMA_HISTORY_REPORT_STATUS_EMPTY
+        ),
+        engineering_calculations_allowed=False,
+        included_history_count=review.item_count,
+        diagnostic_row_count=sum(len(item.diagnostic_rows) for item in review.items),
+    )
+
+
+def _history_rows(
+    review: IITPaveSchemaDiagnosticsHistoryReview,
+) -> list[list[str]]:
+    if not review.items:
+        return [["No persisted schema diagnostics history.", "", "", "", "", "No"]]
+    return [
+        [
+            f"#{item.id}",
+            item.generated_at,
+            item.workflow_status or "status_unknown",
+            item.manifest_status or "status_unknown",
+            "Yes" if item.parser_audit_ready else "No",
+            "No",
+        ]
+        for item in review.items
+    ]
+
+
+def _fixture_count_rows(item: IITPaveSchemaDiagnosticsHistoryItem) -> list[list[str]]:
+    return [
+        ["Total fixtures", str(item.total_fixture_count)],
+        ["Verified fixtures", str(item.verified_fixture_count)],
+        ["Mapped schema fixtures", str(item.mapped_schema_count)],
+        ["Blocked schema fixtures", str(item.blocked_schema_count)],
+        ["Unknown schema fixtures", str(item.unknown_schema_count)],
+        ["Unsupported fixture contracts", str(item.unsupported_schema_count)],
+    ]
+
+
+def _diagnostic_table_rows(item: IITPaveSchemaDiagnosticsHistoryItem) -> list[list[str]]:
+    rows = [
+        [row["severity"], row["field"], row["message"]]
+        for row in item.diagnostic_rows
+        if row.get("severity") or row.get("field") or row.get("message")
+    ]
+    if not rows:
+        rows.append(["info", "schema_history", "No blocking diagnostics recorded."])
+    return rows
+
+
+def write_iitpave_schema_history_section(
+    doc: Document,
+    ctx: IITPaveSchemaHistoryReportContext,
+    review: IITPaveSchemaDiagnosticsHistoryReview,
+    *,
+    include_header: bool = True,
+) -> IITPaveSchemaHistoryReportSummary:
+    """Append audit-only recalled IITPAVE schema diagnostics history to a report."""
+    summary = build_iitpave_schema_history_report_summary(review)
+
+    if include_header:
+        add_heading(
+            doc,
+            "IITPAVE SCHEMA DIAGNOSTICS HISTORY",
+            level=1,
+            align=WD_ALIGN_PARAGRAPH.CENTER,
+        )
+        if ctx.project_title:
+            add_p(doc, ctx.project_title, bold=True, size=12,
+                  align=WD_ALIGN_PARAGRAPH.CENTER)
+        date_text = ctx.report_date or datetime.now().strftime("%d-%b-%Y")
+        add_p(doc, f"{ctx.lab_name}  -  Report Date: {date_text}",
+              size=10, align=WD_ALIGN_PARAGRAPH.CENTER)
+        add_heading(doc, "Project Information", level=2)
+        add_kv_table(doc, (
+            ("Name of Work", ctx.work_name),
+            ("Work Order No.", ctx.work_order_no),
+            ("Work Order Date", ctx.work_order_date),
+            ("Client", ctx.client),
+            ("Agency", ctx.agency),
+            ("Submitted By", ctx.submitted_by),
+        ))
+
+    add_heading(doc, "Audit-Only Recall Summary", level=2)
+    add_kv_table(doc, (
+        ("Review status", review.status),
+        ("Persisted history records", str(review.item_count)),
+        ("Engineering calculations allowed", "No"),
+    ))
+    for line in review.operator_summary:
+        add_p(doc, line, size=10)
+
+    add_heading(doc, "Persisted History Records", level=2)
+    add_table(
+        doc,
+        ["History", "Generated", "Workflow status", "Manifest status", "Audit-ready", "Calculations"],
+        _history_rows(review),
+    )
+
+    if review.latest_item is not None:
+        latest = review.latest_item
+        add_heading(doc, "Latest Recalled Diagnostic Summary", level=2)
+        add_kv_table(doc, (
+            ("History ID", f"#{latest.id}"),
+            ("Fixture folder", latest.fixture_dir),
+            ("Report path", latest.report_path),
+            ("Workflow status", latest.workflow_status),
+            ("Manifest status", latest.manifest_status),
+            ("Parser audit-ready", "Yes" if latest.parser_audit_ready else "No"),
+            ("Engineering calculations allowed", "No"),
+        ))
+        add_table(doc, ["Count", "Value"], _fixture_count_rows(latest))
+        if latest.operator_message:
+            add_heading(doc, "Original Operator Message", level=3)
+            for line in latest.operator_message.splitlines():
+                add_p(doc, line, size=9)
+        add_heading(doc, "Propagated Diagnostics", level=3)
+        add_table(doc, ["Severity", "Field", "Message"], _diagnostic_table_rows(latest))
+
+    add_note(
+        doc,
+        "This section recalls persisted IITPAVE schema diagnostics for audit "
+        "traceability only. It does not extract strains, run mechanistic "
+        "calculations, evaluate fatigue or rutting, make IRC compliance "
+        "claims, or issue engineering recommendations.",
+    )
+    return summary
+
+
+def build_iitpave_schema_history_docx(
+    out_path: Path,
+    ctx: IITPaveSchemaHistoryReportContext,
+    review: IITPaveSchemaDiagnosticsHistoryReview,
+) -> Path:
+    out_path = Path(out_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    doc = new_portrait_document()
+    write_iitpave_schema_history_section(doc, ctx, review, include_header=True)
+    add_signature_block(doc)
+    doc.save(out_path)
+    return out_path

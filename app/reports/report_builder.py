@@ -85,6 +85,11 @@ from .structural_report import (
     StructuralReportContext,
     write_structural_section,
 )
+from .iitpave_schema_history import (
+    IITPaveSchemaHistoryReportContext,
+    build_iitpave_schema_history_review,
+    write_iitpave_schema_history_section,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -313,6 +318,20 @@ def _struct_ctx(ctx: CombinedReportContext) -> StructuralReportContext:
     )
 
 
+def _schema_history_ctx(ctx: CombinedReportContext) -> IITPaveSchemaHistoryReportContext:
+    return IITPaveSchemaHistoryReportContext(
+        project_title=ctx.project_title,
+        work_name=ctx.work_name,
+        work_order_no=ctx.work_order_no,
+        work_order_date=ctx.work_order_date,
+        client=ctx.client,
+        agency=ctx.agency,
+        submitted_by=ctx.submitted_by,
+        lab_name=ctx.lab_name,
+        report_date=ctx.report_date,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Public entry point
 # ---------------------------------------------------------------------------
@@ -356,10 +375,14 @@ def build_combined_report(
     traffic = _rehydrate_traffic(tr_row)
     cs_row = db.latest_condition_survey(project_id)
     condition = _rehydrate_condition(cs_row)
+    schema_history_review = build_iitpave_schema_history_review(
+        project_id,
+        db.list_iitpave_schema_diagnostics(project_id),
+    )
 
     have_mix = mix_result_live is not None
     have_any = any((have_mix, traffic, structural, overlay, cold_mix, micro,
-                    material_qty, condition))
+                    material_qty, condition, schema_history_review.items))
     if not have_any:
         raise ValueError(
             "No module data found for this project — compute and save at "
@@ -411,6 +434,11 @@ def build_combined_report(
     if condition:
         toc_rows.append(["Pavement Condition Survey",
                          "ASTM D6433 / IRC:82-1982 (placeholder PCI)"])
+    if schema_history_review.items:
+        toc_rows.append([
+            "IITPAVE Schema Diagnostics History",
+            "Audit-only parser/fixture traceability; calculations blocked",
+        ])
     # Phase 12 synthesis — derived on-demand from the rehydrated
     # condition + traffic + maintenance results. Not persisted (no DB
     # schema change in Phase 15 P2).
@@ -602,6 +630,17 @@ def build_combined_report(
         )
         write_rehab_section(doc, rh_ctx, rehab_synthesis, include_header=True)
         included.append("Rehabilitation Recommendations")
+
+    # ---- IITPAVE Schema Diagnostics History (audit-only recall) ----
+    if schema_history_review.items:
+        doc.add_page_break()
+        write_iitpave_schema_history_section(
+            doc,
+            _schema_history_ctx(ctx),
+            schema_history_review,
+            include_header=True,
+        )
+        included.append("IITPAVE Schema Diagnostics History")
 
     add_signature_block(doc)
     doc.save(out_path)
