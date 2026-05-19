@@ -15,6 +15,8 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QDoubleSpinBox,
     QFormLayout,
+    QGridLayout,
+    QGroupBox,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -52,6 +54,14 @@ from .common import PageHeader, PlaceholderBanner, styled_button
 SIEVES = (37.5, 26.5, 19, 13.2, 4.75, 2.36, 0.3, 0.075)
 AVAILABLE_AGGS = ("25mm", "20mm", "10mm", "6mm", "SD", "Cement")
 AGGS = ("25mm", "20mm", "6mm", "SD", "Cement")
+MATERIAL_DISPLAY_NAMES = {
+    "25mm": "25 mm",
+    "20mm": "20 mm",
+    "10mm": "10 mm",
+    "6mm": "6 mm",
+    "SD": "Stone Dust",
+    "Cement": "Cement",
+}
 DESIGN_PB = (3.5, 4.0, 4.5, 5.0, 5.5)
 
 
@@ -126,22 +136,74 @@ class GradationTab(QWidget):
         layout.addWidget(self._mix_code_label)
         layout.addWidget(self._warning_banner)
 
-        # Blend ratios row (small)
-        self._blend_form = QFormLayout()
         self.active_checks: dict[str, QCheckBox] = {}
-        self.blend_spins: dict[str, QDoubleSpinBox] = {}
-        self.blend_labels: dict[str, QLabel] = {}
-        self._material_row_widget = QWidget()
-        self._material_row = QHBoxLayout(self._material_row_widget)
-        self._material_row.setContentsMargins(0, 0, 0, 0)
-        for name in self._available_aggs:
-            cb = QCheckBox(name)
+        self.material_group = QGroupBox("Active material selection")
+        self.material_group.setObjectName("ActiveMaterialSelection")
+        self.material_group.setStyleSheet(
+            """
+            QGroupBox#ActiveMaterialSelection {
+                background:#ffffff;
+                border:1px solid #c9d6ec;
+                border-radius:6px;
+                margin-top:14px;
+                padding:10px 10px 8px 10px;
+                color:#1f3a68;
+                font-weight:bold;
+            }
+            QGroupBox#ActiveMaterialSelection::title {
+                subcontrol-origin: margin;
+                subcontrol-position: top left;
+                left:10px;
+                padding:0 6px;
+                background:#ffffff;
+            }
+            QGroupBox#ActiveMaterialSelection QCheckBox {
+                spacing:8px;
+                padding:6px 10px;
+                border:1px solid #c5ccda;
+                border-radius:4px;
+                background:#f9fafc;
+                color:#1f3a68;
+                font-weight:normal;
+            }
+            QGroupBox#ActiveMaterialSelection QCheckBox:checked {
+                background:#eaf4ee;
+                border-color:#5d9b6e;
+                color:#185d33;
+                font-weight:bold;
+            }
+            QGroupBox#ActiveMaterialSelection QCheckBox::indicator {
+                width:16px;
+                height:16px;
+            }
+            """
+        )
+        material_layout = QVBoxLayout(self.material_group)
+        material_layout.setContentsMargins(10, 14, 10, 10)
+        material_layout.setSpacing(8)
+        self._active_summary = QLabel("")
+        self._active_summary.setObjectName("ActiveMaterialSummary")
+        self._active_summary.setStyleSheet("color:#4a5260; font-size:9pt; font-weight:normal;")
+        material_layout.addWidget(self._active_summary)
+        self._material_grid = QGridLayout()
+        self._material_grid.setHorizontalSpacing(8)
+        self._material_grid.setVerticalSpacing(8)
+        for idx, name in enumerate(self._available_aggs):
+            cb = QCheckBox(MATERIAL_DISPLAY_NAMES.get(name, name))
+            cb.setToolTip(
+                "Enable this component in gradation, blend ratio, calculation, and report output."
+            )
             cb.setChecked(name in self._aggs)
             cb.stateChanged.connect(self._on_active_materials_changed)
             self.active_checks[name] = cb
-            self._material_row.addWidget(cb)
-        self._material_row.addStretch(1)
-        self._blend_form.addRow("Active Materials:", self._material_row_widget)
+            self._material_grid.addWidget(cb, idx // 3, idx % 3)
+        material_layout.addLayout(self._material_grid)
+        layout.addWidget(self.material_group)
+
+        # Blend ratios row (small)
+        self._blend_form = QFormLayout()
+        self.blend_spins: dict[str, QDoubleSpinBox] = {}
+        self.blend_labels: dict[str, QLabel] = {}
         self._blend_row_widget = QWidget()
         self._blend_row = QHBoxLayout(self._blend_row_widget)
         self._blend_row.setContentsMargins(0, 0, 0, 0)
@@ -151,7 +213,7 @@ class GradationTab(QWidget):
             sp.setRange(0, 1)
             sp.setSingleStep(0.01)
             sp.setValue(DEMO_BLEND.get(name, 0))
-            lbl = QLabel(name)
+            lbl = QLabel(MATERIAL_DISPLAY_NAMES.get(name, name))
             self.blend_spins[name] = sp
             self.blend_labels[name] = lbl
             self._blend_row.addWidget(lbl)
@@ -160,7 +222,9 @@ class GradationTab(QWidget):
         layout.addLayout(self._blend_form)
 
         # Gradation table
-        headers = ["IS Sieve (mm)"] + list(self._available_aggs) + ["MoRTH Lower", "MoRTH Upper"]
+        headers = ["IS Sieve (mm)"] + [
+            MATERIAL_DISPLAY_NAMES.get(name, name) for name in self._available_aggs
+        ] + ["MoRTH Lower", "MoRTH Upper"]
         self.table = QTableWidget(len(self._sieves), len(headers))
         self.table.setHorizontalHeaderLabels(headers)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
@@ -198,6 +262,12 @@ class GradationTab(QWidget):
     def _sync_active_materials(self) -> None:
         self._aggs = self.active_materials()
         active = set(self._aggs)
+        active_labels = [MATERIAL_DISPLAY_NAMES.get(name, name) for name in self._aggs]
+        self._active_summary.setText(
+            "Active: " + ", ".join(active_labels)
+            if active_labels else
+            "Active: none selected"
+        )
         for name in self._available_aggs:
             visible = name in active
             self.blend_labels[name].setVisible(visible)
@@ -256,7 +326,9 @@ class GradationTab(QWidget):
             self._warning_banner.set_message("", visible=False)
 
         # Rebuild table with new sieve count
-        headers = ["IS Sieve (mm)"] + list(self._available_aggs) + ["MoRTH Lower", "MoRTH Upper"]
+        headers = ["IS Sieve (mm)"] + [
+            MATERIAL_DISPLAY_NAMES.get(name, name) for name in self._available_aggs
+        ] + ["MoRTH Lower", "MoRTH Upper"]
         self.table.setRowCount(len(self._sieves))
         self.table.setColumnCount(len(headers))
         self.table.setHorizontalHeaderLabels(headers)

@@ -51,6 +51,11 @@ def test_gradation_active_materials_hide_inactive_blend_inputs() -> None:
     _app()
     tab = GradationTab()
 
+    assert tab.material_group.title() == "Active material selection"
+    assert tab.material_group.isHidden() is False
+    assert tab.active_checks["10mm"].text() == "10 mm"
+    assert tab.active_checks["SD"].text() == "Stone Dust"
+    assert "Active: 25 mm, 20 mm, 6 mm, Stone Dust, Cement" in tab._active_summary.text()
     assert tab.active_materials() == ("25mm", "20mm", "6mm", "SD", "Cement")
     assert tab.blend_spins["10mm"].isHidden()
     assert tab.table.isColumnHidden(tab._available_aggs.index("10mm") + 1)
@@ -66,6 +71,10 @@ def test_gradation_active_materials_hide_inactive_blend_inputs() -> None:
     assert tuple(grad.pass_pct) == active
     assert "20mm" not in grad.blend_ratios
     assert "Cement" not in grad.blend_ratios
+    assert tab.active_checks["10mm"].isChecked()
+    assert "10 mm" in tab._active_summary.text()
+    assert "20 mm" not in tab._active_summary.text()
+    assert "Cement" not in tab._active_summary.text()
     assert tab.blend_spins["20mm"].isHidden()
     assert tab.blend_spins["Cement"].isHidden()
     assert tab.table.isColumnHidden(tab._available_aggs.index("20mm") + 1)
