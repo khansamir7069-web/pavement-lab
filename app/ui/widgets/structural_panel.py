@@ -4,6 +4,8 @@ Independent module: needs a project but no mix-design data.
 """
 from __future__ import annotations
 
+import dataclasses
+
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QComboBox,
@@ -22,6 +24,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.core import (
+    MECHANISTIC_WORKFLOW_NOT_RUN,
     StructuralInput,
     StructuralResult,
     compute_structural_design,
@@ -43,6 +46,13 @@ ROAD_CATEGORIES = (
 
 def _fmt_mech_value(value: float | None, suffix: str = "") -> str:
     return "not available" if value is None else f"{value:.2f}{suffix}"
+
+
+def _needs_mechanistic_workflow(result: StructuralResult) -> bool:
+    if result.mechanistic_validation is not None:
+        return False
+    checks = (result.fatigue_check or "", result.rutting_check or "")
+    return any(MECHANISTIC_WORKFLOW_NOT_RUN in text for text in checks)
 
 
 def _spin(value: float, lo: float, hi: float, step: float,
@@ -213,8 +223,10 @@ class StructuralPanel(QWidget):
         try:
             inp = self._collect()
             result = compute_structural_design(inp)
-            workflow = run_structural_iitpave_mechanistic_workflow(result)
-            result = workflow.structural_result
+            workflow = None
+            if _needs_mechanistic_workflow(result):
+                workflow = run_structural_iitpave_mechanistic_workflow(result)
+                result = workflow.structural_result
         except Exception as e:
             QMessageBox.critical(self, "Computation error", str(e))
             return
@@ -224,6 +236,19 @@ class StructuralPanel(QWidget):
         self.btn_save.setEnabled(self._project_id is not None)
 
     def _render(self, r: StructuralResult) -> None:
+        if _needs_mechanistic_workflow(r):
+            try:
+                workflow = run_structural_iitpave_mechanistic_workflow(r)
+                r = workflow.structural_result
+                self._last_result = r
+                self._last_iitpave_workflow = workflow
+            except Exception as e:
+                r = dataclasses.replace(
+                    r,
+                    fatigue_check=f"IITPAVE unavailable - {e}",
+                    rutting_check=f"IITPAVE unavailable - {e}",
+                )
+                self._last_result = r
         self.res_card.setVisible(True)
         self.lbl_msa.setText(f"Design Traffic = {r.design_msa:.2f} MSA")
         self.lbl_meta.setText(

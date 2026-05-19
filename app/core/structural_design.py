@@ -34,6 +34,12 @@ REFERENCES: Tuple[CodeRef, ...] = (
     CodeRef("IRC:37-2018", "Plates 1-4", "Catalogue layer compositions"),
 )
 
+MECHANISTIC_WORKFLOW_NOT_RUN: str = (
+    "IITPAVE unavailable - mechanistic workflow has not run. "
+    "Use Structural Design Compute to run local IITPAVE or configure "
+    "SAMPAVE_IITPAVE_EXE."
+)
+
 
 # ---------------------------------------------------------------------------
 # Input / output dataclasses
@@ -160,8 +166,8 @@ def compute_structural_design(inp: StructuralInput) -> StructuralResult:
         subgrade_mr_mpa=mr,
         composition=comp,
         total_pavement_thickness_mm=total_t,
-        fatigue_check="Placeholder — IITPAVE / mechanistic check not yet integrated.",
-        rutting_check="Placeholder — IITPAVE / mechanistic check not yet integrated.",
+        fatigue_check=MECHANISTIC_WORKFLOW_NOT_RUN,
+        rutting_check=MECHANISTIC_WORKFLOW_NOT_RUN,
         notes=("Layer composition is a catalogue-style suggestion (Phase 4 skeleton). "
                "Cross-check against IRC:37 Plates and run mechanistic analysis "
                "before adoption for design."),

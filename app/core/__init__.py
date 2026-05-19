@@ -144,6 +144,7 @@ from .traffic import (
     compute_traffic_analysis,
 )
 from .structural_design import (
+    MECHANISTIC_WORKFLOW_NOT_RUN,
     StructuralInput,
     PavementLayer,
     StructuralResult,
@@ -409,6 +410,7 @@ __all__ = [
     "load_binders",
     "reload_binders",
     "StructuralInput",
+    "MECHANISTIC_WORKFLOW_NOT_RUN",
     "PavementLayer",
     "StructuralResult",
     "compute_design_traffic",
