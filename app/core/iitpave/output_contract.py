@@ -17,17 +17,19 @@ from app.core.config_profiles import (
 )
 
 from .discovery import IITPaveEnvironmentIssue
-from .runner import SOURCE_STUB, STUB_OUTPUT_VERSION
+from .runner import SOURCE_EXTERNAL, SOURCE_STUB, STUB_OUTPUT_VERSION
 
 
 IITPAVE_OUTPUT_STATUS_MISSING = "missing"
 IITPAVE_OUTPUT_STATUS_UNREADABLE = "unreadable"
 IITPAVE_OUTPUT_STATUS_EMPTY = "empty"
 IITPAVE_OUTPUT_STATUS_STUB_CONTRACT = "stub_contract"
+IITPAVE_OUTPUT_STATUS_REAL_CONTRACT_SUPPORTED = "real_contract_supported"
 IITPAVE_OUTPUT_STATUS_REAL_CONTRACT_PENDING = "real_contract_pending"
 IITPAVE_OUTPUT_STATUS_UNSUPPORTED = "unsupported"
 
 IITPAVE_OUTPUT_FORMAT_STUB = "sampave_phase13_stub"
+IITPAVE_OUTPUT_FORMAT_REAL_TABLE = "real_iitpave_stress_strain_table"
 IITPAVE_OUTPUT_FORMAT_REAL_PENDING = "real_iitpave_pending"
 IITPAVE_OUTPUT_FORMAT_UNKNOWN = "unknown"
 
@@ -40,6 +42,8 @@ _REAL_IITPAVE_HINTS = (
     "stress",
     "strain",
 )
+
+_SUPPORTED_TABLE_MARKERS = ("sigmaz", "sigmat", "sigmar", "epz", "ept", "epr")
 
 
 @dataclass(frozen=True, slots=True)
@@ -95,6 +99,15 @@ def _issue(severity: str, field: str, message: str) -> IITPaveEnvironmentIssue:
 
 def _line_count(text: str) -> int:
     return len(text.splitlines())
+
+
+def _has_supported_real_table(text: str) -> bool:
+    lower = text.lower()
+    compact = "".join(ch for ch in lower if ch.isalnum() or ch.isspace())
+    compact_markers = set(compact.split())
+    if not all(marker in compact_markers or marker in lower for marker in _SUPPORTED_TABLE_MARKERS):
+        return False
+    return any(char.isdigit() for char in text)
 
 
 def _result(
@@ -164,6 +177,25 @@ def _detect_text_contract(
             format_key=IITPAVE_OUTPUT_FORMAT_STUB,
             parse_allowed=True,
             parser_source=SOURCE_STUB,
+            source_path=source_path,
+            text=text,
+            byte_count=byte_count,
+            markers=tuple(markers),
+            issues=issues,
+        )
+
+    if _has_supported_real_table(text):
+        markers.extend(m for m in _SUPPORTED_TABLE_MARKERS if m not in markers)
+        issues.append(_issue(
+            VALIDATION_INFO,
+            "output.contract",
+            "Recognized IITPAVE stress/strain table fields; external parser may run.",
+        ))
+        return _result(
+            status=IITPAVE_OUTPUT_STATUS_REAL_CONTRACT_SUPPORTED,
+            format_key=IITPAVE_OUTPUT_FORMAT_REAL_TABLE,
+            parse_allowed=True,
+            parser_source=SOURCE_EXTERNAL,
             source_path=source_path,
             text=text,
             byte_count=byte_count,

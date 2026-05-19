@@ -58,11 +58,13 @@ from .fixture_intake import (
 )
 from .output_contract import (
     IITPAVE_OUTPUT_FORMAT_REAL_PENDING,
+    IITPAVE_OUTPUT_FORMAT_REAL_TABLE,
     IITPAVE_OUTPUT_FORMAT_STUB,
     IITPAVE_OUTPUT_FORMAT_UNKNOWN,
     IITPAVE_OUTPUT_STATUS_EMPTY,
     IITPAVE_OUTPUT_STATUS_MISSING,
     IITPAVE_OUTPUT_STATUS_REAL_CONTRACT_PENDING,
+    IITPAVE_OUTPUT_STATUS_REAL_CONTRACT_SUPPORTED,
     IITPAVE_OUTPUT_STATUS_STUB_CONTRACT,
     IITPAVE_OUTPUT_STATUS_UNREADABLE,
     IITPAVE_OUTPUT_STATUS_UNSUPPORTED,
@@ -144,6 +146,13 @@ from .runner_config import (
     iitpave_runner_config_from_mapping,
     select_iitpave_runner,
 )
+from .workflow import (
+    IITPAVE_WORKFLOW_STATUS_BLOCKED,
+    IITPAVE_WORKFLOW_STATUS_READY,
+    IITPAVE_WORKFLOW_STATUS_WARN,
+    IITPaveMechanisticWorkflowResult,
+    run_structural_iitpave_mechanistic_workflow,
+)
 
 __all__ = [
     # structure / load / points
@@ -192,11 +201,13 @@ __all__ = [
     "run_iitpave_parser_contract_harness",
     # output contract / parser guardrails
     "IITPAVE_OUTPUT_FORMAT_REAL_PENDING",
+    "IITPAVE_OUTPUT_FORMAT_REAL_TABLE",
     "IITPAVE_OUTPUT_FORMAT_STUB",
     "IITPAVE_OUTPUT_FORMAT_UNKNOWN",
     "IITPAVE_OUTPUT_STATUS_EMPTY",
     "IITPAVE_OUTPUT_STATUS_MISSING",
     "IITPAVE_OUTPUT_STATUS_REAL_CONTRACT_PENDING",
+    "IITPAVE_OUTPUT_STATUS_REAL_CONTRACT_SUPPORTED",
     "IITPAVE_OUTPUT_STATUS_STUB_CONTRACT",
     "IITPAVE_OUTPUT_STATUS_UNREADABLE",
     "IITPAVE_OUTPUT_STATUS_UNSUPPORTED",
@@ -257,4 +268,9 @@ __all__ = [
     "IITPaveRunnerSelectionResult",
     "iitpave_runner_config_from_mapping",
     "select_iitpave_runner",
+    "IITPAVE_WORKFLOW_STATUS_BLOCKED",
+    "IITPAVE_WORKFLOW_STATUS_READY",
+    "IITPAVE_WORKFLOW_STATUS_WARN",
+    "IITPaveMechanisticWorkflowResult",
+    "run_structural_iitpave_mechanistic_workflow",
 ]

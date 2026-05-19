@@ -25,6 +25,7 @@ from app.core import (
     StructuralInput,
     StructuralResult,
     compute_structural_design,
+    run_structural_iitpave_mechanistic_workflow,
 )
 from .common import Card, PageHeader, styled_button
 
@@ -38,6 +39,10 @@ ROAD_CATEGORIES = (
     "Urban Arterial",
     "Other",
 )
+
+
+def _fmt_mech_value(value: float | None, suffix: str = "") -> str:
+    return "not available" if value is None else f"{value:.2f}{suffix}"
 
 
 def _spin(value: float, lo: float, hi: float, step: float,
@@ -61,6 +66,7 @@ class StructuralPanel(QWidget):
         self.db = db
         self._project_id: int | None = None
         self._last_result: StructuralResult | None = None
+        self._last_iitpave_workflow = None
         self._build()
 
     # ----- build -----
@@ -163,6 +169,7 @@ class StructuralPanel(QWidget):
     def set_project(self, pid: int | None, name: str = "") -> None:
         self._project_id = pid
         self._last_result = None
+        self._last_iitpave_workflow = None
         self.btn_save.setEnabled(False)
         self.res_card.setVisible(False)
         if pid is None:
@@ -206,10 +213,13 @@ class StructuralPanel(QWidget):
         try:
             inp = self._collect()
             result = compute_structural_design(inp)
+            workflow = run_structural_iitpave_mechanistic_workflow(result)
+            result = workflow.structural_result
         except Exception as e:
             QMessageBox.critical(self, "Computation error", str(e))
             return
         self._last_result = result
+        self._last_iitpave_workflow = workflow
         self._render(result)
         self.btn_save.setEnabled(self._project_id is not None)
 
@@ -234,11 +244,25 @@ class StructuralPanel(QWidget):
         self.lbl_total.setText(
             f"Total pavement thickness: {r.total_pavement_thickness_mm:.0f} mm"
         )
-        self.lbl_checks.setText(
-            f"Fatigue check: {r.fatigue_check}<br>"
-            f"Rutting check: {r.rutting_check}<br>"
-            f"<i>{r.notes}</i>"
-        )
+        mech = r.mechanistic_validation
+        if mech is not None:
+            self.lbl_checks.setText(
+                f"Fatigue check: {r.fatigue_check}<br>"
+                f"Rutting check: {r.rutting_check}<br>"
+                f"epsilon_t = {_fmt_mech_value(mech.fatigue.epsilon_t_microstrain)} "
+                f"microstrain; NF = {_fmt_mech_value(mech.fatigue.cumulative_life_msa)} "
+                f"MSA<br>"
+                f"epsilon_v = {_fmt_mech_value(mech.rutting.epsilon_v_microstrain)} "
+                f"microstrain; NR = {_fmt_mech_value(mech.rutting.cumulative_life_msa)} "
+                f"MSA<br>"
+                f"<i>{r.notes}</i>"
+            )
+        else:
+            self.lbl_checks.setText(
+                f"Fatigue check: {r.fatigue_check}<br>"
+                f"Rutting check: {r.rutting_check}<br>"
+                f"<i>{r.notes}</i>"
+            )
 
     def _on_save(self) -> None:
         if self._project_id is None or self._last_result is None:
@@ -247,6 +271,16 @@ class StructuralPanel(QWidget):
             self.db.save_structural_design(
                 project_id=self._project_id, result=self._last_result
             )
+            if self._last_result.mechanistic_validation is not None:
+                self.db.save_mechanistic_validation(
+                    project_id=self._project_id,
+                    summary=self._last_result.mechanistic_validation,
+                    inputs=(
+                        self._last_iitpave_workflow.as_dict()
+                        if self._last_iitpave_workflow is not None
+                        else None
+                    ),
+                )
             self.db.set_module_status(self._project_id, "structural", "complete")
             self.btn_export.setEnabled(True)
             QMessageBox.information(self, "Saved",

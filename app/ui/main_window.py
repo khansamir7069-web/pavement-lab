@@ -492,7 +492,10 @@ class MainWindow(QMainWindow):
     def _on_export_structural(self, project_id: int) -> None:
         from app.reports.report_builder import _rehydrate_structural
         sd_row = self.db.latest_structural_design(project_id)
-        result = _rehydrate_structural(sd_row)
+        result = _rehydrate_structural(
+            sd_row,
+            self.db.latest_mechanistic_validation(project_id),
+        )
         if result is None:
             QMessageBox.information(
                 self, "Nothing to export",

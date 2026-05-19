@@ -25,7 +25,7 @@ from __future__ import annotations
 import json
 import platform
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Mapping, Optional, Sequence
@@ -36,12 +36,18 @@ from app import __product_name__, __version__
 from app.core import (
     ColdMixInput,
     ConditionSurveyInput,
+    CodeRef,
     DistressRecord,
+    FatigueCalibration,
+    FatigueCheck,
     LayerInput,
     MaterialQuantityInput,
+    MechanisticValidationSummary,
     MicroSurfacingInput,
     MixDesignResult,
     OverlayInput,
+    RuttingCalibration,
+    RuttingCheck,
     StructuralInput,
     TrafficInput,
     compute_cold_mix,
@@ -189,7 +195,89 @@ def _coerce_tuple(v) -> tuple:
     return tuple(v) if isinstance(v, list) else v
 
 
-def _rehydrate_structural(sd_row) -> "StructuralResult | None":
+def _code_refs_from_json(raw) -> tuple[CodeRef, ...]:
+    if not isinstance(raw, list):
+        return ()
+    refs: list[CodeRef] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        code_id = item.get("code_id") or ""
+        if code_id:
+            refs.append(CodeRef(
+                code_id=code_id,
+                clause=item.get("clause", "") or "",
+                note=item.get("note", "") or "",
+            ))
+    return tuple(refs)
+
+
+def _rehydrate_mechanistic_validation(row) -> MechanisticValidationSummary | None:
+    if not row or not row.summary_json:
+        return None
+    try:
+        data = json.loads(row.summary_json)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(data, dict):
+        return None
+    fatigue_data = data.get("fatigue") or {}
+    rutting_data = data.get("rutting") or {}
+    fcal_data = fatigue_data.get("calibration") or {}
+    rcal_data = rutting_data.get("calibration") or {}
+    fatigue_cal = FatigueCalibration(
+        label=fcal_data.get("label", "IRC37_PLACEHOLDER_80pct"),
+        k1=float(fcal_data.get("k1", 2.21e-04)),
+        k2=float(fcal_data.get("k2", 3.89)),
+        k3=float(fcal_data.get("k3", 0.854)),
+        reliability_pct=int(fcal_data.get("reliability_pct", 80)),
+        is_placeholder=bool(fcal_data.get("is_placeholder", True)),
+    )
+    rutting_cal = RuttingCalibration(
+        label=rcal_data.get("label", "IRC37_PLACEHOLDER_80pct"),
+        k_r=float(rcal_data.get("k_r", 4.1656e-08)),
+        k_v=float(rcal_data.get("k_v", 4.5337)),
+        reliability_pct=int(rcal_data.get("reliability_pct", 80)),
+        is_placeholder=bool(rcal_data.get("is_placeholder", True)),
+    )
+    fatigue = FatigueCheck(
+        epsilon_t_microstrain=fatigue_data.get("epsilon_t_microstrain"),
+        e_bc_mpa=fatigue_data.get("e_bc_mpa"),
+        design_msa=float(fatigue_data.get("design_msa", 0.0)),
+        c_factor=float(fatigue_data.get("c_factor", 1.0)),
+        cumulative_life_msa=fatigue_data.get("cumulative_life_msa"),
+        verdict=fatigue_data.get("verdict"),
+        calibration=fatigue_cal,
+        references=_code_refs_from_json(fatigue_data.get("references")),
+        is_placeholder=bool(fatigue_data.get("is_placeholder", True)),
+        refused=bool(fatigue_data.get("refused", False)),
+        refused_reason=fatigue_data.get("refused_reason", "") or "",
+        notes=fatigue_data.get("notes", "") or "",
+    )
+    rutting = RuttingCheck(
+        epsilon_v_microstrain=rutting_data.get("epsilon_v_microstrain"),
+        design_msa=float(rutting_data.get("design_msa", fatigue.design_msa)),
+        cumulative_life_msa=rutting_data.get("cumulative_life_msa"),
+        verdict=rutting_data.get("verdict"),
+        calibration=rutting_cal,
+        references=_code_refs_from_json(rutting_data.get("references")),
+        is_placeholder=bool(rutting_data.get("is_placeholder", True)),
+        refused=bool(rutting_data.get("refused", False)),
+        refused_reason=rutting_data.get("refused_reason", "") or "",
+        notes=rutting_data.get("notes", "") or "",
+    )
+    return MechanisticValidationSummary(
+        fatigue=fatigue,
+        rutting=rutting,
+        is_placeholder=bool(data.get("is_placeholder", True)),
+        refused=bool(data.get("refused", False)),
+        refused_reason=data.get("refused_reason", "") or "",
+        references=_code_refs_from_json(data.get("references")),
+        notes=data.get("notes", "") or "",
+    )
+
+
+def _rehydrate_structural(sd_row, mech_row=None) -> "StructuralResult | None":
     if not sd_row or not sd_row.inputs_json:
         return None
     try:
@@ -207,7 +295,24 @@ def _rehydrate_structural(sd_row) -> "StructuralResult | None":
         resilient_modulus_mpa=d.get("resilient_modulus_mpa"),
         notes=d.get("notes", "") or "",
     )
-    return compute_structural_design(inp)
+    result = compute_structural_design(inp)
+    mech = _rehydrate_mechanistic_validation(mech_row)
+    if mech is not None and abs(float(mech.fatigue.design_msa) - result.design_msa) <= 0.01:
+        return replace(
+            result,
+            mechanistic_validation=mech,
+            fatigue_check=(
+                mech.fatigue.verdict
+                or mech.fatigue.refused_reason
+                or result.fatigue_check
+            ),
+            rutting_check=(
+                mech.rutting.verdict
+                or mech.rutting.refused_reason
+                or result.rutting_check
+            ),
+        )
+    return result
 
 
 def _rehydrate_overlay(row) -> "OverlayResult | None":
@@ -567,7 +672,10 @@ def build_combined_report(
     cm_row = db.latest_maintenance_design(project_id, "cold_mix")
     ms_row = db.latest_maintenance_design(project_id, "micro_surfacing")
 
-    structural = _rehydrate_structural(sd_row)
+    structural = _rehydrate_structural(
+        sd_row,
+        db.latest_mechanistic_validation(project_id),
+    )
     overlay = _rehydrate_overlay(ov_row)
     cold_mix = _rehydrate_cold_mix(cm_row)
     micro = _rehydrate_micro(ms_row)
