@@ -44,18 +44,11 @@ from typing import Mapping
 
 @dataclass(frozen=True, slots=True)
 class MaterialCalcInput:
-    standard_bitumen_pct: float = 4.5
-    standard_aggregate_weight_g: float = 1200.0
-    target_bitumen_pct: float = 4.0
+    standard_bitumen_pct: float
+    standard_aggregate_weight_g: float
+    target_bitumen_pct: float
     # Blend ratios per fraction (must come from the same gradation input).
-    blend_ratios: Mapping[str, float] = None  # type: ignore[assignment]
-
-    def __post_init__(self) -> None:
-        if self.blend_ratios is None:
-            object.__setattr__(
-                self, "blend_ratios",
-                {"25mm": 0.23, "20mm": 0.11, "6mm": 0.32, "SD": 0.32, "Cement": 0.02},
-            )
+    blend_ratios: Mapping[str, float]
 
 
 @dataclass(frozen=True, slots=True)

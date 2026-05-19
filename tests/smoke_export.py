@@ -33,6 +33,16 @@ try:
             # also call it here so the panel's gradation envelope tracks
             # the project's mix type before _on_compute reads it.
             w.inputs.set_mix_type("DBM-II")
+            from tests.test_mix_dynamic_material_selection import (
+                _fill_gradation,
+                _fill_required_lab_inputs,
+                _set_blend,
+            )
+            gt = w.inputs.tab_gradation
+            _set_blend(gt, {"25mm": 0.23, "20mm": 0.11, "6mm": 0.32, "SD": 0.32, "Cement": 0.02})
+            for name in gt._aggs:
+                _fill_gradation(gt, name)
+            _fill_required_lab_inputs(w.inputs)
             w._on_compute()
 
             # Build report directly (skipping the file-save dialog)

@@ -1,25 +1,22 @@
 """Tabbed inputs panel: Gradation | Sp.Gr. | Gmb | Gmm | Stability/Flow.
 
 All inputs live in one widget so the engine receives a single coherent
-payload when the user hits "Compute". Each tab is a QTableWidget with
-sensible defaults pre-loaded from the source Excel sample.
+payload when the user hits "Compute". Lab-data cells are intentionally
+blank on startup so operators enter measured values explicitly.
 """
 from __future__ import annotations
-
-from dataclasses import dataclass
-from typing import Callable
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QDoubleValidator
 from PySide6.QtWidgets import (
     QCheckBox,
-    QDoubleSpinBox,
     QFormLayout,
     QGridLayout,
     QGroupBox,
     QHBoxLayout,
     QHeaderView,
     QLabel,
+    QLineEdit,
     QPushButton,
     QSpinBox,
     QTabWidget,
@@ -48,9 +45,8 @@ from app.core import (
 from .common import PageHeader, PlaceholderBanner, styled_button
 
 
-# Demo defaults are DBM-II-shaped — used only as fallback when no mix_type
-# is supplied. F1 (dynamic gradation) drives the panel from MIX_TYPES at
-# runtime via GradationTab.set_mix_type / InputsPanel.set_mix_type.
+# Fallback gradation envelope used only before a project mix type is selected.
+# Lab-data cells remain blank until the operator fills them.
 SIEVES = (37.5, 26.5, 19, 13.2, 4.75, 2.36, 0.3, 0.075)
 AVAILABLE_AGGS = ("25mm", "20mm", "10mm", "6mm", "SD", "Cement")
 AGGS = ("25mm", "20mm", "6mm", "SD", "Cement")
@@ -62,7 +58,8 @@ MATERIAL_DISPLAY_NAMES = {
     "SD": "Stone Dust",
     "Cement": "Cement",
 }
-DESIGN_PB = (3.5, 4.0, 4.5, 5.0, 5.5)
+BLANK_MARSHALL_ROWS = 15
+BLANK_GMM_ROWS = 2
 
 
 # ---------- helper utilities ----------------------------------------------
@@ -83,6 +80,56 @@ def _get_num(table: QTableWidget, r: int, c: int, default: float = 0.0) -> float
         return default
 
 
+def _cell_text(table: QTableWidget, r: int, c: int) -> str:
+    item = table.item(r, c)
+    return item.text().strip() if item and item.text() else ""
+
+
+def _set_blank(table: QTableWidget, r: int, c: int) -> None:
+    item = QTableWidgetItem("")
+    item.setTextAlignment(Qt.AlignCenter)
+    table.setItem(r, c, item)
+
+
+def _require_table_num(table: QTableWidget, r: int, c: int, label: str) -> float:
+    text = _cell_text(table, r, c)
+    if not text:
+        raise ValueError(f"Missing {label}. Fill the field before computing.")
+    try:
+        return float(text)
+    except ValueError as exc:
+        raise ValueError(f"Invalid numeric value for {label}: {text!r}.") from exc
+
+
+def _optional_table_num(table: QTableWidget, r: int, c: int, label: str) -> float | None:
+    text = _cell_text(table, r, c)
+    if not text:
+        return None
+    try:
+        return float(text)
+    except ValueError as exc:
+        raise ValueError(f"Invalid numeric value for {label}: {text!r}.") from exc
+
+
+def _line_num(widget: QLineEdit, label: str) -> float:
+    text = widget.text().strip()
+    if not text:
+        raise ValueError(f"Missing {label}. Fill the field before computing.")
+    try:
+        return float(text)
+    except ValueError as exc:
+        raise ValueError(f"Invalid numeric value for {label}: {text!r}.") from exc
+
+
+def _row_has_any(table: QTableWidget, r: int, cols: tuple[int, ...]) -> bool:
+    return any(_cell_text(table, r, c) for c in cols)
+
+
+def _active_material_text(active_materials: tuple[str, ...] | list[str]) -> str:
+    labels = [MATERIAL_DISPLAY_NAMES.get(name, name) for name in active_materials]
+    return "Active materials: " + (", ".join(labels) if labels else "none selected")
+
+
 def _set_text(table: QTableWidget, r: int, c: int, text: str) -> None:
     item = QTableWidgetItem(text)
     item.setFlags(item.flags() & ~Qt.ItemIsEditable)
@@ -99,19 +146,10 @@ def _checkbox_item(checked: bool = True) -> QTableWidgetItem:
     return item
 
 
-# ---------- demo defaults from the Shirdi DBM dataset ---------------------
+# ---------- fallback specification envelope -------------------------------
 
-DEMO_GRADATION_PASS = {
-    "25mm":   (100, 96.566, 44.500, 4.013, 0.000, 0.000, 0.000, 0.000),
-    "20mm":   (100, 100,    89.832, 5.154, 0.000, 0.000, 0.000, 0.000),
-    "10mm":   (None, None,  None,   None,  None,  None,  None,  None),
-    "6mm":    (100, 100,    100,    100,   38.600, 8.050, 0.000, 0.000),
-    "SD":     (100, 100,    100,    100,   99.749, 92.285, 33.768, 9.469),
-    "Cement": (100, 100,    100,    100,   100,    100,    100,    42.169),
-}
-DEMO_BLEND = {"25mm": 0.23, "20mm": 0.11, "6mm": 0.32, "SD": 0.32, "Cement": 0.02}
-DEMO_SPEC_LOW = (100, 90, 71, 56, 38, 28, 7, 2)
-DEMO_SPEC_UP  = (100, 100, 95, 80, 54, 42, 21, 8)
+FALLBACK_SPEC_LOW = (100, 90, 71, 56, 38, 28, 7, 2)
+FALLBACK_SPEC_UP  = (100, 100, 95, 80, 54, 42, 21, 8)
 
 
 # ---------- gradation tab --------------------------------------------------
@@ -202,17 +240,14 @@ class GradationTab(QWidget):
 
         # Blend ratios row (small)
         self._blend_form = QFormLayout()
-        self.blend_spins: dict[str, QDoubleSpinBox] = {}
+        self.blend_spins: dict[str, QLineEdit] = {}
         self.blend_labels: dict[str, QLabel] = {}
         self._blend_row_widget = QWidget()
         self._blend_row = QHBoxLayout(self._blend_row_widget)
         self._blend_row.setContentsMargins(0, 0, 0, 0)
         for name in self._available_aggs:
-            sp = QDoubleSpinBox()
-            sp.setDecimals(3)
-            sp.setRange(0, 1)
-            sp.setSingleStep(0.01)
-            sp.setValue(DEMO_BLEND.get(name, 0))
+            sp = QLineEdit()
+            sp.setValidator(QDoubleValidator(0.0, 1.0, 3, self))
             lbl = QLabel(MATERIAL_DISPLAY_NAMES.get(name, name))
             self.blend_spins[name] = sp
             self.blend_labels[name] = lbl
@@ -232,13 +267,9 @@ class GradationTab(QWidget):
         for r, sieve in enumerate(self._sieves):
             _set_text(self.table, r, 0, f"{sieve:g}")
             for ci, name in enumerate(self._available_aggs, start=1):
-                value = DEMO_GRADATION_PASS[name][r]
-                if value is None:
-                    self.table.setItem(r, ci, QTableWidgetItem(""))
-                else:
-                    _set_num(self.table, r, ci, value, decimals=2)
-            _set_num(self.table, r, len(self._available_aggs) + 1, DEMO_SPEC_LOW[r], decimals=0)
-            _set_num(self.table, r, len(self._available_aggs) + 2, DEMO_SPEC_UP[r], decimals=0)
+                _set_blank(self.table, r, ci)
+            _set_num(self.table, r, len(self._available_aggs) + 1, FALLBACK_SPEC_LOW[r], decimals=0)
+            _set_num(self.table, r, len(self._available_aggs) + 2, FALLBACK_SPEC_UP[r], decimals=0)
         self._sync_active_materials()
         layout.addWidget(self.table)
 
@@ -280,13 +311,13 @@ class GradationTab(QWidget):
 
         Replaces sieve set, lower/upper envelope from the spec database
         (Phase 6 source-tagged). Per-aggregate passing% cells are cleared
-        because demo numbers are mix-specific. The active material selector
+        because the source envelope changes by mix type. The active material selector
         keeps the user's chosen aggregate fractions when the envelope changes.
         Surfaces the placeholder warning banner when status is unverified.
         """
         record = MIX_TYPES.get(mix_type_key) if mix_type_key else None
         if not record or not record.sieve_sizes_mm:
-            # Fallback: leave the demo (DBM-II) shape in place
+            # Fallback: leave the generic startup envelope in place
             self._mix_type_key = ""
             self._mix_code_label.setText("")
             self._warning_banner.setVisible(False)
@@ -335,7 +366,7 @@ class GradationTab(QWidget):
         for r, sieve in enumerate(self._sieves):
             _set_text(self.table, r, 0, f"{sieve:g}")
             for ci, _name in enumerate(self._available_aggs, start=1):
-                # Clear per-aggregate cells — demo values are DBM-II-shaped
+                # Clear per-aggregate lab-data cells when the envelope changes
                 self.table.setItem(r, ci, QTableWidgetItem(""))
             lo = lower[r] if r < len(lower) else None
             hi = upper[r] if r < len(upper) else None
@@ -354,7 +385,13 @@ class GradationTab(QWidget):
             raise ValueError("Select at least two active materials before computing gradation.")
         if len(set(self._aggs)) != len(self._aggs) or any(not n.strip() for n in self._aggs):
             raise ValueError("Active material names must be non-blank and unique.")
-        blend = {n: self.blend_spins[n].value() for n in self._aggs}
+        blend = {
+            n: _line_num(
+                self.blend_spins[n],
+                f"blend ratio for {MATERIAL_DISPLAY_NAMES.get(n, n)}",
+            )
+            for n in self._aggs
+        }
         if abs(sum(blend.values()) - 1.0) > 0.001:
             raise ValueError("Blend ratios for active materials must sum to 1.000.")
         pass_pct = {}
@@ -391,6 +428,9 @@ class SpGrTab(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(12, 12, 12, 12)
 
+        self._active_summary = QLabel(_active_material_text(AGGS))
+        self._active_summary.setStyleSheet("color:#4a5260; font-size:9pt;")
+        layout.addWidget(self._active_summary)
         self._material_labels: dict[str, QLabel] = {}
 
         # 25mm coarse
@@ -403,9 +443,6 @@ class SpGrTab(QWidget):
                                                 "D — oven-dry in air"])
         self.coarse_25.setHorizontalHeaderLabels(["Rep 1", "Rep 2", "Rep 3", "Rep 4"])
         self.coarse_25.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        # Demo defaults (only rep 1 from the source file)
-        for r, val in enumerate([3647, 2363, 2003, 1954]):
-            _set_num(self.coarse_25, r, 0, val, decimals=0)
         layout.addWidget(self.coarse_25)
 
         # 20mm coarse
@@ -415,8 +452,6 @@ class SpGrTab(QWidget):
         self.coarse_20.setVerticalHeaderLabels(["A", "B", "C", "D"])
         self.coarse_20.setHorizontalHeaderLabels(["Rep 1", "Rep 2", "Rep 3", "Rep 4"])
         self.coarse_20.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        for r, val in enumerate([3649, 2363, 2010, 1951]):
-            _set_num(self.coarse_20, r, 0, val, decimals=0)
         layout.addWidget(self.coarse_20)
 
         # 10mm coarse - optional V1.1 user-selectable component.
@@ -438,8 +473,6 @@ class SpGrTab(QWidget):
                                              "W4 — + water"])
         self.fine_6.setHorizontalHeaderLabels(["Rep 1", "Rep 2", "Rep 3", "Rep 4"])
         self.fine_6.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        for r, val in enumerate([492, 834, 1655, 1435]):
-            _set_num(self.fine_6, r, 0, val, decimals=0)
         layout.addWidget(self.fine_6)
 
         # Stone dust
@@ -449,8 +482,6 @@ class SpGrTab(QWidget):
         self.fine_sd.setVerticalHeaderLabels(["W1", "W2", "W3", "W4"])
         self.fine_sd.setHorizontalHeaderLabels(["Rep 1", "Rep 2", "Rep 3", "Rep 4"])
         self.fine_sd.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        for r, val in enumerate([486, 839, 1664, 1439]):
-            _set_num(self.fine_sd, r, 0, val, decimals=0)
         layout.addWidget(self.fine_sd)
         self.set_active_materials(AGGS)
 
@@ -463,33 +494,43 @@ class SpGrTab(QWidget):
                                               "D — bottle + sample + water"])
         self.bitumen.setHorizontalHeaderLabels(["Rep 1", "Rep 2", "Rep 3", "Rep 4"])
         self.bitumen.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        for r, val in enumerate([40.76, 97.5, 65.56, 97.77]):
-            _set_num(self.bitumen, r, 0, val, decimals=2)
         layout.addWidget(self.bitumen)
 
+    def _collect_complete_reps(
+        self,
+        t: QTableWidget,
+        label: str,
+        row_labels: tuple[str, str, str, str],
+    ) -> tuple[tuple[float, ...], tuple[float, ...], tuple[float, ...], tuple[float, ...]]:
+        by_row: list[list[float]] = [[], [], [], []]
+        for c in range(t.columnCount()):
+            texts = [_cell_text(t, r, c) for r in range(4)]
+            if not any(texts):
+                continue
+            if not all(texts):
+                missing = [row_labels[i] for i, text in enumerate(texts) if not text]
+                raise ValueError(
+                    f"Missing {label} data in Rep {c + 1}: "
+                    + ", ".join(missing)
+                    + ". Fill the complete repetition or leave it blank."
+                )
+            for r, row_label in enumerate(row_labels):
+                by_row[r].append(_require_table_num(t, r, c, f"{label} Rep {c + 1} {row_label}"))
+        if not by_row[0]:
+            raise ValueError(f"Missing specific-gravity data for {label}. Fill at least one complete repetition.")
+        return tuple(tuple(row) for row in by_row)  # type: ignore[return-value]
+
     def _collect_coarse(self, t: QTableWidget) -> CoarseAggSGInput:
-        cols = t.columnCount()
-        def col(i):  # noqa
-            return tuple(_get_num(t, r, c) for c in range(cols) for r in [i] if _get_num(t, r, c) != 0)
-        # Simpler: iterate columns, skipping empty ones
-        A = tuple(v for v in (_get_num(t, 0, c) for c in range(cols)) if v != 0)
-        B = tuple(v for v in (_get_num(t, 1, c) for c in range(cols)) if v != 0)
-        C = tuple(v for v in (_get_num(t, 2, c) for c in range(cols)) if v != 0)
-        D = tuple(v for v in (_get_num(t, 3, c) for c in range(cols)) if v != 0)
-        n = min(len(A), len(B), len(C), len(D))
-        return CoarseAggSGInput(A[:n], B[:n], C[:n], D[:n])
+        A, B, C, D = self._collect_complete_reps(t, "coarse aggregate", ("A", "B", "C", "D"))
+        return CoarseAggSGInput(A, B, C, D)
 
     def _collect_fine(self, t: QTableWidget) -> FineAggSGInput:
-        cols = t.columnCount()
-        W1 = tuple(v for v in (_get_num(t, 0, c) for c in range(cols)) if v != 0)
-        W2 = tuple(v for v in (_get_num(t, 1, c) for c in range(cols)) if v != 0)
-        W3 = tuple(v for v in (_get_num(t, 2, c) for c in range(cols)) if v != 0)
-        W4 = tuple(v for v in (_get_num(t, 3, c) for c in range(cols)) if v != 0)
-        n = min(len(W1), len(W2), len(W3), len(W4))
-        return FineAggSGInput(W1[:n], W2[:n], W3[:n], W4[:n])
+        W1, W2, W3, W4 = self._collect_complete_reps(t, "fine aggregate", ("W1", "W2", "W3", "W4"))
+        return FineAggSGInput(W1, W2, W3, W4)
 
     def set_active_materials(self, active_materials: tuple[str, ...] | list[str]) -> None:
         active = set(active_materials)
+        self._active_summary.setText(_active_material_text(tuple(active_materials)))
         tables = {
             "25mm": self.coarse_25,
             "20mm": self.coarse_20,
@@ -523,27 +564,12 @@ class SpGrTab(QWidget):
             for name, table in fine_tables.items()
             if name in active
         }
-        t = self.bitumen
-        cols = t.columnCount()
-        A = tuple(v for v in (_get_num(t, 0, c) for c in range(cols)) if v != 0)
-        B = tuple(v for v in (_get_num(t, 1, c) for c in range(cols)) if v != 0)
-        C = tuple(v for v in (_get_num(t, 2, c) for c in range(cols)) if v != 0)
-        D = tuple(v for v in (_get_num(t, 3, c) for c in range(cols)) if v != 0)
-        n = min(len(A), len(B), len(C), len(D))
-        bit = BitumenSGInput(A[:n], B[:n], C[:n], D[:n])
+        A, B, C, D = self._collect_complete_reps(self.bitumen, "bitumen", ("A", "B", "C", "D"))
+        bit = BitumenSGInput(A, B, C, D)
         return coarse, fine, bit
 
 
 # ---------- Gmb tab --------------------------------------------------------
-
-GMB_DEMO_BY_PB = {
-    3.5: [(1233, 732, 1236), (1231, 730, 1234), (1232, 729, 1234)],
-    4.0: [(1239, 740, 1245), (1246, 741, 1249), (1247, 741, 1250)],
-    4.5: [(1241, 741, 1245), (1247, 742, 1249), (1248, 743, 1251)],
-    5.0: [(1241, 736, 1243), (1239, 735, 1242), (1241, 736, 1243)],
-    5.5: [(1241, 736, 1246), (1245, 736, 1247), (1243, 735, 1245)],
-}
-
 
 class GmbTab(QWidget):
     """5 Pb groups × 3 specimens, columns: A | C (water) | B (SSD)."""
@@ -558,46 +584,45 @@ class GmbTab(QWidget):
         ))
         headers = ["Pb %", "Sample", "A — dry in air", "C — in water",
                    "B — SSD in air"]
-        self.table = QTableWidget(len(GMB_DEMO_BY_PB) * 3, len(headers))
+        self._active_summary = QLabel(_active_material_text(AGGS))
+        self._active_summary.setStyleSheet("color:#4a5260; font-size:9pt;")
+        layout.addWidget(self._active_summary)
+        self.table = QTableWidget(BLANK_MARSHALL_ROWS, len(headers))
         self.table.setHorizontalHeaderLabels(headers)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.table.verticalHeader().setVisible(False)
-        r = 0
-        for pb, samples in GMB_DEMO_BY_PB.items():
-            for s_idx, (A, C, B) in enumerate(samples, start=1):
-                _set_text(self.table, r, 0, f"{pb:.1f}")
-                _set_text(self.table, r, 1, f"S-{s_idx}")
-                _set_num(self.table, r, 2, A, decimals=0)
-                _set_num(self.table, r, 3, C, decimals=0)
-                _set_num(self.table, r, 4, B, decimals=0)
-                r += 1
+        for r in range(self.table.rowCount()):
+            for c in range(self.table.columnCount()):
+                _set_blank(self.table, r, c)
         layout.addWidget(self.table)
+
+    def set_active_materials(self, active_materials: tuple[str, ...] | list[str]) -> None:
+        self._active_summary.setText(_active_material_text(tuple(active_materials)))
 
     def collect(self) -> GmbInput:
         groups: dict[float, list[GmbSpecimen]] = {}
         order: list[float] = []
         for r in range(self.table.rowCount()):
-            pb = float(self.table.item(r, 0).text())
-            A = _get_num(self.table, r, 2)
-            C = _get_num(self.table, r, 3)
-            B = _get_num(self.table, r, 4)
+            data_cols = (0, 2, 3, 4)
+            if not _row_has_any(self.table, r, data_cols):
+                continue
+            pb = _require_table_num(self.table, r, 0, f"Gmb row {r + 1} Pb %")
+            A = _require_table_num(self.table, r, 2, f"Gmb row {r + 1} dry in air")
+            C = _require_table_num(self.table, r, 3, f"Gmb row {r + 1} in water")
+            B = _require_table_num(self.table, r, 4, f"Gmb row {r + 1} SSD in air")
             sp = GmbSpecimen(a_dry_in_air=A, c_in_water=C, b_ssd_in_air=B)
             if pb not in groups:
                 groups[pb] = []
                 order.append(pb)
             groups[pb].append(sp)
+        if not order:
+            raise ValueError("Missing Gmb data. Fill at least one complete Gmb specimen row before computing.")
         return GmbInput(groups=tuple(
             GmbGroup(bitumen_pct=pb, specimens=tuple(groups[pb])) for pb in order
         ))
 
 
 # ---------- Gmm tab --------------------------------------------------------
-
-GMM_DEMO = [
-    (909, 2152, 3316, 4072),
-    (910, 2154, 3313, 4068),
-]
-
 
 class GmmTab(QWidget):
     """Reference Pb Rice test (2 samples) + design Pb list."""
@@ -608,9 +633,12 @@ class GmmTab(QWidget):
         layout.setContentsMargins(12, 12, 12, 12)
 
         layout.addWidget(QLabel("<b>Reference Pb for Rice test</b>"))
+        self._active_summary = QLabel(_active_material_text(AGGS))
+        self._active_summary.setStyleSheet("color:#4a5260; font-size:9pt;")
+        layout.addWidget(self._active_summary)
         row = QHBoxLayout()
-        self.pb_ref = QDoubleSpinBox()
-        self.pb_ref.setDecimals(2); self.pb_ref.setRange(0, 20); self.pb_ref.setValue(4.5)
+        self.pb_ref = QLineEdit()
+        self.pb_ref.setValidator(QDoubleValidator(0.0, 20.0, 2, self))
         row.addWidget(QLabel("Pb_ref (%)"))
         row.addWidget(self.pb_ref)
         row.addStretch(1)
@@ -618,56 +646,45 @@ class GmmTab(QWidget):
 
         headers = ["Sample", "A — empty flask", "B — flask + dry sample",
                    "D — flask + water", "E — flask + sample + water"]
-        self.table = QTableWidget(2, len(headers))
+        self.table = QTableWidget(BLANK_GMM_ROWS, len(headers))
         self.table.setHorizontalHeaderLabels(headers)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.table.verticalHeader().setVisible(False)
-        for r, (A, B, D, E) in enumerate(GMM_DEMO):
-            _set_text(self.table, r, 0, f"S-{r+1}")
-            _set_num(self.table, r, 1, A, decimals=0)
-            _set_num(self.table, r, 2, B, decimals=0)
-            _set_num(self.table, r, 3, D, decimals=0)
-            _set_num(self.table, r, 4, E, decimals=0)
+        for r in range(self.table.rowCount()):
+            for c in range(self.table.columnCount()):
+                _set_blank(self.table, r, c)
         layout.addWidget(self.table)
 
-    def collect(self, bitumen_sg: float) -> GmmInput:
-        samples = tuple(
-            GmmSampleRaw(
-                a_empty_flask=_get_num(self.table, r, 1),
-                b_flask_plus_dry_sample=_get_num(self.table, r, 2),
-                d_flask_filled_water=_get_num(self.table, r, 3),
-                e_flask_sample_water=_get_num(self.table, r, 4),
+    def set_active_materials(self, active_materials: tuple[str, ...] | list[str]) -> None:
+        self._active_summary.setText(_active_material_text(tuple(active_materials)))
+
+    def collect(self, bitumen_sg: float, design_pb_pct: tuple[float, ...]) -> GmmInput:
+        if not design_pb_pct:
+            raise ValueError("Missing design bitumen contents. Fill Gmb rows before computing Gmm.")
+        samples: list[GmmSampleRaw] = []
+        for r in range(self.table.rowCount()):
+            data_cols = (1, 2, 3, 4)
+            if not _row_has_any(self.table, r, data_cols):
+                continue
+            samples.append(
+                GmmSampleRaw(
+                    a_empty_flask=_require_table_num(self.table, r, 1, f"Gmm row {r + 1} empty flask"),
+                    b_flask_plus_dry_sample=_require_table_num(self.table, r, 2, f"Gmm row {r + 1} flask + dry sample"),
+                    d_flask_filled_water=_require_table_num(self.table, r, 3, f"Gmm row {r + 1} flask + water"),
+                    e_flask_sample_water=_require_table_num(self.table, r, 4, f"Gmm row {r + 1} flask + sample + water"),
+                )
             )
-            for r in range(self.table.rowCount())
-        )
+        if not samples:
+            raise ValueError("Missing Gmm data. Fill at least one complete Rice-test sample before computing.")
         return GmmInput(
-            reference_pb_pct=self.pb_ref.value(),
-            samples_at_reference=samples,
-            design_pb_pct=DESIGN_PB,
+            reference_pb_pct=_line_num(self.pb_ref, "Gmm reference Pb"),
+            samples_at_reference=tuple(samples),
+            design_pb_pct=design_pb_pct,
             bitumen_sg=bitumen_sg,
         )
 
 
 # ---------- Stability/Flow tab --------------------------------------------
-
-SF_DEMO_BY_PB = {
-    3.5: [(64, 64, 63.6, 101.9, 1.00, 13.42, 3.21, 12.30),
-          (64.05, 64, 65, 101.5, 1.00, 13.69, 3.32, 12.12),
-          (65.71, 65.8, 66.83, 101.73, 0.93, 13.53, 3.55, 12.24)],
-    4.0: [(65.04, 65.03, 65.09, 101.78, 0.96, 14.28, 3.41, None),
-          (64.7, 64.32, 64.6, 101.3, 1.00, 14.16, 3.52, None),
-          (64.72, 64.88, 64.52, 101.82, 0.96, 14.82, 3.38, None)],
-    4.5: [(62.82, 62.84, 62.4, 101.84, 1.00, 16.33, 3.61, None),
-          (64.33, 64.54, 64.02, 101.83, 0.96, 16.52, 3.66, None),
-          (63.01, 63.44, 63.3, 101.73, 1.00, 16.58, 3.59, None)],
-    5.0: [(64.1, 64.09, 64.2, 101.3, 1.00, 14.31, 3.78, None),
-          (62.2, 62.29, 62.15, 101.4, 1.04, 14.22, 3.69, None),
-          (62.35, 62.15, 63, 101.2, 1.04, 13.65, 3.81, None)],
-    5.5: [(62.15, 62.8, 62.78, 101.6, 1.04, 12.76, 3.86, None),
-          (62.79, 62.4, 62.7, 101.19, 1.04, 12.7, 3.83, None),
-          (63.2, 62.7, 62.5, 102.3, 1.00, 14.28, 3.96, None)],
-}
-
 
 class StabilityFlowTab(QWidget):
     def __init__(self, parent=None):
@@ -678,53 +695,46 @@ class StabilityFlowTab(QWidget):
             "<b>Marshall Stability and Flow</b>  "
             "(per-specimen include columns let you exclude failed-height samples)"
         ))
+        self._active_summary = QLabel(_active_material_text(AGGS))
+        self._active_summary.setStyleSheet("color:#4a5260; font-size:9pt;")
+        layout.addWidget(self._active_summary)
         headers = [
             "Pb %", "Sample", "H1", "H2", "H3", "Dia mm", "Corr. Factor",
             "Measured Stab. (kN)", "Flow (mm)", "N override (opt)",
             "Inc Stab", "Inc Flow",
         ]
-        rows = sum(len(v) for v in SF_DEMO_BY_PB.values())
-        self.table = QTableWidget(rows, len(headers))
+        self.table = QTableWidget(BLANK_MARSHALL_ROWS, len(headers))
         self.table.setHorizontalHeaderLabels(headers)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.table.verticalHeader().setVisible(False)
-        r = 0
-        for pb, samples in SF_DEMO_BY_PB.items():
-            for s_idx, (h1, h2, h3, dia, corr, stab, flow, n_override) in enumerate(samples, start=1):
-                _set_text(self.table, r, 0, f"{pb:.1f}")
-                _set_text(self.table, r, 1, f"S-{s_idx}")
-                _set_num(self.table, r, 2, h1, decimals=2)
-                _set_num(self.table, r, 3, h2, decimals=2)
-                _set_num(self.table, r, 4, h3, decimals=2)
-                _set_num(self.table, r, 5, dia, decimals=2)
-                _set_num(self.table, r, 6, corr, decimals=2)
-                _set_num(self.table, r, 7, stab, decimals=2)
-                _set_num(self.table, r, 8, flow, decimals=2)
-                if n_override is not None:
-                    _set_num(self.table, r, 9, n_override, decimals=2)
-                else:
-                    self.table.setItem(r, 9, QTableWidgetItem(""))
-                self.table.setItem(r, 10, _checkbox_item(True))
-                self.table.setItem(r, 11, _checkbox_item(True))
-                r += 1
+        for r in range(self.table.rowCount()):
+            for c in range(10):
+                _set_blank(self.table, r, c)
+            self.table.setItem(r, 10, _checkbox_item(True))
+            self.table.setItem(r, 11, _checkbox_item(True))
         layout.addWidget(self.table)
+
+    def set_active_materials(self, active_materials: tuple[str, ...] | list[str]) -> None:
+        self._active_summary.setText(_active_material_text(tuple(active_materials)))
 
     def collect(self) -> StabilityFlowInput:
         specimens: list[StabilitySpecimen] = []
         for r in range(self.table.rowCount()):
-            pb = float(self.table.item(r, 0).text())
-            sid = self.table.item(r, 1).text()
-            h = (_get_num(self.table, r, 2), _get_num(self.table, r, 3),
-                 _get_num(self.table, r, 4))
-            dia = _get_num(self.table, r, 5)
-            corr = _get_num(self.table, r, 6)
-            stab = _get_num(self.table, r, 7)
-            flow = _get_num(self.table, r, 8)
-            override_item = self.table.item(r, 9)
-            override = (
-                float(override_item.text())
-                if override_item and override_item.text().strip() else None
+            data_cols = (0, 2, 3, 4, 5, 6, 7, 8)
+            if not _row_has_any(self.table, r, data_cols):
+                continue
+            pb = _require_table_num(self.table, r, 0, f"Stability/Flow row {r + 1} Pb %")
+            sid = _cell_text(self.table, r, 1) or f"S-{r + 1}"
+            h = (
+                _require_table_num(self.table, r, 2, f"Stability/Flow row {r + 1} H1"),
+                _require_table_num(self.table, r, 3, f"Stability/Flow row {r + 1} H2"),
+                _require_table_num(self.table, r, 4, f"Stability/Flow row {r + 1} H3"),
             )
+            dia = _require_table_num(self.table, r, 5, f"Stability/Flow row {r + 1} diameter")
+            corr = _require_table_num(self.table, r, 6, f"Stability/Flow row {r + 1} correction factor")
+            stab = _require_table_num(self.table, r, 7, f"Stability/Flow row {r + 1} measured stability")
+            flow = _require_table_num(self.table, r, 8, f"Stability/Flow row {r + 1} flow")
+            override = _optional_table_num(self.table, r, 9, f"Stability/Flow row {r + 1} N override")
             inc_stab = self.table.item(r, 10).checkState() == Qt.Checked
             inc_flow = self.table.item(r, 11).checkState() == Qt.Checked
             specimens.append(StabilitySpecimen(
@@ -736,6 +746,8 @@ class StabilityFlowTab(QWidget):
                 include_in_flow_avg=inc_flow,
                 corrected_stability_kn_override=override,
             ))
+        if not specimens:
+            raise ValueError("Missing stability/flow data. Fill at least one complete specimen row before computing.")
         return StabilityFlowInput(specimens=tuple(specimens))
 
 
@@ -756,30 +768,28 @@ class MaterialCalcTab(QWidget):
         layout.addWidget(QLabel(
             "<b>Material Calculation for Preparation of Bituminous Mix Sample</b><br>"
             "<span style='color:#6a7180; font-size:9pt;'>"
-            "Two parallel blocks reproduced from Excel sheet \"Material  Cal\": "
-            "a Standard sample at a chosen Pb (default 4.5 %, agg = 1200 g), "
-            "and a Target sample scaled to that standard's total mix weight. "
-            "Dry-material breakdown uses the Gradation-tab blend ratios."
+            "Enter the standard and target sample values manually. "
+            "Dry-material breakdown uses only active Gradation-tab blend ratios."
             "</span>"
         ))
+        self._active_summary = QLabel(_active_material_text(AGGS))
+        self._active_summary.setStyleSheet("color:#4a5260; font-size:9pt;")
+        layout.addWidget(self._active_summary)
 
         form_row = QHBoxLayout()
 
-        self.std_pb = QDoubleSpinBox()
-        self.std_pb.setDecimals(2); self.std_pb.setRange(0, 20); self.std_pb.setValue(4.5)
-        self.std_pb.setSuffix(" %")
+        self.std_pb = QLineEdit()
+        self.std_pb.setValidator(QDoubleValidator(0.0, 20.0, 2, self))
         form_row.addWidget(QLabel("Standard Bitumen Content:"))
         form_row.addWidget(self.std_pb)
 
-        self.std_agg_wt = QDoubleSpinBox()
-        self.std_agg_wt.setDecimals(1); self.std_agg_wt.setRange(0, 100000)
-        self.std_agg_wt.setValue(1200.0); self.std_agg_wt.setSuffix(" g")
+        self.std_agg_wt = QLineEdit()
+        self.std_agg_wt.setValidator(QDoubleValidator(0.0, 100000.0, 1, self))
         form_row.addWidget(QLabel("Standard Aggregate Weight:"))
         form_row.addWidget(self.std_agg_wt)
 
-        self.tgt_pb = QDoubleSpinBox()
-        self.tgt_pb.setDecimals(2); self.tgt_pb.setRange(0, 20); self.tgt_pb.setValue(4.0)
-        self.tgt_pb.setSuffix(" %")
+        self.tgt_pb = QLineEdit()
+        self.tgt_pb.setValidator(QDoubleValidator(0.0, 20.0, 2, self))
         form_row.addWidget(QLabel("Target Bitumen Content:"))
         form_row.addWidget(self.tgt_pb)
 
@@ -787,11 +797,14 @@ class MaterialCalcTab(QWidget):
         layout.addLayout(form_row)
         layout.addStretch(1)
 
+    def set_active_materials(self, active_materials: tuple[str, ...] | list[str]) -> None:
+        self._active_summary.setText(_active_material_text(tuple(active_materials)))
+
     def collect(self, blend_ratios: dict[str, float]) -> MaterialCalcInput:
         return MaterialCalcInput(
-            standard_bitumen_pct=self.std_pb.value(),
-            standard_aggregate_weight_g=self.std_agg_wt.value(),
-            target_bitumen_pct=self.tgt_pb.value(),
+            standard_bitumen_pct=_line_num(self.std_pb, "standard bitumen content"),
+            standard_aggregate_weight_g=_line_num(self.std_agg_wt, "standard aggregate weight"),
+            target_bitumen_pct=_line_num(self.tgt_pb, "target bitumen content"),
             blend_ratios=dict(blend_ratios),
         )
 
@@ -802,7 +815,7 @@ class InputsPanel(QWidget):
     """Hosts the 5 tabs. Provides .collect() returning all engine inputs."""
 
     compute_requested = Signal()
-    load_demo_requested = Signal()
+    reset_requested = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -816,22 +829,22 @@ class InputsPanel(QWidget):
         )
         self.btn_compute = styled_button("Compute Mix Design")
         self.btn_compute.clicked.connect(self.compute_requested.emit)
-        self.btn_demo = styled_button("Reset to Demo Data", "secondary")
-        self.btn_demo.clicked.connect(self.load_demo_requested.emit)
-        header.add_action(self.btn_demo)
+        self.btn_reset = styled_button("Reset Inputs", "secondary")
+        self.btn_reset.clicked.connect(self.reset_requested.emit)
+        header.add_action(self.btn_reset)
         header.add_action(self.btn_compute)
         layout.addWidget(header)
 
         self.tabs = QTabWidget()
         self.tab_gradation = GradationTab()
         self.tab_spgr = SpGrTab()
-        self.tab_gradation.active_materials_changed.connect(
-            self.tab_spgr.set_active_materials
-        )
         self.tab_gmb = GmbTab()
         self.tab_gmm = GmmTab()
         self.tab_sf = StabilityFlowTab()
         self.tab_material = MaterialCalcTab()
+        for tab in (self.tab_spgr, self.tab_gmb, self.tab_gmm, self.tab_sf, self.tab_material):
+            self.tab_gradation.active_materials_changed.connect(tab.set_active_materials)
+            tab.set_active_materials(self.tab_gradation.active_materials())
         self.tabs.addTab(self.tab_gradation, "1. Gradation")
         self.tabs.addTab(self.tab_spgr, "2. Specific Gravity")
         self.tabs.addTab(self.tab_gmb, "3. Gmb")
@@ -853,26 +866,23 @@ class InputsPanel(QWidget):
         active_materials = tuple(grad.blend_ratios.keys())
         self.tab_spgr.set_active_materials(active_materials)
         coarse, fine, bit = self.tab_spgr.collect(active_materials)
-        sg_inputs = {**coarse, **fine}
-        missing_sg = [
-            name for name in active_materials
-            if name != "Cement"
-            and (
-                name not in sg_inputs
-                or not any(getattr(sg_inputs[name], field) for field in sg_inputs[name].__dataclass_fields__)
-            )
-        ]
-        if missing_sg:
+        gmb = self.tab_gmb.collect()
+        design_pbs = tuple(group.bitumen_pct for group in gmb.groups)
+        gmm = self.tab_gmm.collect(bitumen_sg=0.0, design_pb_pct=design_pbs)
+        stability_flow = self.tab_sf.collect()
+        sf_pbs = {sp.bitumen_pct for sp in stability_flow.specimens}
+        missing_sf = [pb for pb in design_pbs if pb not in sf_pbs]
+        if missing_sf:
             raise ValueError(
-                "Missing specific-gravity data for active material(s): "
-                + ", ".join(missing_sg)
-                + ". Fill the Specific Gravity tab or deactivate unused materials."
+                "Missing Stability/Flow rows for design bitumen content(s): "
+                + ", ".join(f"{pb:g}%" for pb in missing_sf)
+                + ". Fill matching Stability/Flow data before computing."
             )
         return {
             "gradation": grad,
             "spgr": (coarse, fine, bit),
-            "gmb": self.tab_gmb.collect(),
-            "gmm_tab": self.tab_gmm,
-            "stability_flow": self.tab_sf.collect(),
+            "gmb": gmb,
+            "gmm": gmm,
+            "stability_flow": stability_flow,
             "material_calc": self.tab_material.collect(dict(grad.blend_ratios)),
         }

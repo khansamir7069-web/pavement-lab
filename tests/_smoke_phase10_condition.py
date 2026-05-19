@@ -239,16 +239,20 @@ def main() -> int:
         GradationInput, MixDesignInput, compute_mix_design,
     )
     from app.core.models import ProjectInfo
-    # Reuse the InputsPanel demo defaults to compose a coherent dataset.
-    from app.ui.widgets.inputs_panel import DEMO_GRADATION_PASS, InputsPanel
+    # Enter a coherent manual dataset; the UI no longer seeds lab values.
+    from app.ui.widgets.inputs_panel import InputsPanel
+    from tests.test_mix_dynamic_material_selection import (
+        _fill_gradation,
+        _fill_required_lab_inputs,
+        _set_blend,
+    )
     ipanel = InputsPanel()
     ipanel.set_mix_type("DBM-II")
-    from PySide6.QtWidgets import QTableWidgetItem
     gt = ipanel.tab_gradation
+    _set_blend(gt, {"25mm": 0.23, "20mm": 0.11, "6mm": 0.32, "SD": 0.32, "Cement": 0.02})
     for name in gt._aggs:
-        ci = gt._available_aggs.index(name) + 1
-        for row, value in enumerate(DEMO_GRADATION_PASS[name]):
-            gt.table.setItem(row, ci, QTableWidgetItem(f"{value:g}"))
+        _fill_gradation(gt, name)
+    _fill_required_lab_inputs(ipanel)
     payload = ipanel.collect_all()
     grad = payload["gradation"]
     grad_no_cement = GradationInput(
@@ -259,7 +263,7 @@ def main() -> int:
         spec_upper=grad.spec_upper,
     )
     coarse, fine, bit = payload["spgr"]
-    gmm_in = payload["gmm_tab"].collect(bitumen_sg=0.0)
+    gmm_in = payload["gmm"]
     md_in = MixDesignInput(
         project=ProjectInfo(mix_type="DBM-II", work_name="phase9-followup", client=""),
         gradation=grad_no_cement,

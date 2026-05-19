@@ -128,26 +128,28 @@ def main() -> int:
     print("  [PASS] ResultsPanel banner toggles correctly per mix status")
 
     # ---------- Marshall pipeline still computes ------------------------
-    # We exercise the engine through the panel collect() path with the
-    # demo defaults; engine math is mix-agnostic so this proves the
-    # compute path stays green after set_mix_type calls.
+    # We exercise the engine through the panel collect() path with explicit
+    # manual entries; the UI itself no longer seeds lab values.
     from app.core import MixDesignInput, compute_mix_design
     from app.core.models import ProjectInfo
+    from tests.test_mix_dynamic_material_selection import _fill_required_lab_inputs, _set_blend
 
     def _synthetic_input(mix_code: str) -> MixDesignInput:
         # Reuse the gradation from the panel after set_mix_type(mix_code),
         # but ensure per-aggregate passing % cells are populated (set_mix_type
-        # clears them by design — we re-fill with demo numbers for the smoke).
+        # clears them by design; this smoke enters values explicitly.
         panel.set_mix_type(mix_code)
         gt = panel.tab_gradation
-        # Refill per-aggregate columns with demo passing% so collect() works.
+        # Refill per-aggregate columns with manual passing% so collect() works.
         # We use a flat 50% per cell — engine doesn't care for this smoke,
         # only that the data shape is consistent.
+        _set_blend(gt, {"25mm": 0.23, "20mm": 0.11, "6mm": 0.32, "SD": 0.32, "Cement": 0.02})
         for r in range(gt.table.rowCount()):
             for name in gt._aggs:
                 ci = gt._available_aggs.index(name) + 1
                 from PySide6.QtWidgets import QTableWidgetItem
                 gt.table.setItem(r, ci, QTableWidgetItem("50"))
+        _fill_required_lab_inputs(panel)
         grad = panel.tab_gradation.collect()
         # Strip cement bin (mirrors live compute path)
         grad_blend = {k: v for k, v in grad.blend_ratios.items() if k.lower() != "cement"}
@@ -159,15 +161,16 @@ def main() -> int:
             spec_lower=grad.spec_lower,
             spec_upper=grad.spec_upper,
         )
-        coarse, fine, bit = panel.tab_spgr.collect()
-        gmm_in = panel.tab_gmm.collect(bitumen_sg=0.0)
+        payload = panel.collect_all()
+        coarse, fine, bit = payload["spgr"]
+        gmm_in = payload["gmm"]
         return MixDesignInput(
             project=ProjectInfo(mix_type=mix_code, work_name="smoke", client=""),
             gradation=grad_for_gsb,
             sg_coarse=coarse, sg_fine=fine, sg_bitumen=bit,
-            gmb=panel.tab_gmb.collect(),
+            gmb=payload["gmb"],
             gmm=gmm_in,
-            stability_flow=panel.tab_sf.collect(),
+            stability_flow=payload["stability_flow"],
         )
 
     for code in ("DBM-II", "BC-II", "SMA"):

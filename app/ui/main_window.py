@@ -291,7 +291,7 @@ class MainWindow(QMainWindow):
         self.condition.saved.connect(self._on_condition_saved)
         self.condition.export_requested.connect(self._on_export_condition)
         self.inputs.compute_requested.connect(self._on_compute)
-        self.inputs.load_demo_requested.connect(self._on_load_demo)
+        self.inputs.reset_requested.connect(self._on_reset_inputs)
         self.results.generate_word.connect(self._on_export_word)
         self.results.generate_pdf.connect(self._on_export_pdf)
 
@@ -1174,20 +1174,19 @@ class MainWindow(QMainWindow):
 
     # ----- compute -----
 
-    def _on_load_demo(self) -> None:
-        # Re-instantiate the inputs panel (cheapest way to reset)
+    def _on_reset_inputs(self) -> None:
+        # Re-instantiate the inputs panel (cheapest way to reset to blank lab fields)
         old = self.inputs
         new = InputsPanel()
         new.compute_requested.connect(self._on_compute)
-        new.load_demo_requested.connect(self._on_load_demo)
+        new.reset_requested.connect(self._on_reset_inputs)
         idx = self._page_keys["inputs"]
         self.stack.removeWidget(old)
         self.stack.insertWidget(idx, new)
         old.deleteLater()
         self.inputs = new
-        # F1 wire-up: re-apply mix-type-driven panel population after reset,
-        # so the rebuilt panel matches the current project's mix type
-        # rather than the hardcoded DBM-II demo defaults.
+        # F1 wire-up: re-apply mix-type-driven standards envelope after reset,
+        # while leaving operator-entered lab-data fields blank.
         if self._current_project_id is not None:
             p = self.db.get_project(self._current_project_id)
             if p and p.mix_type:
@@ -1204,7 +1203,7 @@ class MainWindow(QMainWindow):
             payload = self.inputs.collect_all()
             coarse, fine, bit = payload["spgr"]
             # bitumen SG for GmmInput requires the value — let engine compute it
-            gmm_in = payload["gmm_tab"].collect(bitumen_sg=0.0)
+            gmm_in = payload["gmm"]
 
             grad = payload["gradation"]
 
