@@ -7,8 +7,8 @@ blocks:
   RIGHT — "Material Calculation For Preparation of Bituminous Mix Sample"
           (Pb_target, weights scaled to the standard total)
 
-Plus a per-fraction dry-material breakdown (25mm, 20mm, 6mm, SD, Cement)
-weighted by the gradation blend ratios.
+Plus a per-fraction dry-material breakdown weighted by the active gradation
+blend ratios.
 
 Excel formulas reproduced literally (CALCULATION_SPEC, sheet "Material  Cal"):
 

@@ -240,9 +240,15 @@ def main() -> int:
     )
     from app.core.models import ProjectInfo
     # Reuse the InputsPanel demo defaults to compose a coherent dataset.
-    from app.ui.widgets.inputs_panel import InputsPanel
+    from app.ui.widgets.inputs_panel import DEMO_GRADATION_PASS, InputsPanel
     ipanel = InputsPanel()
     ipanel.set_mix_type("DBM-II")
+    from PySide6.QtWidgets import QTableWidgetItem
+    gt = ipanel.tab_gradation
+    for name in gt._aggs:
+        ci = gt._available_aggs.index(name) + 1
+        for row, value in enumerate(DEMO_GRADATION_PASS[name]):
+            gt.table.setItem(row, ci, QTableWidgetItem(f"{value:g}"))
     payload = ipanel.collect_all()
     grad = payload["gradation"]
     grad_no_cement = GradationInput(

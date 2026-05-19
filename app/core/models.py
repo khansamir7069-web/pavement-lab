@@ -80,7 +80,12 @@ def compute_mix_design(inp: MixDesignInput) -> MixDesignResult:
     for name, res in fine_sg.items():
         bulk_by_name[name] = res.avg_bulk_ovendry
 
-    gsb = compute_bulk_sg_blend(dict(inp.gradation.blend_ratios), bulk_by_name)
+    gsb_blend = {
+        name: ratio
+        for name, ratio in inp.gradation.blend_ratios.items()
+        if name.lower() != "cement"
+    }
+    gsb = compute_bulk_sg_blend(gsb_blend, bulk_by_name)
 
     gmm_in = inp.gmm
     if gmm_in.bitumen_sg == 0:

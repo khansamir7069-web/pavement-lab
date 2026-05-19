@@ -1206,18 +1206,7 @@ class MainWindow(QMainWindow):
             # bitumen SG for GmmInput requires the value — let engine compute it
             gmm_in = payload["gmm_tab"].collect(bitumen_sg=0.0)
 
-            # Strip cement from blend so Gsb mirrors Excel behavior on the sample.
-            # Users can re-include cement by editing the engine call directly.
             grad = payload["gradation"]
-            grad_blend = {k: v for k, v in grad.blend_ratios.items() if k.lower() != "cement"}
-            from app.core import GradationInput
-            grad_for_gsb = GradationInput(
-                sieve_sizes_mm=grad.sieve_sizes_mm,
-                pass_pct=grad.pass_pct,
-                blend_ratios=grad_blend,
-                spec_lower=grad.spec_lower,
-                spec_upper=grad.spec_upper,
-            )
 
             p = self.db.get_project(self._current_project_id)
             # F4: refuse to compute without an explicit mix type. The hub
@@ -1236,10 +1225,11 @@ class MainWindow(QMainWindow):
                 mix_type=mix_type,
                 work_name=p.work_name if p else "",
                 client=p.client.name if (p and p.client) else "",
+                materials={name: "" for name in grad.blend_ratios},
             )
             inp = MixDesignInput(
                 project=proj,
-                gradation=grad_for_gsb,
+                gradation=grad,
                 sg_coarse=coarse,
                 sg_fine=fine,
                 sg_bitumen=bit,

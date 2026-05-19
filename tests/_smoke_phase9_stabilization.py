@@ -49,7 +49,7 @@ def _envelope(panel: InputsPanel) -> tuple[tuple[float, ...], tuple[float, ...]]
     """Read back (lower, upper) envelope from the gradation table."""
     gt = panel.tab_gradation
     n = gt.table.rowCount()
-    n_agg = len(gt._aggs)
+    n_agg = len(gt._available_aggs)
     lo, up = [], []
     for r in range(n):
         lo_item = gt.table.item(r, n_agg + 1)
@@ -144,7 +144,8 @@ def main() -> int:
         # We use a flat 50% per cell — engine doesn't care for this smoke,
         # only that the data shape is consistent.
         for r in range(gt.table.rowCount()):
-            for ci in range(1, 1 + len(gt._aggs)):
+            for name in gt._aggs:
+                ci = gt._available_aggs.index(name) + 1
                 from PySide6.QtWidgets import QTableWidgetItem
                 gt.table.setItem(r, ci, QTableWidgetItem("50"))
         grad = panel.tab_gradation.collect()
