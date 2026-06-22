@@ -44,6 +44,15 @@ class PavementLayer:
     poisson_ratio: float = 0.35
     thickness_mm: float | None = None
 
+    def __post_init__(self) -> None:
+        if self.thickness_mm is not None and self.thickness_mm <= 0:
+            raise ValueError("Layer thickness must be > 0")
+        if self.modulus_mpa <= 0:
+            raise ValueError("Modulus must be > 0")
+        if self.poisson_ratio <= 0 or self.poisson_ratio >= 0.5:
+            raise ValueError("Poisson ratio must be > 0 and < 0.5")
+
+
 
 @dataclass(frozen=True, slots=True)
 class PavementStructure:

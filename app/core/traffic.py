@@ -109,6 +109,19 @@ class TrafficInput:
     wim_records: Tuple[float, ...] = ()
     survey_source_file: str = ""
 
+    def __post_init__(self) -> None:
+        if self.initial_cvpd < 0:
+            raise ValueError("CVPD must be >= 0")
+        if self.growth_rate_pct < 0:
+            raise ValueError("Growth rate must be >= 0")
+        if self.design_life_years < 1:
+            raise ValueError("Design life must be >= 1")
+        if self.vdf is not None and self.vdf < 0:
+            raise ValueError("VDF must be >= 0")
+        if self.ldf is not None and (self.ldf <= 0 or self.ldf > 1):
+            raise ValueError("Lane distribution factor must be > 0 and <= 1")
+
+
 
 @dataclass(frozen=True, slots=True)
 class TrafficResult:

@@ -57,6 +57,20 @@ class StructuralInput:
     resilient_modulus_mpa: float | None = None   # optional measured Mr
     notes: str = ""
 
+    def __post_init__(self) -> None:
+        if self.initial_cvpd < 0:
+            raise ValueError("CVPD must be >= 0")
+        if self.growth_rate_pct < 0:
+            raise ValueError("Growth rate must be >= 0")
+        if self.design_life_years < 1:
+            raise ValueError("Design life must be >= 1")
+        if self.vdf < 0:
+            raise ValueError("VDF must be >= 0")
+        if self.ldf <= 0 or self.ldf > 1:
+            raise ValueError("Lane distribution factor must be > 0 and <= 1")
+        if self.subgrade_cbr_pct <= 0:
+            raise ValueError("CBR must be > 0")
+
 
 @dataclass(frozen=True, slots=True)
 class PavementLayer:
@@ -64,6 +78,13 @@ class PavementLayer:
     thickness_mm: float
     material: str = ""                     # tag (e.g. "BC", "DBM-II", "WMM")
     modulus_mpa: float | None = None       # typical / assumed E
+
+    def __post_init__(self) -> None:
+        if self.thickness_mm <= 0:
+            raise ValueError("Layer thickness must be > 0")
+        if self.modulus_mpa is not None and self.modulus_mpa <= 0:
+            raise ValueError("Modulus must be > 0")
+
 
 
 @dataclass(frozen=True, slots=True)
@@ -159,6 +180,13 @@ def compute_structural_design(inp: StructuralInput) -> StructuralResult:
           else compute_subgrade_mr(inp.subgrade_cbr_pct))
     comp = suggest_composition(msa, inp.subgrade_cbr_pct)
     total_t = sum(l.thickness_mm for l in comp)
+    
+    notes = ("Layer composition is a catalogue-style suggestion (Phase 4 skeleton). "
+             "Cross-check against IRC:37 Plates and run mechanistic analysis "
+             "before adoption for design.")
+    if inp.subgrade_cbr_pct > 20.0:
+        notes += " WARNING: Subgrade CBR is exceptionally high (> 20%). Verify field moisture conditions and subgrade compaction."
+
     return StructuralResult(
         inputs=inp,
         design_msa=msa,
@@ -168,7 +196,6 @@ def compute_structural_design(inp: StructuralInput) -> StructuralResult:
         total_pavement_thickness_mm=total_t,
         fatigue_check=MECHANISTIC_WORKFLOW_NOT_RUN,
         rutting_check=MECHANISTIC_WORKFLOW_NOT_RUN,
-        notes=("Layer composition is a catalogue-style suggestion (Phase 4 skeleton). "
-               "Cross-check against IRC:37 Plates and run mechanistic analysis "
-               "before adoption for design."),
+        notes=notes,
     )
+
