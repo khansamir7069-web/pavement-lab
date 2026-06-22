@@ -305,9 +305,20 @@ def _rehydrate_structural(sd_row, mech_row=None) -> "StructuralResult | None":
     result = compute_structural_design(inp)
     mech = _rehydrate_mechanistic_validation(mech_row)
     if mech is not None and abs(float(mech.fatigue.design_msa) - result.design_msa) <= 0.01:
+        has_mech = False
+        try:
+            inputs_data = json.loads(mech_row.inputs_json) if mech_row.inputs_json else {}
+            selection = inputs_data.get("selection") or {}
+            runner = selection.get("runner") or {}
+            if runner.get("source") == "external_exe":
+                has_mech = not mech.refused
+        except Exception:
+            pass
+        mode = "Mechanistic Verified Mode" if has_mech else "Decision Support Mode"
         return replace(
             result,
             mechanistic_validation=mech,
+            validation_mode=mode,
             fatigue_check=(
                 mech.fatigue.verdict
                 or mech.fatigue.refused_reason
@@ -510,7 +521,7 @@ def _maint_ctx(ctx: CombinedReportContext) -> MaintenanceReportContext:
     )
 
 
-def _struct_ctx(ctx: CombinedReportContext) -> StructuralReportContext:
+def _struct_ctx(ctx: CombinedReportContext, execution_time: str | None = None) -> StructuralReportContext:
     return StructuralReportContext(
         project_title=ctx.project_title,
         work_name=ctx.work_name,
@@ -521,10 +532,11 @@ def _struct_ctx(ctx: CombinedReportContext) -> StructuralReportContext:
         submitted_by=ctx.submitted_by,
         lab_name=ctx.lab_name,
         report_date=ctx.report_date,
+        execution_time=execution_time,
     )
 
 
-def _stab_ctx(ctx: CombinedReportContext) -> StabilizedReportContext:
+def _stab_ctx(ctx: CombinedReportContext, execution_time: str | None = None) -> StabilizedReportContext:
     return StabilizedReportContext(
         project_title=ctx.project_title,
         work_name=ctx.work_name,
@@ -535,6 +547,7 @@ def _stab_ctx(ctx: CombinedReportContext) -> StabilizedReportContext:
         submitted_by=ctx.submitted_by,
         lab_name=ctx.lab_name,
         report_date=ctx.report_date,
+        execution_time=execution_time,
     )
 
 
@@ -721,6 +734,9 @@ def build_combined_report(
 
     mech_val = db.latest_mechanistic_validation(project_id)
     has_mechanistic = mech_val is not None and not mech_val.refused
+    exec_time_str = None
+    if mech_val and mech_val.computed_at:
+        exec_time_str = mech_val.computed_at.strftime("%d-%b-%Y %H:%M:%S")
 
     structural = _rehydrate_structural(
         sd_row,
@@ -942,14 +958,14 @@ def build_combined_report(
     # ---- Structural ----
     if structural:
         doc.add_page_break()
-        write_structural_section(doc, _struct_ctx(ctx), structural,
+        write_structural_section(doc, _struct_ctx(ctx, execution_time=exec_time_str), structural,
                                  include_header=True)
         included.append("Flexible Pavement Structural Design")
 
     # ---- Stabilized ----
     if stabilized:
         doc.add_page_break()
-        write_stabilized_section(doc, _stab_ctx(ctx), stabilized,
+        write_stabilized_section(doc, _stab_ctx(ctx, execution_time=exec_time_str), stabilized,
                                  include_header=True)
         included.append("Stabilized Pavement Design (CTB/CTS)")
 

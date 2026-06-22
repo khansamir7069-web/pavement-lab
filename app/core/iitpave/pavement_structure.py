@@ -188,11 +188,16 @@ def from_structural_layers(
             # Conservative placeholder modulus when the source did not
             # supply one (e.g. older catalogue rows).
             e_mpa = 300.0
+        poisson = getattr(sl, "poisson", None)
+        if poisson is None:
+            poisson = getattr(sl, "poisson_ratio", None)
+        if poisson is None:
+            poisson = _poisson_for(material)
         layers.append(PavementLayer(
             name=getattr(sl, "name", "") or material or "layer",
             material=material,
             modulus_mpa=float(e_mpa),
-            poisson_ratio=_poisson_for(material),
+            poisson_ratio=float(poisson),
             thickness_mm=float(getattr(sl, "thickness_mm", 0.0) or 0.0),
         ))
     layers.append(PavementLayer(

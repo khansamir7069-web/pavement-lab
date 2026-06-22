@@ -160,6 +160,10 @@ def write_mechanistic_section(
     summary: MechanisticValidationSummary,
     *,
     include_header: bool = True,
+    validation_mode: str | None = None,
+    execution_time: str | None = None,
+    composition: Sequence[Any] | None = None,
+    design_msa: float | None = None,
 ) -> None:
     if include_header:
         add_heading(doc, "MECHANISTIC VALIDATION (IRC:37-2018 cl. 6.4)",
@@ -183,6 +187,42 @@ def write_mechanistic_section(
             ("Agency",          ctx.agency),
             ("Submitted By",    ctx.submitted_by),
         ))
+
+    # --- Verification Mode Banner / Info ---
+    if validation_mode is None:
+        validation_mode = "Mechanistic Verified Mode" if (not summary.is_placeholder and not summary.refused) else "Decision Support Mode"
+    
+    add_heading(doc, "IITPAVE Integration Details", level=2)
+    integration_info = [
+        ("Verification Mode", f"★ {validation_mode} ★"),
+    ]
+    if execution_time:
+        integration_info.append(("Execution Timestamp", execution_time))
+    elif hasattr(ctx, "execution_time") and getattr(ctx, "execution_time", None):
+        integration_info.append(("Execution Timestamp", getattr(ctx, "execution_time")))
+    if design_msa is not None:
+        integration_info.append(("Design Traffic", f"{design_msa:.2f} MSA"))
+    
+    add_kv_table(doc, tuple(integration_info))
+
+    # --- Pavement Layers Input Summary ---
+    if composition:
+        add_heading(doc, "IITPAVE Analysis Layer Composition", level=3)
+        comp_rows = []
+        for idx, ly in enumerate(composition):
+            mod_str = f"{ly.modulus_mpa:.0f}" if getattr(ly, "modulus_mpa", None) is not None else "—"
+            poi_val = getattr(ly, "poisson", None)
+            if poi_val is None:
+                poi_val = getattr(ly, "poisson_ratio", 0.25)
+            poi_str = f"{poi_val:.2f}"
+            comp_rows.append([
+                ly.name,
+                getattr(ly, "material", "—"),
+                f"{ly.thickness_mm:.0f} mm",
+                mod_str,
+                poi_str
+            ])
+        add_table(doc, ["Layer", "Material", "Thickness", "Elastic Modulus (MPa)", "Poisson's Ratio"], comp_rows)
 
     # --- Overall refusal banner (Phase 14 safety contract) --------------
     if summary.refused:

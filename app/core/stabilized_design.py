@@ -6,10 +6,13 @@ routines for the stabilized pavement design module.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Tuple, Optional
+from typing import Tuple, Optional, TYPE_CHECKING
 
 from .structural_design import PavementLayer
 from .intelligence_checker import IntelligenceResult
+
+if TYPE_CHECKING:
+    from .mechanistic_validation import MechanisticValidationSummary
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,11 +72,13 @@ class StabilizedResult:
         "is required before field execution."
     )
     intelligence: Optional[IntelligenceResult] = None
+    mechanistic_validation: "Optional[MechanisticValidationSummary]" = None
 
 
 def compute_stabilized_design(
     inp: StabilizedInput,
     has_mechanistic_validation: bool = False,
+    mechanistic_validation: "Optional[MechanisticValidationSummary]" = None,
 ) -> StabilizedResult:
     """Compute stabilized pavement design values, safety warnings, and side-by-side comparison."""
     from app.core.catalogue.engine import lookup_catalogue_design
@@ -187,7 +192,12 @@ def compute_stabilized_design(
     savings_pct = (savings_mm / total_flexible * 100.0) if total_flexible > 0 else 0.0
 
     # 5. Validation mode
-    mode = "Mechanistic Verified Mode" if has_mechanistic_validation else "Decision Support Mode"
+    has_mech = has_mechanistic_validation or (
+        mechanistic_validation is not None
+        and not mechanistic_validation.is_placeholder
+        and not mechanistic_validation.refused
+    )
+    mode = "Mechanistic Verified Mode" if has_mech else "Decision Support Mode"
 
     from app.core.intelligence_checker import check_pavement_intelligence
     from app.core.structural_design import compute_subgrade_mr
@@ -203,4 +213,5 @@ def compute_stabilized_design(
         stabilized_composition=stabilized_comp,
         validation_mode=mode,
         intelligence=intel,
+        mechanistic_validation=mechanistic_validation,
     )

@@ -51,6 +51,7 @@ class StructuralReportContext:
     submitted_by: str = ""
     lab_name: str = "Pavement Laboratory"
     report_date: str = field(default_factory=lambda: datetime.now().strftime("%d-%b-%Y"))
+    execution_time: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -176,10 +177,11 @@ def write_structural_section(
                 report_date=ctx.report_date,
             ),
             result.mechanistic_validation,
-            # Header for the standalone variant is suppressed — this is
-            # already an embedded sub-section under "6. Mechanistic
-            # Checks" inside the structural report.
             include_header=False,
+            validation_mode=result.validation_mode,
+            execution_time=ctx.execution_time,
+            composition=result.composition,
+            design_msa=result.design_msa,
         )
     else:
         add_table(doc, ["Check", "Status"], [

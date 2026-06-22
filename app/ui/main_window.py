@@ -88,6 +88,7 @@ from .widgets.results_panel import ResultsPanel
 from .widgets.spec_admin import SpecAdminPanel
 from .widgets.structural_panel import StructuralPanel
 from .widgets.stabilized_panel import StabilizedPanel
+from .widgets.iitpave_status_panel import IITPaveStatusPanel
 
 
 log = logging.getLogger(__name__)
@@ -106,6 +107,7 @@ SIDEBAR_ITEMS = [
     ("Condition Survey", "condition"),
     ("Results & Report", "results"),
     ("Specifications", "specs_admin"),
+    ("IITPAVE Integration", "iitpave_status"),
 ]
 
 
@@ -234,6 +236,7 @@ class MainWindow(QMainWindow):
         self.material_qty = MaterialQuantityPanel(self.db)
         self.traffic = TrafficPanel(self.db)
         self.condition = ConditionSurveyPanel(self.db)
+        self.iitpave_status = IITPaveStatusPanel(self.db)
 
         # Wire Back buttons on every page's header.
         # Lambdas must swallow Qt's clicked(bool) positional arg with *_.
@@ -249,6 +252,7 @@ class MainWindow(QMainWindow):
             (self.material_qty, "hub"),
             (self.traffic,      "hub"),
             (self.condition,    "hub"),
+            (self.iitpave_status, "hub"),
         )
         for w, target in back_routes:
             hdr = w.findChild(PageHeader)
@@ -270,6 +274,7 @@ class MainWindow(QMainWindow):
                 "material_qty": self.material_qty,
                 "traffic": self.traffic,
                 "condition": self.condition,
+                "iitpave_status": self.iitpave_status,
             }[key]
             idx = self.stack.addWidget(widget)
             self._page_keys[key] = idx
@@ -303,6 +308,10 @@ class MainWindow(QMainWindow):
         self.inputs.reset_requested.connect(self._on_reset_inputs)
         self.results.generate_word.connect(self._on_export_word)
         self.results.generate_pdf.connect(self._on_export_pdf)
+        self.iitpave_status.config_updated.connect(self._on_iitpave_config_updated)
+
+    def _on_iitpave_config_updated(self) -> None:
+        self.statusBar().showMessage("IITPAVE configuration updated.")
 
     # ----- navigation -----
 
@@ -321,6 +330,8 @@ class MainWindow(QMainWindow):
         self.stack.setCurrentIndex(self._page_keys[key])
         if key == "dashboard":
             self.dashboard.refresh()
+        elif key == "iitpave_status":
+            self.iitpave_status.refresh()
 
     # ----- project lifecycle -----
 

@@ -108,6 +108,7 @@ class StructuralResult:
     # for every existing project.
     mechanistic_validation: "Optional[MechanisticValidationSummary]" = None
     intelligence: "Optional[IntelligenceResult]" = None
+    validation_mode: str = "Decision Support Mode"
 
 
 # ---------------------------------------------------------------------------

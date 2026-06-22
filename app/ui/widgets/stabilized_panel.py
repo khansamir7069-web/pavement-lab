@@ -26,6 +26,7 @@ from app.core import (
     StabilizedInput,
     StabilizedResult,
     compute_stabilized_design,
+    run_stabilized_iitpave_mechanistic_workflow,
 )
 from app.reports.stabilized_report import (
     StabilizedReportContext,
@@ -55,6 +56,7 @@ class StabilizedPanel(QWidget):
         self.db = db
         self._project_id: int | None = None
         self._last_result: StabilizedResult | None = None
+        self._last_iitpave_workflow = None
         self._build()
 
     def _build(self) -> None:
@@ -152,6 +154,8 @@ class StabilizedPanel(QWidget):
 
         # Validation Mode + safety
         self.lbl_mode = QLabel("Validation Mode: —")
+        self.lbl_mode.setWordWrap(True)
+        self.lbl_mode.linkActivated.connect(self._on_banner_link_clicked)
         self.lbl_mode.setStyleSheet("font-size:12pt; font-weight:bold; color:#1f3a68;")
         rl.addWidget(self.lbl_mode)
         
@@ -302,15 +306,22 @@ class StabilizedPanel(QWidget):
     def _on_compute(self) -> None:
         try:
             inp = self._collect()
+            res = compute_stabilized_design(inp, has_mechanistic_validation=False)
             
-            # Check validation mode: Mechanistic if project has mechanistic validation
-            has_mech = False
-            if self._project_id is not None:
-                mech_val = self.db.latest_mechanistic_validation(self._project_id)
-                has_mech = mech_val is not None and not mech_val.refused
-
-            res = compute_stabilized_design(inp, has_mechanistic_validation=has_mech)
+            workflow = None
+            try:
+                workflow = run_stabilized_iitpave_mechanistic_workflow(res)
+                res = workflow.structural_result
+            except Exception as e:
+                # We remain in Decision Support Mode as required if execution or parser fails
+                res = dataclasses.replace(
+                    res,
+                    validation_mode="Decision Support Mode",
+                    mechanistic_validation=None,
+                )
+            
             self._last_result = res
+            self._last_iitpave_workflow = workflow
             self._render(res)
             self.btn_save.setEnabled(self._project_id is not None)
         except Exception as e:
@@ -318,7 +329,27 @@ class StabilizedPanel(QWidget):
 
     def _render(self, r: StabilizedResult) -> None:
         self.res_card.setVisible(True)
-        self.lbl_mode.setText(f"Validation Mode: <b>{r.validation_mode}</b>")
+        
+        # Determine and display active validation mode banner
+        mode = r.validation_mode
+        if mode == "Mechanistic Verified Mode":
+            banner_style = "background-color:#d4efdf; color:#196f3d; font-weight:bold; border:1px solid #a3e4d7; border-radius:4px; padding:6px 12px; font-size:10pt;"
+            banner_text = (
+                f"🛡️ <b>Verification Mode:</b> {mode}<br>"
+                "Verified using real local IITPAVE execution. "
+                "Stabilized pavement design strains conform to specifications."
+            )
+        else:
+            banner_style = "background-color:#fef9e7; color:#7d6608; border:1px solid #f9e79f; border-radius:4px; padding:6px 12px; font-size:10pt;"
+            banner_text = (
+                f"ℹ️ <b>Verification Mode:</b> {mode}<br>"
+                "This design is computed under Decision Support Mode. "
+                "IITPAVE mechanistic verification has not been performed or is using default stubs/placeholders. "
+                "To verify the design with IITPAVE.exe, configure the executable path in the "
+                "<a href='#iitpave_settings' style='color:#1a5276; font-weight:bold;'>IITPAVE Integration Manager</a>."
+            )
+        self.lbl_mode.setStyleSheet(banner_style)
+        self.lbl_mode.setText(banner_text)
         self.lbl_safety.setText(f"⚠ {r.safety_disclaimer}")
 
         # Render composition table side-by-side
@@ -402,6 +433,17 @@ class StabilizedPanel(QWidget):
                 project_id=self._project_id,
                 result=self._last_result,
             )
+            # Persist mechanistic validation summary if completed successfully
+            if self._last_result.mechanistic_validation is not None:
+                self.db.save_mechanistic_validation(
+                    project_id=self._project_id,
+                    summary=self._last_result.mechanistic_validation,
+                    inputs=(
+                        self._last_iitpave_workflow.as_dict()
+                        if self._last_iitpave_workflow is not None
+                        else None
+                    ),
+                )
             # Mark module complete in Project.modules_json
             self.db.update_module_status(self._project_id, "stabilized", "complete")
             
@@ -411,6 +453,14 @@ class StabilizedPanel(QWidget):
             QMessageBox.information(self, "Success", "Stabilized design saved successfully.")
         except Exception as e:
             QMessageBox.critical(self, "Save failed", str(e))
+
+    def _on_banner_link_clicked(self) -> None:
+        parent = self.parent()
+        while parent is not None:
+            if hasattr(parent, "_show_page"):
+                parent._show_page("iitpave_status")
+                break
+            parent = parent.parent()
 
     def _on_export(self) -> None:
         if self._project_id is None or self._last_result is None:

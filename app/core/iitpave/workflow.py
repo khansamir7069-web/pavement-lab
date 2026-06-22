@@ -18,6 +18,7 @@ from app.core.mechanistic_validation import (
     compute_mechanistic_validation,
 )
 from app.core.structural_design import StructuralResult
+from app.core.stabilized_design import StabilizedResult
 
 from .input_builder import build_iitpave_input
 from .output_contract import inspect_iitpave_output_contract
@@ -36,6 +37,7 @@ from .runner_config import (
     IITPaveRunnerSelectionResult,
     select_iitpave_runner,
 )
+from .installation_manager import load_persisted_config
 
 
 IITPAVE_WORKFLOW_STATUS_READY = "mechanistic_workflow_ready"
@@ -46,7 +48,7 @@ IITPAVE_WORKFLOW_STATUS_BLOCKED = "mechanistic_workflow_blocked"
 @dataclass(frozen=True, slots=True)
 class IITPaveMechanisticWorkflowResult:
     status: str
-    structural_result: StructuralResult
+    structural_result: Any
     input_text: str = ""
     output_text: str = ""
     summary: MechanisticValidationSummary | None = None
@@ -86,12 +88,23 @@ def _append_note(existing: str, note: str) -> str:
 
 
 def _diagnostic_structural_result(
-    result: StructuralResult,
+    result: Any,
     *,
     fatigue_check: str,
     rutting_check: str,
     note: str,
-) -> StructuralResult:
+) -> Any:
+    if isinstance(result, StabilizedResult):
+        existing_warnings = list(result.warnings)
+        msg = f"IITPAVE integration alert: {note}"
+        if msg not in existing_warnings:
+            existing_warnings.append(msg)
+        return dataclasses.replace(
+            result,
+            validation_mode="Decision Support Mode",
+            warnings=tuple(existing_warnings),
+            mechanistic_validation=None,
+        )
     return dataclasses.replace(
         result,
         fatigue_check=fatigue_check,
@@ -102,7 +115,7 @@ def _diagnostic_structural_result(
 
 
 def _blocked(
-    result: StructuralResult,
+    result: Any,
     *,
     input_text: str,
     selection: IITPaveRunnerSelectionResult | None = None,
@@ -247,7 +260,7 @@ def _critical_design_result(
 
 
 def _completed(
-    result: StructuralResult,
+    result: Any,
     *,
     input_text: str,
     output_text: str,
@@ -284,16 +297,27 @@ def _completed(
         if summary.is_placeholder
         else IITPAVE_WORKFLOW_STATUS_READY
     )
-    updated = dataclasses.replace(
-        result,
-        fatigue_check=fatigue_text,
-        rutting_check=rutting_text,
-        mechanistic_validation=summary,
-        notes=_append_note(
-            result.notes,
-            "IITPAVE mechanistic workflow executed through the local external runner.",
-        ),
-    )
+    has_mech = (selection is not None and selection.runner is not None and selection.runner.source == SOURCE_EXTERNAL and not summary.refused)
+    mode = "Mechanistic Verified Mode" if has_mech else "Decision Support Mode"
+
+    if isinstance(result, StabilizedResult):
+        updated = dataclasses.replace(
+            result,
+            validation_mode=mode,
+            mechanistic_validation=summary,
+        )
+    else:
+        updated = dataclasses.replace(
+            result,
+            fatigue_check=fatigue_text,
+            rutting_check=rutting_text,
+            mechanistic_validation=summary,
+            validation_mode=mode,
+            notes=_append_note(
+                result.notes,
+                "IITPAVE mechanistic workflow executed through the local external runner.",
+            ),
+        )
     reason = summary.refused_reason if summary.refused else ""
     return IITPaveMechanisticWorkflowResult(
         status=status,
@@ -326,7 +350,7 @@ def run_structural_iitpave_mechanistic_workflow(
     points = default_evaluation_points(structure)
     input_text = build_iitpave_input(structure, load or LoadConfig(), points)
 
-    cfg = runner_config or IITPaveRunnerConfig(mode=IITPAVE_RUNNER_EXTERNAL)
+    cfg = runner_config or load_persisted_config()
     selection = select_iitpave_runner(cfg)
     if not selection.ok or selection.runner is None:
         reason = selection.blocked_reason or "No usable local IITPAVE executable was found."
@@ -350,7 +374,7 @@ def run_structural_iitpave_mechanistic_workflow(
             output_text=output_text,
             selection=selection,
             output_contract=output_contract,
-            reason=output_contract.blocked_reason or "IITPAVE output format is not supported.",
+            reason="IITPAVE execution completed but output verification failed.",
         )
 
     try:
@@ -365,7 +389,7 @@ def run_structural_iitpave_mechanistic_workflow(
             output_text=output_text,
             selection=selection,
             output_contract=output_contract,
-            reason=f"IITPAVE output parsing failed: {exc}",
+            reason="IITPAVE execution completed but output verification failed.",
         )
 
     mech_result = _critical_design_result(mech_result, structure)
@@ -374,6 +398,83 @@ def run_structural_iitpave_mechanistic_workflow(
             mech_result=mech_result,
             structure=structure,
             design_msa=result.design_msa,
+            point_labels=(LABEL_FATIGUE, LABEL_RUTTING),
+        )
+    )
+    return _completed(
+        result,
+        input_text=input_text,
+        output_text=output_text,
+        selection=selection,
+        output_contract=output_contract,
+        summary=summary,
+    )
+
+
+def run_stabilized_iitpave_mechanistic_workflow(
+    result: StabilizedResult,
+    *,
+    runner_config: IITPaveRunnerConfig | None = None,
+    load: LoadConfig | None = None,
+) -> IITPaveMechanisticWorkflowResult:
+    """Run IITPAVE on the stabilized design composition and attach mechanistic validation."""
+    from app.core.structural_design import compute_subgrade_mr
+    mr = compute_subgrade_mr(result.inputs.flexible_subgrade_cbr)
+    structure = from_structural_layers(
+        result.stabilized_composition,
+        subgrade_mr_mpa=mr,
+    )
+    points = default_evaluation_points(structure)
+    input_text = build_iitpave_input(structure, load or LoadConfig(), points)
+
+    cfg = runner_config or load_persisted_config()
+    selection = select_iitpave_runner(cfg)
+    if not selection.ok or selection.runner is None:
+        reason = selection.blocked_reason or "No usable local IITPAVE executable was found."
+        return _blocked(result, input_text=input_text, selection=selection, reason=reason)
+
+    try:
+        output_text = selection.runner.run(input_text)
+    except Exception as exc:
+        return _blocked(
+            result,
+            input_text=input_text,
+            selection=selection,
+            reason=f"IITPAVE execution failed: {exc}",
+        )
+
+    output_contract = inspect_iitpave_output_contract(text=output_text)
+    if not output_contract.parse_allowed:
+        return _blocked(
+            result,
+            input_text=input_text,
+            output_text=output_text,
+            selection=selection,
+            output_contract=output_contract,
+            reason="IITPAVE execution completed but output verification failed.",
+        )
+
+    try:
+        mech_result = parse_iitpave_output(
+            output_text,
+            source=output_contract.parser_source or SOURCE_EXTERNAL,
+        )
+    except Exception as exc:
+        return _blocked(
+            result,
+            input_text=input_text,
+            output_text=output_text,
+            selection=selection,
+            output_contract=output_contract,
+            reason="IITPAVE execution completed but output verification failed.",
+        )
+
+    mech_result = _critical_design_result(mech_result, structure)
+    summary = compute_mechanistic_validation(
+        MechanisticValidationInput(
+            mech_result=mech_result,
+            structure=structure,
+            design_msa=result.inputs.flexible_design_msa,
             point_labels=(LABEL_FATIGUE, LABEL_RUTTING),
         )
     )

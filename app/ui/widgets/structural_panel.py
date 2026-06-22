@@ -162,6 +162,12 @@ class StructuralPanel(QWidget):
         self.lbl_total = QLabel("")
         self.lbl_total.setStyleSheet("font-weight:bold; color:#1f3a68;")
         rl.addWidget(self.lbl_total)
+
+        self.lbl_mode_banner = QLabel("")
+        self.lbl_mode_banner.setWordWrap(True)
+        self.lbl_mode_banner.linkActivated.connect(self._on_banner_link_clicked)
+        rl.addWidget(self.lbl_mode_banner)
+
         self.lbl_checks = QLabel("")
         self.lbl_checks.setWordWrap(True)
         self.lbl_checks.setStyleSheet(
@@ -305,6 +311,28 @@ class StructuralPanel(QWidget):
         self.lbl_total.setText(
             f"Total pavement thickness: {r.total_pavement_thickness_mm:.0f} mm"
         )
+        
+        # Determine and display active validation mode banner
+        mode = r.validation_mode
+        if mode == "Mechanistic Verified Mode":
+            banner_style = "background-color:#d4efdf; color:#196f3d; font-weight:bold; border:1px solid #a3e4d7; border-radius:4px; padding:6px 12px; font-size:10pt;"
+            banner_text = (
+                f"🛡️ <b>Verification Mode:</b> {mode}<br>"
+                "Verified using real local IITPAVE execution. "
+                "Design strains conform to IRC:37 fatigue/rutting specifications."
+            )
+        else:
+            banner_style = "background-color:#fef9e7; color:#7d6608; border:1px solid #f9e79f; border-radius:4px; padding:6px 12px; font-size:10pt;"
+            banner_text = (
+                f"ℹ️ <b>Verification Mode:</b> {mode}<br>"
+                "This design is computed under Decision Support Mode. "
+                "IITPAVE mechanistic verification has not been performed or is using default stubs/placeholders. "
+                "To verify the design with IITPAVE.exe, configure the executable path in the "
+                "<a href='#iitpave_settings' style='color:#1a5276; font-weight:bold;'>IITPAVE Integration Manager</a>."
+            )
+        self.lbl_mode_banner.setStyleSheet(banner_style)
+        self.lbl_mode_banner.setText(banner_text)
+
         mech = r.mechanistic_validation
         if mech is not None:
             self.lbl_checks.setText(
@@ -324,6 +352,14 @@ class StructuralPanel(QWidget):
                 f"Rutting check: {r.rutting_check}<br>"
                 f"<i>{r.notes}</i>"
             )
+
+    def _on_banner_link_clicked(self) -> None:
+        parent = self.parent()
+        while parent is not None:
+            if hasattr(parent, "_show_page"):
+                parent._show_page("iitpave_status")
+                break
+            parent = parent.parent()
 
         if hasattr(r, 'intelligence') and r.intelligence:
             intel = r.intelligence

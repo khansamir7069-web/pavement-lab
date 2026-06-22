@@ -152,6 +152,13 @@ from .workflow import (
     IITPAVE_WORKFLOW_STATUS_WARN,
     IITPaveMechanisticWorkflowResult,
     run_structural_iitpave_mechanistic_workflow,
+    run_stabilized_iitpave_mechanistic_workflow,
+)
+from .installation_manager import (
+    load_persisted_config,
+    save_persisted_config,
+    detect_iitpave_version,
+    get_last_run_info,
 )
 
 __all__ = [
@@ -273,4 +280,9 @@ __all__ = [
     "IITPAVE_WORKFLOW_STATUS_WARN",
     "IITPaveMechanisticWorkflowResult",
     "run_structural_iitpave_mechanistic_workflow",
+    "run_stabilized_iitpave_mechanistic_workflow",
+    "load_persisted_config",
+    "save_persisted_config",
+    "detect_iitpave_version",
+    "get_last_run_info",
 ]

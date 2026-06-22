@@ -32,6 +32,7 @@ class StabilizedReportContext:
     submitted_by: str = ""
     lab_name: str = "Pavement Laboratory"
     report_date: str = field(default_factory=lambda: datetime.now().strftime("%d-%b-%Y"))
+    execution_time: str | None = None
 
 
 def write_stabilized_section(
@@ -146,6 +147,32 @@ def write_stabilized_section(
     if hasattr(result, "intelligence") and result.intelligence:
         from .intelligence_report import write_intelligence_section
         write_intelligence_section(doc, result.intelligence, section_title="Stabilized Pavement Design", include_header=True)
+
+    if result.mechanistic_validation is not None:
+        add_heading(doc, "5. Mechanistic Checks (IITPAVE)", level=2)
+        from .mechanistic_report import (
+            MechanisticReportContext,
+            write_mechanistic_section,
+        )
+        write_mechanistic_section(
+            doc,
+            MechanisticReportContext(
+                project_title=ctx.project_title,
+                work_name=ctx.work_name,
+                work_order_no=ctx.work_order_no,
+                work_order_date=ctx.work_order_date,
+                client=ctx.client, agency=ctx.agency,
+                submitted_by=ctx.submitted_by,
+                lab_name=ctx.lab_name,
+                report_date=ctx.report_date,
+            ),
+            result.mechanistic_validation,
+            include_header=False,
+            validation_mode=result.validation_mode,
+            execution_time=ctx.execution_time,
+            composition=result.stabilized_composition,
+            design_msa=inp.flexible_design_msa,
+        )
 
     add_note(
         doc,

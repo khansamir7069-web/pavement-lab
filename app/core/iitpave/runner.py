@@ -23,9 +23,13 @@ from __future__ import annotations
 import math
 import subprocess
 import tempfile
+import time
+import json
+from datetime import datetime
 from pathlib import Path
 from typing import Optional, Protocol
 
+from app.config import USER_DATA_DIR
 from .discovery import bundled_iitpave_exe_path
 
 
@@ -224,55 +228,149 @@ class ExternalExeRunner:
 
     # ---- internals -----------------------------------------------------
     def _run_stdin_stdout(self, input_text: str) -> str:
+        runs_dir = USER_DATA_DIR / "iitpave_runs"
+        runs_dir.mkdir(parents=True, exist_ok=True)
+        run_id = f"run_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
+        run_dir = runs_dir / run_id
+        run_dir.mkdir(parents=True, exist_ok=True)
+
+        inp_path = run_dir / self.input_filename
+        inp_path.write_text(input_text, encoding="utf-8")
+
+        start_time = time.time()
+        completed = None
+        error_msg = ""
+        status = "failed"
+        returncode = None
+        stdout_content = ""
+        stderr_content = ""
+        output_content = ""
+
         try:
             completed = subprocess.run(
                 [str(self.exe_path)],
                 input=input_text,
                 capture_output=True,
                 text=True,
-                cwd=str(self.working_dir) if self.working_dir else None,
+                cwd=str(run_dir),
                 timeout=self.timeout_sec,
                 check=False,
             )
+            duration = time.time() - start_time
+            returncode = completed.returncode
+            stdout_content = completed.stdout or ""
+            stderr_content = completed.stderr or ""
+            if completed.returncode == 0:
+                output_content = stdout_content
+                status = "success"
+            else:
+                error_msg = f"IITPAVE exit code {completed.returncode}; stderr: {stderr_content.strip()[:500]}"
+                status = f"exit_code_{completed.returncode}"
         except subprocess.TimeoutExpired as e:
-            raise TimeoutError(
-                f"IITPAVE subprocess timed out after {self.timeout_sec:g}s"
-            ) from e
-        if completed.returncode != 0:
-            raise RuntimeError(
-                f"IITPAVE exit code {completed.returncode}; "
-                f"stderr: {completed.stderr.strip()[:500]}"
-            )
-        return completed.stdout
+            duration = time.time() - start_time
+            status = "timeout"
+            error_msg = f"IITPAVE subprocess timed out after {self.timeout_sec:g}s"
+            stdout_content = e.stdout or ""
+            stderr_content = e.stderr or ""
+        except Exception as e:
+            duration = time.time() - start_time
+            status = "error"
+            error_msg = str(e)
+
+        # Save artifacts
+        (run_dir / "stdout.log").write_text(stdout_content, encoding="utf-8")
+        (run_dir / "stderr.log").write_text(stderr_content, encoding="utf-8")
+        (run_dir / self.output_filename).write_text(output_content, encoding="utf-8")
+
+        run_status = {
+            "timestamp": datetime.now().isoformat(),
+            "executable": str(self.exe_path),
+            "status": status,
+            "duration_sec": duration,
+            "error": error_msg,
+            "returncode": returncode
+        }
+        (run_dir / "run_status.json").write_text(json.dumps(run_status, indent=4), encoding="utf-8")
+
+        if status == "timeout":
+            raise TimeoutError(error_msg)
+        elif status in ("error", "failed") or (returncode is not None and returncode != 0):
+            raise RuntimeError(error_msg or f"IITPAVE run failed with status: {status}")
+
+        return output_content
 
     def _run_file_based(self, input_text: str) -> str:
-        # Use a private temp dir per invocation so concurrent runs do
-        # not collide on iitp_inp.dat / iitp_out.dat.
-        with tempfile.TemporaryDirectory(prefix="iitpave_") as td:
-            cwd = Path(td)
-            (cwd / self.input_filename).write_text(input_text, encoding="utf-8")
-            try:
-                completed = subprocess.run(
-                    [str(self.exe_path)],
-                    capture_output=True,
-                    text=True,
-                    cwd=str(cwd),
-                    timeout=self.timeout_sec,
-                    check=False,
-                )
-            except subprocess.TimeoutExpired as e:
-                raise TimeoutError(
-                    f"IITPAVE subprocess timed out after {self.timeout_sec:g}s"
-                ) from e
-            if completed.returncode != 0:
-                raise RuntimeError(
-                    f"IITPAVE exit code {completed.returncode}; "
-                    f"stderr: {completed.stderr.strip()[:500]}"
-                )
-            out_path = cwd / self.output_filename
-            if not out_path.is_file():
-                raise RuntimeError(
-                    f"IITPAVE produced no output file at {out_path}; "
-                    f"stdout: {completed.stdout.strip()[:500]}"
-                )
-            return out_path.read_text(encoding="utf-8")
+        runs_dir = USER_DATA_DIR / "iitpave_runs"
+        runs_dir.mkdir(parents=True, exist_ok=True)
+        run_id = f"run_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
+        run_dir = runs_dir / run_id
+        run_dir.mkdir(parents=True, exist_ok=True)
+
+        inp_path = run_dir / self.input_filename
+        inp_path.write_text(input_text, encoding="utf-8")
+
+        start_time = time.time()
+        completed = None
+        error_msg = ""
+        status = "failed"
+        returncode = None
+        stdout_content = ""
+        stderr_content = ""
+        output_content = ""
+
+        try:
+            completed = subprocess.run(
+                [str(self.exe_path)],
+                capture_output=True,
+                text=True,
+                cwd=str(run_dir),
+                timeout=self.timeout_sec,
+                check=False,
+            )
+            duration = time.time() - start_time
+            returncode = completed.returncode
+            stdout_content = completed.stdout or ""
+            stderr_content = completed.stderr or ""
+            if completed.returncode == 0:
+                out_path = run_dir / self.output_filename
+                if out_path.is_file():
+                    output_content = out_path.read_text(encoding="utf-8")
+                    status = "success"
+                else:
+                    error_msg = f"IITPAVE completed with code 0 but produced no output file at {self.output_filename}"
+                    status = "output_missing"
+            else:
+                error_msg = f"IITPAVE exit code {completed.returncode}; stderr: {stderr_content.strip()[:500]}"
+                status = f"exit_code_{completed.returncode}"
+        except subprocess.TimeoutExpired as e:
+            duration = time.time() - start_time
+            status = "timeout"
+            error_msg = f"IITPAVE subprocess timed out after {self.timeout_sec:g}s"
+            stdout_content = e.stdout or ""
+            stderr_content = e.stderr or ""
+        except Exception as e:
+            duration = time.time() - start_time
+            status = "error"
+            error_msg = str(e)
+
+        # Save artifacts
+        (run_dir / "stdout.log").write_text(stdout_content, encoding="utf-8")
+        (run_dir / "stderr.log").write_text(stderr_content, encoding="utf-8")
+        (run_dir / self.output_filename).write_text(output_content, encoding="utf-8")
+
+        run_status = {
+            "timestamp": datetime.now().isoformat(),
+            "executable": str(self.exe_path),
+            "status": status,
+            "duration_sec": duration,
+            "error": error_msg,
+            "returncode": returncode
+        }
+        (run_dir / "run_status.json").write_text(json.dumps(run_status, indent=4), encoding="utf-8")
+
+        if status == "timeout":
+            raise TimeoutError(error_msg)
+        elif status in ("error", "failed", "output_missing") or (returncode is not None and returncode != 0):
+            raise RuntimeError(error_msg or f"IITPAVE run failed with status: {status}")
+
+        return output_content
