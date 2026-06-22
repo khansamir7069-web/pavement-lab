@@ -6,9 +6,10 @@ routines for the stabilized pavement design module.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Tuple
+from typing import Tuple, Optional
 
 from .structural_design import PavementLayer
+from .intelligence_checker import IntelligenceResult
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,6 +68,7 @@ class StabilizedResult:
         "This design is for decision support only. Independent engineering verification "
         "is required before field execution."
     )
+    intelligence: Optional[IntelligenceResult] = None
 
 
 def compute_stabilized_design(
@@ -152,24 +154,28 @@ def compute_stabilized_design(
             thickness_mm=inp.bituminous_thickness_mm,
             material="BC/DBM",
             modulus_mpa=3000.0,
+            poisson=0.35,
         ),
         PavementLayer(
             name="Cement Treated Base (CTB)",
             thickness_mm=inp.ctb_thickness_mm,
             material="CTB",
             modulus_mpa=inp.ctb_modulus_mpa,
+            poisson=inp.ctb_poisson,
         ),
         PavementLayer(
             name="Cement Treated Sub-base (CTS)",
             thickness_mm=inp.cts_thickness_mm,
             material="CTS",
             modulus_mpa=inp.cts_modulus_mpa,
+            poisson=inp.cts_poisson,
         ),
         PavementLayer(
             name="Granular Sub-base",
             thickness_mm=inp.gsb_thickness_mm,
             material="GSB",
             modulus_mpa=150.0,
+            poisson=0.35,
         ),
     )
 
@@ -183,6 +189,11 @@ def compute_stabilized_design(
     # 5. Validation mode
     mode = "Mechanistic Verified Mode" if has_mechanistic_validation else "Decision Support Mode"
 
+    from app.core.intelligence_checker import check_pavement_intelligence
+    from app.core.structural_design import compute_subgrade_mr
+    mr = compute_subgrade_mr(inp.flexible_subgrade_cbr)
+    intel = check_pavement_intelligence(stabilized_comp, mr)
+
     return StabilizedResult(
         inputs=inp,
         warnings=tuple(warnings_list),
@@ -191,4 +202,5 @@ def compute_stabilized_design(
         conventional_composition=flexible_comp,
         stabilized_composition=stabilized_comp,
         validation_mode=mode,
+        intelligence=intel,
     )

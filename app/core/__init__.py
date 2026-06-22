@@ -179,6 +179,10 @@ from .stabilized_design import (
     StabilizedResult,
     compute_stabilized_design,
 )
+from .intelligence_checker import (
+    IntelligenceResult,
+    check_pavement_intelligence,
+)
 from .condition_survey import (
     DISTRESS_TYPES,
     SEVERITY_LEVELS,
@@ -718,4 +722,6 @@ __all__ = [
     "load_irc37_catalogue",
     "load_catalogue_metadata",
     "lookup_catalogue_design",
+    "IntelligenceResult",
+    "check_pavement_intelligence",
 ]

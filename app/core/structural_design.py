@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     # of a runtime dependency on the mechanistic-validation package
     # (preserves the existing import order in ``app.core.__init__``).
     from .mechanistic_validation import MechanisticValidationSummary
+    from .intelligence_checker import IntelligenceResult
 
 REFERENCES: Tuple[CodeRef, ...] = (
     CodeRef("IRC:37-2018", "cl. 4.6",  "Cumulative design traffic (MSA)"),
@@ -78,12 +79,15 @@ class PavementLayer:
     thickness_mm: float
     material: str = ""                     # tag (e.g. "BC", "DBM-II", "WMM")
     modulus_mpa: float | None = None       # typical / assumed E
+    poisson: float | None = None
 
     def __post_init__(self) -> None:
         if self.thickness_mm <= 0:
             raise ValueError("Layer thickness must be > 0")
         if self.modulus_mpa is not None and self.modulus_mpa <= 0:
             raise ValueError("Modulus must be > 0")
+        if self.poisson is not None and (self.poisson <= 0.05 or self.poisson >= 0.49):
+            raise ValueError("Poisson's ratio must be physically realistic (between 0.05 and 0.49)")
 
 
 
@@ -103,6 +107,7 @@ class StructuralResult:
     # the legacy string fields. Default None preserves Phase-4 behaviour
     # for every existing project.
     mechanistic_validation: "Optional[MechanisticValidationSummary]" = None
+    intelligence: "Optional[IntelligenceResult]" = None
 
 
 # ---------------------------------------------------------------------------
@@ -163,6 +168,9 @@ def compute_structural_design(inp: StructuralInput) -> StructuralResult:
         
     notes = " | ".join(notes_list)
 
+    from .intelligence_checker import check_pavement_intelligence
+    intel = check_pavement_intelligence(comp, mr)
+
     return StructuralResult(
         inputs=inp,
         design_msa=msa,
@@ -173,6 +181,7 @@ def compute_structural_design(inp: StructuralInput) -> StructuralResult:
         fatigue_check=MECHANISTIC_WORKFLOW_NOT_RUN,
         rutting_check=MECHANISTIC_WORKFLOW_NOT_RUN,
         notes=notes,
+        intelligence=intel,
     )
 
 

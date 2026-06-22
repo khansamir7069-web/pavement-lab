@@ -73,10 +73,16 @@ def lookup_catalogue_design(msa: float, cbr: float) -> CatalogueLookupResult:
         
     ref_plate = matched_entry.reference_plate
     
+    from app.core.intelligence_checker import check_pavement_intelligence
+    from app.core.structural_design import compute_subgrade_mr
+    mr = compute_subgrade_mr(cbr)
+    intel = check_pavement_intelligence(matched_entry.composition, mr)
+
     return CatalogueLookupResult(
         composition=matched_entry.composition,
         source_reference=f"IRC:37 catalogue reference: {ref_plate}",
         warnings=tuple(warnings),
         is_out_of_range=is_out_of_range,
-        is_boundary=is_boundary
+        is_boundary=is_boundary,
+        intelligence=intel
     )

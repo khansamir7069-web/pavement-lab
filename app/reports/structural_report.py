@@ -194,6 +194,11 @@ def write_structural_section(
         add_heading(doc, "7. Designer Notes", level=2)
         add_p(doc, result.notes, size=10)
 
+    # Engineering Intelligence Checker
+    if hasattr(result, "intelligence") and result.intelligence:
+        from .intelligence_report import write_intelligence_section
+        write_intelligence_section(doc, result.intelligence, section_title="Flexible Pavement Design", include_header=True)
+
     add_note(doc,
         "References: IRC:37-2018 'Guidelines for the Design of Flexible "
         "Pavements' (Indian Roads Congress, 4th Revision)."

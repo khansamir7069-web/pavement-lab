@@ -142,6 +142,11 @@ def write_stabilized_section(
     else:
         add_p(doc, "No engineering screening warnings generated.")
 
+    # Engineering Intelligence Checker
+    if hasattr(result, "intelligence") and result.intelligence:
+        from .intelligence_report import write_intelligence_section
+        write_intelligence_section(doc, result.intelligence, section_title="Stabilized Pavement Design", include_header=True)
+
     add_note(
         doc,
         "Disclaimer: This module is intended for structural comparison and decision-support "

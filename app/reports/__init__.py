@@ -89,6 +89,9 @@ from .stabilized_report import (
     build_stabilized_docx,
     write_stabilized_section,
 )
+from .intelligence_report import (
+    write_intelligence_section,
+)
 from .report_builder import (
     CombinedReportContext,
     CombinedReportProvenanceSummary,
@@ -203,4 +206,5 @@ __all__ = [
     "StabilizedReportContext",
     "build_stabilized_docx",
     "write_stabilized_section",
+    "write_intelligence_section",
 ]

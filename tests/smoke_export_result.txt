@@ -1,5 +1,5 @@
 Report built: E:\pavment sam pave\build\smoke_report.docx
-Size: 302161 bytes
+Size: 311070 bytes
 Has Material Calculation section: True
 Material standard wt: 1256.54 g
 Material target  wt: 1256.54 g

@@ -171,6 +171,41 @@ class StructuralPanel(QWidget):
         self.res_card.setVisible(False)
         bl.addWidget(self.res_card)
 
+        # ----- Engineering Health Check card -----
+        self.health_card = Card()
+        hl = QVBoxLayout(self.health_card)
+        hl.setContentsMargins(20, 16, 20, 16); hl.setSpacing(8)
+        
+        self.lbl_health_title = QLabel("<b>Engineering Health Check</b>")
+        self.lbl_health_title.setStyleSheet("font-size:11pt; color:#1f3a68;")
+        hl.addWidget(self.lbl_health_title)
+        
+        score_layout = QHBoxLayout()
+        self.lbl_health_score = QLabel("Engineering Screening Score: —")
+        self.lbl_health_score.setStyleSheet("font-size:14pt; font-weight:bold; color:#1f3a68;")
+        self.lbl_risk_level = QLabel("Risk Level: —")
+        self.lbl_risk_level.setStyleSheet("font-size:10pt; font-weight:bold; padding:4px 8px; border-radius:4px;")
+        score_layout.addWidget(self.lbl_health_score)
+        score_layout.addWidget(self.lbl_risk_level)
+        score_layout.addStretch(1)
+        hl.addLayout(score_layout)
+        
+        self.lbl_health_warnings = QLabel("")
+        self.lbl_health_warnings.setWordWrap(True)
+        self.lbl_health_warnings.setStyleSheet(
+            "background:#fbeee6; color:#a04000; padding:8px 12px; "
+            "border:1px solid #f5cba7; border-radius:4px; font-size:9.5pt;")
+        hl.addWidget(self.lbl_health_warnings)
+        
+        self.lbl_health_notes = QLabel("")
+        self.lbl_health_notes.setWordWrap(True)
+        self.lbl_health_notes.setStyleSheet(
+            "color:#5d6d7e; font-size:9.5pt; font-style:italic;")
+        hl.addWidget(self.lbl_health_notes)
+        
+        self.health_card.setVisible(False)
+        bl.addWidget(self.health_card)
+
         bl.addStretch(1)
         scroll.setWidget(body)
         lay.addWidget(scroll, stretch=1)
@@ -182,6 +217,7 @@ class StructuralPanel(QWidget):
         self._last_iitpave_workflow = None
         self.btn_save.setEnabled(False)
         self.res_card.setVisible(False)
+        self.health_card.setVisible(False)
         if pid is None:
             self.proj_banner.setText("⚠ No project loaded.")
             self.btn_export.setEnabled(False)
@@ -288,6 +324,36 @@ class StructuralPanel(QWidget):
                 f"Rutting check: {r.rutting_check}<br>"
                 f"<i>{r.notes}</i>"
             )
+
+        if hasattr(r, 'intelligence') and r.intelligence:
+            intel = r.intelligence
+            self.health_card.setVisible(True)
+            self.lbl_health_score.setText(f"Engineering Screening Score: {intel.health_score:.0f}/100")
+            self.lbl_risk_level.setText(intel.risk_level)
+            
+            # Style risk level badge
+            if "high" in intel.risk_level.lower():
+                self.lbl_risk_level.setStyleSheet("background:#f9d5d5; color:#a81f1f; font-size:10pt; font-weight:bold; padding:4px 8px; border-radius:4px;")
+            elif "review" in intel.risk_level.lower():
+                self.lbl_risk_level.setStyleSheet("background:#fef5d1; color:#a67c00; font-size:10pt; font-weight:bold; padding:4px 8px; border-radius:4px;")
+            elif "acceptable" in intel.risk_level.lower():
+                self.lbl_risk_level.setStyleSheet("background:#d4efdf; color:#196f3d; font-size:10pt; font-weight:bold; padding:4px 8px; border-radius:4px;")
+            else:
+                self.lbl_risk_level.setStyleSheet("background:#d4e6f1; color:#1a5276; font-size:10pt; font-weight:bold; padding:4px 8px; border-radius:4px;")
+                
+            if intel.warnings:
+                self.lbl_health_warnings.setVisible(True)
+                self.lbl_health_warnings.setText("<br>".join(f"⚠️ {w}" for w in intel.warnings))
+            else:
+                self.lbl_health_warnings.setVisible(False)
+                
+            if intel.review_notes:
+                self.lbl_health_notes.setVisible(True)
+                self.lbl_health_notes.setText("<br>".join(f"• {n}" for n in intel.review_notes))
+            else:
+                self.lbl_health_notes.setVisible(False)
+        else:
+            self.health_card.setVisible(False)
 
     def _on_save(self) -> None:
         if self._project_id is None or self._last_result is None:

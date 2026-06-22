@@ -953,6 +953,34 @@ def build_combined_report(
                                  include_header=True)
         included.append("Stabilized Pavement Design (CTB/CTS)")
 
+    # ---- Engineering Intelligence Checker (Phase M) ----
+    has_intel_struct = structural and hasattr(structural, "intelligence") and structural.intelligence
+    has_intel_stab = stabilized and hasattr(stabilized, "intelligence") and stabilized.intelligence
+    
+    if has_intel_struct or has_intel_stab:
+        doc.add_page_break()
+        add_heading(doc, "ENGINEERING INTELLIGENCE REVIEW", level=1, align=WD_ALIGN_PARAGRAPH.CENTER)
+        add_p(
+            doc,
+            "Design screening checks based on static layer modular ratios, thicknesses, "
+            "and material tier compatibility.",
+            size=10, align=WD_ALIGN_PARAGRAPH.CENTER, italic=True
+        )
+        
+        first = True
+        if has_intel_struct:
+            from .intelligence_report import write_intelligence_section
+            write_intelligence_section(doc, structural.intelligence, section_title="Flexible Pavement Design", include_header=True)
+            first = False
+            included.append("Engineering Intelligence Review (Flexible)")
+            
+        if has_intel_stab:
+            if not first:
+                add_p(doc, "") # blank spacing paragraph
+            from .intelligence_report import write_intelligence_section
+            write_intelligence_section(doc, stabilized.intelligence, section_title="Stabilized Pavement Design", include_header=True)
+            included.append("Engineering Intelligence Review (Stabilized)")
+
     # ---- Maintenance sections ----
     maint_ctx = _maint_ctx(ctx)
     if overlay:

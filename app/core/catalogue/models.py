@@ -1,7 +1,8 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Tuple
+from typing import Tuple, Optional
 from app.core.structural_design import PavementLayer
+from app.core.intelligence_checker import IntelligenceResult
 
 @dataclass(frozen=True, slots=True)
 class CatalogueEntry:
@@ -22,3 +23,4 @@ class CatalogueLookupResult:
     warnings: Tuple[str, ...]
     is_out_of_range: bool
     is_boundary: bool
+    intelligence: Optional[IntelligenceResult] = None
