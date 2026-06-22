@@ -11,6 +11,7 @@ ROOT = Path(SPECPATH).parent
 datas = [
     (str(ROOT / "app" / "ui" / "style.qss"), "app/ui"),
     (str(ROOT / "app" / "reports" / "templates"), "app/reports/templates"),
+    (str(ROOT / "database" / "irc37_catalogue.json"), "database"),
     (str(ROOT / "app" / "data"), "app/data"),
 ]
 

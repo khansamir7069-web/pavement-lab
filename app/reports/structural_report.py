@@ -137,7 +137,12 @@ def write_structural_section(
     rows.append(["TOTAL", "—", f"{result.total_pavement_thickness_mm:.0f}", "—"])
     add_table(doc, ["Layer", "Material", "Thickness (mm)",
                     "Typical Modulus (MPa)"], rows)
+    # Dynamic catalogue reference note
+    from app.core.catalogue.engine import lookup_catalogue_design
+    cat_res = lookup_catalogue_design(result.design_msa, inp.subgrade_cbr_pct)
+    
     add_note(doc,
+        f"Design selected from {cat_res.source_reference}. "
         "Layer composition is a catalogue-style suggestion. Cross-check "
         "against IRC:37-2018 Plates 1–4 and run a mechanistic analysis "
         "(IITPAVE) for the fatigue and rutting limits in cl. 6.4 before "

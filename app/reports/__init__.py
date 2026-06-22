@@ -84,6 +84,11 @@ from .rehab_report import (
     build_rehab_docx,
     write_rehab_section,
 )
+from .stabilized_report import (
+    StabilizedReportContext,
+    build_stabilized_docx,
+    write_stabilized_section,
+)
 from .report_builder import (
     CombinedReportContext,
     CombinedReportProvenanceSummary,
@@ -195,4 +200,7 @@ __all__ = [
     "RehabReportContext",
     "build_rehab_docx",
     "write_rehab_section",
+    "StabilizedReportContext",
+    "build_stabilized_docx",
+    "write_stabilized_section",
 ]

@@ -31,6 +31,7 @@ from .schema import (
     Project,
     ReportRevisionSnapshotRecord,
     StructuralDesign,
+    StabilizedDesign,
     TrafficAnalysis,
 )
 
@@ -183,6 +184,16 @@ _CHILD_SECTIONS: dict[str, tuple[type, tuple[str, ...], tuple[str, ...]]] = {
             "results_json",
             "pci_score",
             "condition_category",
+            "notes",
+            "computed_at",
+        ),
+        ("inputs_json", "results_json"),
+    ),
+    "stabilized_designs": (
+        StabilizedDesign,
+        (
+            "inputs_json",
+            "results_json",
             "notes",
             "computed_at",
         ),

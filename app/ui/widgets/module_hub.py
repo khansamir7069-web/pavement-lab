@@ -27,6 +27,8 @@ MODULES: tuple[tuple[str, str, str], ...] = (
         "IRC:37 — CVPD, VDF, LDF → design MSA & AASHTO ESAL"),
     ("structural",    "Flexible Pavement Structural Design",
         "IRC:37 — traffic, CBR, layer thickness"),
+    ("stabilized",    "Stabilized Pavement (CTB/CTS)",
+        "IRC:37 — Cement-Treated Base and Sub-base design wizard and comparison"),
     ("maintenance",   "Maintenance / Rehabilitation",
         "Overlay / BBD · Cold mix · Slurry · Micro surfacing"),
     ("material_qty",  "Material Quantity Calculator",

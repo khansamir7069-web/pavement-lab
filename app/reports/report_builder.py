@@ -50,6 +50,8 @@ from app.core import (
     RuttingCheck,
     StructuralInput,
     TrafficInput,
+    StabilizedInput,
+    StabilizedResult,
     compute_cold_mix,
     compute_condition_survey,
     compute_material_quantity,
@@ -57,6 +59,7 @@ from app.core import (
     compute_overlay,
     compute_structural_design,
     compute_traffic_analysis,
+    compute_stabilized_design,
 )
 from app.core.import_summary import ImportedMixResult
 from app.db.project_exchange import PROJECT_EXPORT_FORMAT, PROJECT_EXPORT_FORMAT_VERSION
@@ -95,6 +98,10 @@ from .report_revision import ReportRevisionSnapshot
 from .structural_report import (
     StructuralReportContext,
     write_structural_section,
+)
+from .stabilized_report import (
+    StabilizedReportContext,
+    write_stabilized_section,
 )
 from .iitpave_schema_history import (
     IITPaveSchemaHistoryReportContext,
@@ -315,6 +322,31 @@ def _rehydrate_structural(sd_row, mech_row=None) -> "StructuralResult | None":
     return result
 
 
+def _rehydrate_stabilized(row, has_mechanistic: bool = False) -> "StabilizedResult | None":
+    if not row or not row.inputs_json:
+        return None
+    try:
+        d = json.loads(row.inputs_json)
+    except json.JSONDecodeError:
+        return None
+    inp = StabilizedInput(
+        ctb_thickness_mm=float(d.get("ctb_thickness_mm", 100.0)),
+        ctb_modulus_mpa=float(d.get("ctb_modulus_mpa", 5000.0)),
+        ctb_ucs_mpa=float(d.get("ctb_ucs_mpa", 4.0)),
+        ctb_poisson=float(d.get("ctb_poisson", 0.25)),
+        cts_class=d.get("cts_class", "C1.5/2.0"),
+        cts_thickness_mm=float(d.get("cts_thickness_mm", 100.0)),
+        cts_modulus_mpa=float(d.get("cts_modulus_mpa", 3000.0)),
+        cts_poisson=float(d.get("cts_poisson", 0.25)),
+        gsb_thickness_mm=float(d.get("gsb_thickness_mm", 150.0)),
+        bituminous_thickness_mm=float(d.get("bituminous_thickness_mm", 100.0)),
+        flexible_design_msa=float(d.get("flexible_design_msa", 10.0)),
+        flexible_subgrade_cbr=float(d.get("flexible_subgrade_cbr", 5.0)),
+        notes=d.get("notes", "") or "",
+    )
+    return compute_stabilized_design(inp, has_mechanistic_validation=has_mechanistic)
+
+
 def _rehydrate_overlay(row) -> "OverlayResult | None":
     if not row or not row.inputs_json:
         return None
@@ -480,6 +512,20 @@ def _maint_ctx(ctx: CombinedReportContext) -> MaintenanceReportContext:
 
 def _struct_ctx(ctx: CombinedReportContext) -> StructuralReportContext:
     return StructuralReportContext(
+        project_title=ctx.project_title,
+        work_name=ctx.work_name,
+        work_order_no=ctx.work_order_no,
+        work_order_date=ctx.work_order_date,
+        client=ctx.client,
+        agency=ctx.agency,
+        submitted_by=ctx.submitted_by,
+        lab_name=ctx.lab_name,
+        report_date=ctx.report_date,
+    )
+
+
+def _stab_ctx(ctx: CombinedReportContext) -> StabilizedReportContext:
+    return StabilizedReportContext(
         project_title=ctx.project_title,
         work_name=ctx.work_name,
         work_order_no=ctx.work_order_no,
@@ -671,14 +717,19 @@ def build_combined_report(
     ov_row = db.latest_maintenance_design(project_id, "overlay")
     cm_row = db.latest_maintenance_design(project_id, "cold_mix")
     ms_row = db.latest_maintenance_design(project_id, "micro_surfacing")
+    stab_row = db.latest_stabilized_design(project_id)
+
+    mech_val = db.latest_mechanistic_validation(project_id)
+    has_mechanistic = mech_val is not None and not mech_val.refused
 
     structural = _rehydrate_structural(
         sd_row,
-        db.latest_mechanistic_validation(project_id),
+        mech_val,
     )
     overlay = _rehydrate_overlay(ov_row)
     cold_mix = _rehydrate_cold_mix(cm_row)
     micro = _rehydrate_micro(ms_row)
+    stabilized = _rehydrate_stabilized(stab_row, has_mechanistic=has_mechanistic)
     mq_row = db.latest_material_quantity(project_id)
     material_qty = _rehydrate_material_qty(mq_row)
     tr_row = db.latest_traffic_analysis(project_id)
@@ -697,7 +748,7 @@ def build_combined_report(
     )
 
     have_mix = mix_result_live is not None
-    have_any = any((have_mix, traffic, structural, overlay, cold_mix, micro,
+    have_any = any((have_mix, traffic, structural, stabilized, overlay, cold_mix, micro,
                     material_qty, condition, schema_history_review.items))
     if not have_any:
         raise ValueError(
@@ -894,6 +945,13 @@ def build_combined_report(
         write_structural_section(doc, _struct_ctx(ctx), structural,
                                  include_header=True)
         included.append("Flexible Pavement Structural Design")
+
+    # ---- Stabilized ----
+    if stabilized:
+        doc.add_page_break()
+        write_stabilized_section(doc, _stab_ctx(ctx), stabilized,
+                                 include_header=True)
+        included.append("Stabilized Pavement Design (CTB/CTS)")
 
     # ---- Maintenance sections ----
     maint_ctx = _maint_ctx(ctx)

@@ -136,56 +136,32 @@ def compute_subgrade_mr(cbr_pct: float) -> float:
 
 
 def suggest_composition(msa: float, cbr_pct: float) -> Tuple[PavementLayer, ...]:
-    """Skeleton catalogue suggestion.
-
-    PLACEHOLDER — does not reproduce any specific IRC:37 design Plate; just
-    returns a sensible-shape layer stack so the UI / report has something to
-    show.  Engineer MUST cross-check against the relevant IRC:37 catalogue
-    or run an IITPAVE analysis before adoption.
-    """
-    # Bituminous Concrete — fixed wearing course
-    bc = PavementLayer("Bituminous Concrete (BC)", 40,
-                       material="BC", modulus_mpa=3000)
-
-    # Dense Bituminous Macadam — scales with traffic
-    if   msa <  5:  dbm_t =  50
-    elif msa < 10:  dbm_t =  70
-    elif msa < 20:  dbm_t = 100
-    elif msa < 30:  dbm_t = 130
-    elif msa < 50:  dbm_t = 160
-    else:           dbm_t = 190
-    dbm = PavementLayer("Dense Bituminous Macadam (DBM)", dbm_t,
-                        material="DBM-II", modulus_mpa=3000)
-
-    # Wet Mix Macadam base — standard 250 mm
-    wmm = PavementLayer("Wet Mix Macadam (WMM)", 250,
-                        material="WMM", modulus_mpa=450)
-
-    # Granular Sub-base — inversely with subgrade strength
-    if   cbr_pct <  3:  gsb_t = 400
-    elif cbr_pct <  5:  gsb_t = 300
-    elif cbr_pct <  8:  gsb_t = 230
-    elif cbr_pct < 12:  gsb_t = 200
-    else:               gsb_t = 150
-    gsb = PavementLayer("Granular Sub-base (GSB)", gsb_t,
-                        material="GSB", modulus_mpa=200)
-
-    return (bc, dbm, wmm, gsb)
+    """Expose catalogue lookup composition (retains signature compatibility)."""
+    from .catalogue.engine import lookup_catalogue_design
+    return lookup_catalogue_design(msa, cbr_pct).composition
 
 
 def compute_structural_design(inp: StructuralInput) -> StructuralResult:
+    from .catalogue.engine import lookup_catalogue_design
     msa, gf = compute_design_traffic(inp)
     mr = (inp.resilient_modulus_mpa
           if inp.resilient_modulus_mpa
           else compute_subgrade_mr(inp.subgrade_cbr_pct))
-    comp = suggest_composition(msa, inp.subgrade_cbr_pct)
+    
+    # Catalogue lookup
+    cat_res = lookup_catalogue_design(msa, inp.subgrade_cbr_pct)
+    comp = cat_res.composition
     total_t = sum(l.thickness_mm for l in comp)
     
-    notes = ("Layer composition is a catalogue-style suggestion (Phase 4 skeleton). "
-             "Cross-check against IRC:37 Plates and run mechanistic analysis "
-             "before adoption for design.")
+    notes_list = []
+    notes_list.append(cat_res.source_reference)
+    for warn in cat_res.warnings:
+        notes_list.append(warn)
+        
     if inp.subgrade_cbr_pct > 20.0:
-        notes += " WARNING: Subgrade CBR is exceptionally high (> 20%). Verify field moisture conditions and subgrade compaction."
+        notes_list.append("WARNING: Subgrade CBR is exceptionally high (> 20%). Verify field moisture conditions and subgrade compaction.")
+        
+    notes = " | ".join(notes_list)
 
     return StructuralResult(
         inputs=inp,
@@ -198,4 +174,5 @@ def compute_structural_design(inp: StructuralInput) -> StructuralResult:
         rutting_check=MECHANISTIC_WORKFLOW_NOT_RUN,
         notes=notes,
     )
+
 

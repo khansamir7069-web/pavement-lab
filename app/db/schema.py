@@ -81,6 +81,9 @@ class Project(Base):
     condition_surveys: Mapped[list["ConditionSurvey"]] = relationship(
         back_populates="project", cascade="all, delete-orphan"
     )
+    stabilized_designs: Mapped[list["StabilizedDesign"]] = relationship(
+        back_populates="project", cascade="all, delete-orphan"
+    )
     mechanistic_validations: Mapped[list["MechanisticValidation"]] = relationship(
         back_populates="project", cascade="all, delete-orphan"
     )
@@ -332,6 +335,20 @@ class ReportRevisionSnapshotRecord(Base):
     generated_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
     project: Mapped[Project] = relationship(back_populates="report_revision_snapshots")
+
+
+class StabilizedDesign(Base):
+    """Phase L module: CTB/CTS stabilized pavement design inputs + comparison."""
+    __tablename__ = "stabilized_designs"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False)
+
+    inputs_json: Mapped[Optional[str]] = mapped_column(JSON)
+    results_json: Mapped[Optional[str]] = mapped_column(JSON)
+    notes: Mapped[Optional[str]] = mapped_column(Text)
+    computed_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+    project: Mapped[Project] = relationship(back_populates="stabilized_designs")
 
 
 class User(Base):

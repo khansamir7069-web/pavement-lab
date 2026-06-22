@@ -1,0 +1,12 @@
+Database connected successfully
+Project created with ID: 208
+Calculation succeeded. Savings: 150 mm
+Saved stabilized design ID: 4
+Loaded saved stabilized design successfully
+Standalone report written: smoke_stabilized_standalone.docx (37705 bytes)
+Standalone report has header: True
+Standalone report has disclaimer: True
+Combined report written: smoke_stabilized_combined.docx (38612 bytes)
+Combined report contains stabilized header: True
+Combined report contains validation mode: False
+STABILIZED SMOKE OK

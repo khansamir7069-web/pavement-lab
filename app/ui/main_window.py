@@ -55,6 +55,7 @@ from app.reports import (
     ReportContext,
     StructuralReportContext,
     TrafficReportContext,
+    StabilizedReportContext,
     build_combined_report,
     build_condition_docx,
     IITPaveSchemaReportContext,
@@ -62,6 +63,7 @@ from app.reports import (
     build_material_quantity_docx,
     build_mix_design_docx,
     build_structural_docx,
+    build_stabilized_docx,
     build_traffic_docx,
     build_iitpave_schema_history_review,
     build_iitpave_schema_history_selection_audit_review,
@@ -85,6 +87,7 @@ from .widgets.project_form import ProjectForm
 from .widgets.results_panel import ResultsPanel
 from .widgets.spec_admin import SpecAdminPanel
 from .widgets.structural_panel import StructuralPanel
+from .widgets.stabilized_panel import StabilizedPanel
 
 
 log = logging.getLogger(__name__)
@@ -97,6 +100,7 @@ SIDEBAR_ITEMS = [
     ("Mix Design Inputs", "inputs"),
     ("Traffic / MSA", "traffic"),
     ("Structural Design", "structural"),
+    ("Stabilized Pavement", "stabilized"),
     ("Maintenance", "maintenance"),
     ("Material Quantity", "material_qty"),
     ("Condition Survey", "condition"),
@@ -225,6 +229,7 @@ class MainWindow(QMainWindow):
         self.results = ResultsPanel()
         self.spec_admin = SpecAdminPanel()
         self.structural = StructuralPanel(self.db)
+        self.stabilized = StabilizedPanel(self.db)
         self.maintenance = MaintenancePanel(self.db)
         self.material_qty = MaterialQuantityPanel(self.db)
         self.traffic = TrafficPanel(self.db)
@@ -239,6 +244,7 @@ class MainWindow(QMainWindow):
             (self.results,      "hub"),
             (self.spec_admin,   "hub"),
             (self.structural,   "hub"),
+            (self.stabilized,   "hub"),
             (self.maintenance,  "hub"),
             (self.material_qty, "hub"),
             (self.traffic,      "hub"),
@@ -259,6 +265,7 @@ class MainWindow(QMainWindow):
                 "results": self.results,
                 "specs_admin": self.spec_admin,
                 "structural": self.structural,
+                "stabilized": self.stabilized,
                 "maintenance": self.maintenance,
                 "material_qty": self.material_qty,
                 "traffic": self.traffic,
@@ -282,6 +289,8 @@ class MainWindow(QMainWindow):
         self.hub.module_selected.connect(self._on_module_selected)
         self.structural.saved.connect(self._on_structural_saved)
         self.structural.export_requested.connect(self._on_export_structural)
+        self.stabilized.saved.connect(self._on_stabilized_saved)
+        self.stabilized.export_requested.connect(self._on_export_stabilized)
         self.maintenance.saved.connect(self._on_maintenance_saved)
         self.maintenance.export_requested.connect(self._on_export_maintenance)
         self.material_qty.saved.connect(self._on_material_qty_saved)
@@ -386,6 +395,17 @@ class MainWindow(QMainWindow):
                 self._current_project_id, p.work_name if p else ""
             )
             self._show_page("structural")
+        elif key == "stabilized":
+            if self._current_project_id is None:
+                QMessageBox.warning(self, "No project",
+                                    "Please save a project first.")
+                self._show_page("project")
+                return
+            p = self.db.get_project(self._current_project_id)
+            self.stabilized.set_project(
+                self._current_project_id, p.work_name if p else ""
+            )
+            self._show_page("stabilized")
         elif key == "maintenance":
             if self._current_project_id is None:
                 QMessageBox.warning(self, "No project",
@@ -440,6 +460,13 @@ class MainWindow(QMainWindow):
     def _on_structural_saved(self, project_id: int) -> None:
         self.statusBar().showMessage(
             f"Structural design saved for project #{project_id}."
+        )
+        self._refresh_hub()
+        self.dashboard.refresh()
+
+    def _on_stabilized_saved(self, project_id: int) -> None:
+        self.statusBar().showMessage(
+            f"Stabilized pavement design saved for project #{project_id}."
         )
         self._refresh_hub()
         self.dashboard.refresh()
@@ -516,6 +543,37 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(f"Structural Word saved: {out}")
         except Exception as e:
             log.exception("Structural export failed")
+            QMessageBox.critical(self, "Export failed", str(e))
+
+    def _on_export_stabilized(self, project_id: int) -> None:
+        from app.reports.report_builder import _rehydrate_stabilized
+        stab_row = self.db.latest_stabilized_design(project_id)
+        mech_val = self.db.latest_mechanistic_validation(project_id)
+        has_mechanistic = mech_val is not None and not mech_val.refused
+        result = _rehydrate_stabilized(
+            stab_row,
+            has_mechanistic=has_mechanistic,
+        )
+        if result is None:
+            QMessageBox.information(
+                self, "Nothing to export",
+                "Save a stabilized design first.")
+            return
+        default = REPORTS_DIR / f"Stabilized_{project_id}.docx"
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save Stabilized Word Report",
+            str(default), "Word Document (*.docx)"
+        )
+        if not path:
+            return
+        try:
+            meta = self._project_meta_for_report(project_id)
+            ctx = StabilizedReportContext(**meta)
+            out = build_stabilized_docx(Path(path), ctx, result)
+            QMessageBox.information(self, "Report exported", f"Saved to:\n{out}")
+            self.statusBar().showMessage(f"Stabilized Word saved: {out}")
+        except Exception as e:
+            log.exception("Stabilized export failed")
             QMessageBox.critical(self, "Export failed", str(e))
 
     def _on_export_maintenance(self, project_id: int) -> None:

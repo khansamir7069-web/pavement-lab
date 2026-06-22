@@ -12,4 +12,7 @@ This file tracks the status of the validation checkpoints for the SamPave softwa
 | 4 | Engineering Test Case Validation | Completed | 2026-06-22 | Successfully ran 10 pavement design scenarios via validation script. Identified lack of native core engine bounds validation. |
 | 5 | Formula and Code Audit | Completed | 2026-06-22 | Audited structural, traffic, subgrade, and mechanistic equations against IRC:37-2018. Math is exact. Identified Major input validation gap. |
 | 6 | Safe Input Validation Patch | Completed | 2026-06-22 | Added validation guards in core classes, verified via new unit tests. Re-ran engineering scenarios and confirmed negative input rejection. |
-| 7 | Desktop Build Validation | Not Started | - | Rebuild and verify EXE. |
+| 7 | Desktop Build Validation | Completed | 2026-06-22 | Standalone PyInstaller EXE successfully built and verified; reports generated and validated for 3 scenarios. |
+| 8 | Phase K: IRC:37 Catalogue Engine | Completed | 2026-06-22 | Implemented complete professional IRC:37 catalogue engine with lookup/loader database. |
+| 9 | Phase L: Stabilized Pavement Module | Completed | 2026-06-22 | Implemented professional CTB/CTS design wizard, side-by-side comparison, warnings, and persistence. |
+

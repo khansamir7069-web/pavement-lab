@@ -35,6 +35,9 @@ datas = [
     # _docx_common helpers that reference TEMPLATES_DIR don't fail).
     (str(ROOT / "app" / "reports" / "templates"),
         "app/reports/templates"),
+    # Catalogue database
+    (str(ROOT / "database" / "irc37_catalogue.json"),
+        "database"),
     # Engineering data:
     #   - code_registry.json (CodeRef source-tag registry)
     #   - mix_specs.json     (compliance + mix-type catalogue)

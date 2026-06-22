@@ -8,6 +8,7 @@ from .schema import (
     Project,
     Report,
     StructuralDesign,
+    StabilizedDesign,
     User,
 )
 from .repository import Database, get_db
@@ -34,6 +35,7 @@ __all__ = [
     "MixDesign",
     "Report",
     "StructuralDesign",
+    "StabilizedDesign",
     "User",
     "AuditLog",
     "Database",

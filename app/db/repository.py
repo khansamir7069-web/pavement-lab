@@ -36,6 +36,7 @@ from .schema import (
     Report,
     ReportRevisionSnapshotRecord,
     StructuralDesign,
+    StabilizedDesign,
     TrafficAnalysis,
     User,
 )
@@ -391,6 +392,30 @@ class Database:
                 select(StructuralDesign)
                 .where(StructuralDesign.project_id == project_id)
                 .order_by(StructuralDesign.computed_at.desc())
+                .limit(1)
+            )
+            return s.scalars(stmt).first()
+
+    # ---- Stabilized designs ---------------------------------------------
+    def save_stabilized_design(self, *, project_id: int, result) -> StabilizedDesign:
+        inputs_dict = _to_json_safe(result.inputs)
+        result_dict = _to_json_safe(result)
+        with self.session() as s:
+            sd = StabilizedDesign(
+                project_id=project_id,
+                inputs_json=json.dumps(inputs_dict),
+                results_json=json.dumps(result_dict),
+                notes=result.inputs.notes,
+            )
+            s.add(sd); s.flush()
+            return sd
+
+    def latest_stabilized_design(self, project_id: int) -> StabilizedDesign | None:
+        with self.session() as s:
+            stmt = (
+                select(StabilizedDesign)
+                .where(StabilizedDesign.project_id == project_id)
+                .order_by(StabilizedDesign.computed_at.desc())
                 .limit(1)
             )
             return s.scalars(stmt).first()

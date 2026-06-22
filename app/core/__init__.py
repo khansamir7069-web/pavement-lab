@@ -153,6 +153,13 @@ from .structural_design import (
     suggest_composition,
     compute_structural_design,
 )
+from .catalogue import (
+    CatalogueEntry,
+    CatalogueLookupResult,
+    load_irc37_catalogue,
+    load_catalogue_metadata,
+    lookup_catalogue_design,
+)
 from .maintenance import (
     OverlayInput,
     OverlayResult,
@@ -166,6 +173,11 @@ from .maintenance import (
     MicroSurfacingInput,
     MicroSurfacingResult,
     compute_micro_surfacing,
+)
+from .stabilized_design import (
+    StabilizedInput,
+    StabilizedResult,
+    compute_stabilized_design,
 )
 from .condition_survey import (
     DISTRESS_TYPES,
@@ -429,6 +441,9 @@ __all__ = [
     "MicroSurfacingInput",
     "MicroSurfacingResult",
     "compute_micro_surfacing",
+    "StabilizedInput",
+    "StabilizedResult",
+    "compute_stabilized_design",
     "CodeRef",
     "CodeRecord",
     "CODE_REGISTRY",
@@ -698,4 +713,9 @@ __all__ = [
     "REFUSED_PLACEHOLDER_MECH",
     "REFUSED_MISSING_STRAIN",
     "REFUSED_MISSING_E_BC",
+    "CatalogueEntry",
+    "CatalogueLookupResult",
+    "load_irc37_catalogue",
+    "load_catalogue_metadata",
+    "lookup_catalogue_design",
 ]
