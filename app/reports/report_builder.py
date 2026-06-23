@@ -71,6 +71,7 @@ from ._docx_common import (
     add_p,
     add_signature_block,
     new_portrait_document,
+    add_table,
 )
 from .maintenance_report import (
     MaintenanceReportContext,
@@ -774,29 +775,43 @@ def build_combined_report(
 
     doc = new_portrait_document()
 
-    # ---- Title page ----
-    add_heading(doc, "COMBINED PAVEMENT-DESIGN REPORT",
-                level=1, align=WD_ALIGN_PARAGRAPH.CENTER)
-    if ctx.project_title:
-        add_p(doc, ctx.project_title, bold=True, size=12,
-              align=WD_ALIGN_PARAGRAPH.CENTER)
-    add_p(doc, f"{ctx.lab_name}  •  Report Date: {ctx.report_date}",
-          size=10, align=WD_ALIGN_PARAGRAPH.CENTER)
-
-    add_heading(doc, "Project Information", level=2)
+    # ---- Standalone Cover Page ----
+    add_p(doc, "\n" * 2)
+    add_heading(doc, "SAMPAVE ENGINEERING SUITE", level=1, align=WD_ALIGN_PARAGRAPH.CENTER)
+    add_heading(doc, "PROFESSIONAL PAVEMENT DESIGN REPORT", level=2, align=WD_ALIGN_PARAGRAPH.CENTER)
+    add_p(doc, "\n" * 1)
+    
+    # Project Info
+    add_p(doc, "Name of Work:", bold=True, size=11, align=WD_ALIGN_PARAGRAPH.CENTER)
+    add_p(doc, p.work_name or "(Untitled Project)", bold=True, size=15, align=WD_ALIGN_PARAGRAPH.CENTER)
+    add_p(doc, "\n" * 1)
+    
+    consultant_name = p.consultant or "Pavement Engineering Consultants"
+    report_id_str = p.report_id or f"RP-{project_id}-{datetime.now().strftime('%Y%m%d')}"
+    
     add_kv_table(doc, (
-        ("Name of Work",     ctx.work_name),
+        ("Client Name",      ctx.client),
+        ("Consulting Firm",  consultant_name),
+        ("Report Identifier", report_id_str),
         ("Work Order No.",   ctx.work_order_no),
         ("Work Order Date",  ctx.work_order_date),
-        ("Client",           ctx.client),
-        ("Agency",           ctx.agency),
-        ("Submitted By",     ctx.submitted_by),
-        ("Binder Grade",     ctx.binder_grade),
+        ("Submission Date",  ctx.report_date),
     ))
+    
+    add_p(doc, "\n" * 2)
+    add_p(doc, "========================================================================", size=10, align=WD_ALIGN_PARAGRAPH.CENTER)
+    add_p(doc, "IMPORTANT NOTICE: Submission package is decision-support documentation. "
+               "Final field execution requires review and sign-off by a qualified pavement engineer.",
+          bold=True, size=10, align=WD_ALIGN_PARAGRAPH.CENTER)
+    add_p(doc, "========================================================================", size=10, align=WD_ALIGN_PARAGRAPH.CENTER)
+    
+    doc.add_page_break()
 
     # Contents preview
     add_heading(doc, "Contents of this Report", level=2)
-    toc_rows: list[list[str]] = []
+    toc_rows: list[list[str]] = [
+        ["Executive Summary", "Project summary and engineering disclaimer"]
+    ]
     if have_mix:
         toc_rows.append(["Bituminous Mix Design",
                          "MoRTH Section 500 / IRC:111 / Marshall Mix Design"])
@@ -805,6 +820,8 @@ def build_combined_report(
     if structural:
         toc_rows.append(["Flexible Pavement Structural Design",
                          "IRC:37-2018"])
+    if stabilized:
+        toc_rows.append(["Stabilized Pavement Design (CTB/CTS)", "IRC:37-2018 / mechanistic analysis"])
     if overlay:
         toc_rows.append(["Overlay Design (BBD)", "IRC:81-1997"])
     if cold_mix:
@@ -848,9 +865,17 @@ def build_combined_report(
             "Rehabilitation Recommendations",
             "IRC:82-1982 / IRC:81-1997 / IRC:115 / IRC:SP:81 / IRC:SP:101",
         ])
+        
+    toc_rows.append(["Assumptions Sheet", "Poisson's ratios, moduli, and growth presets"])
+    toc_rows.append(["Limitations of the Report", "Engineering screening disclaimers"])
+    toc_rows.append(["Engineer Review Checklist", "Checklist verification list"])
+    toc_rows.append(["Engineering Sign-Off and Seal", "Reviewer signatures"])
 
     from ._docx_common import add_table
     add_table(doc, ["Section", "Governing Reference"], toc_rows)
+    
+    doc.add_page_break()
+    write_executive_summary_section(doc, p, structural, stabilized, mech_val)
 
     included: list[str] = []
     schema_history_summary = None
@@ -1084,7 +1109,26 @@ def build_combined_report(
             report_path=out_path,
         )
 
-    add_signature_block(doc)
+    # ---- Assumptions ----
+    doc.add_page_break()
+    write_assumptions_section(doc, p, structural, stabilized, tr_row)
+    included.append("Assumptions Sheet")
+
+    # ---- Limitations ----
+    doc.add_page_break()
+    write_limitations_section(doc)
+    included.append("Limitations Sheet")
+
+    # ---- Checklist ----
+    doc.add_page_break()
+    write_engineer_checklist_section(doc, p)
+    included.append("Engineer Review Checklist")
+
+    # ---- Signature ----
+    doc.add_page_break()
+    write_signature_placeholders(doc)
+    included.append("Signature & Seal Placeholders")
+
     doc.save(out_path)
     if schema_history_summary is not None and hasattr(
         db, "save_iitpave_schema_history_selection_audit"
@@ -1103,3 +1147,118 @@ def build_combined_report(
             ),
         )
     return out_path, included
+
+
+def write_executive_summary_section(doc, p, structural, stabilized, mech_val) -> None:
+    add_heading(doc, "EXECUTIVE SUMMARY", level=1)
+    
+    summary_para = (
+        f"This professional pavement design report presents the mechanistic and empirical design parameters "
+        f"established for the work '{p.work_name or 'Untitled work'}'. The evaluation incorporates design traffic analysis, "
+        f"subgrade pavement layer profiling, and mechanistic safety screening. "
+    )
+    if structural:
+        summary_para += (
+            f"A conventional flexible pavement design has been developed for a design traffic of {structural.design_msa or 0:.2f} MSA, "
+            f"resulting in a total pavement thickness of {structural.total_pavement_thickness_mm or 0:.0f} mm. "
+        )
+    if stabilized:
+        summary_para += "A cement-stabilized design (CTB/CTS) has been analyzed as an alternative to achieve structural thickness optimization. "
+    
+    if mech_val:
+        summary_para += f"Mechanistic verification has been successfully conducted using IITPAVE under Mechanistic Verified Mode."
+    else:
+        summary_para += f"The design calculations have been prepared under Decision Support Mode guidelines."
+        
+    add_p(doc, summary_para)
+    
+    # Disclaimer
+    add_p(
+        doc,
+        "Disclaimer: This Engineering Intelligence Review and report is a decision-support screening tool. "
+        "Final design acceptance for construction field execution remains subject to independent review "
+        "and sign-off by a qualified pavement engineer.",
+        italic=True,
+        size=9
+    )
+
+
+def write_assumptions_section(doc, p, structural, stabilized, ta_row=None) -> None:
+    add_heading(doc, "ASSUMPTIONS SHEET", level=1)
+    add_p(doc, "The design is based on the following standard engineering assumptions and presets:")
+    
+    # Let's extract design traffic if available
+    growth = "7.5"
+    if ta_row and ta_row.inputs_json:
+        try:
+            ta_inp = json.loads(ta_row.inputs_json)
+            growth = str(ta_inp.get("growth_rate_pct", "7.5"))
+        except Exception:
+            pass
+            
+    rows = [
+        ["Poisson's Ratio (Bituminous Layer)", "0.35"],
+        ["Poisson's Ratio (Granular Base/Sub-base)", "0.35"],
+        ["Poisson's Ratio (Subgrade Soil)", "0.35"],
+        ["Poisson's Ratio (Cement Treated Base - CTB)", "0.25"],
+        ["Poisson's Ratio (Cement Treated Sub-grade/Sub-base - CTS)", "0.25"],
+        ["Design Traffic Growth Rate", f"{growth} %"],
+        ["Subgrade Soil Behavior Modulus Relation", "IRC:37-2018 Formulae (MR = 17.6 * CBR^0.64 for CBR > 5)"]
+    ]
+    add_table(doc, ["Parameter Description", "Assumed / Preset Value"], rows)
+
+
+def write_limitations_section(doc) -> None:
+    add_heading(doc, "LIMITATIONS OF THE REPORT", level=1)
+    add_p(
+        doc,
+        "1. This pavement design report is prepared as a decision-support guide for the client and the "
+        "design engineers. It does not constitute official government approval or official regulatory stamp."
+    )
+    add_p(
+        doc,
+        "2. The layer thicknesses, material properties, and traffic projections are calculated using subgrade soils "
+        "and traffic data inputs supplied by the client. Any variations in site conditions, soil properties, "
+        "or traffic loads must be verified in the field and the design updated accordingly."
+    )
+    add_p(
+        doc,
+        "3. Final execution of the pavement construction works requires a detailed site-specific verification, "
+        "structural validation, and formal sign-off/approval by a qualified pavement engineer."
+    )
+
+
+def write_engineer_checklist_section(doc, p) -> None:
+    add_heading(doc, "ENGINEER REVIEW CHECKLIST", level=1)
+    add_p(doc, "Review checklists completed by the certifying pavement engineer:")
+    
+    checklist_dict = {}
+    if p.checklist_json:
+        try:
+            checklist_dict = json.loads(p.checklist_json)
+        except Exception:
+            pass
+            
+    rows = [
+        ["Review Workflow Status", p.review_status or "Draft"],
+        ["Design Review Checklist Completed", "YES" if checklist_dict.get("design_review") else "NO"],
+        ["Input Verification Completed", "YES" if checklist_dict.get("input_verification") else "NO"],
+        ["Traffic Assumptions Verified", "YES" if checklist_dict.get("traffic_verification") else "NO"],
+        ["Material Assumptions Verified", "YES" if checklist_dict.get("material_verification") else "NO"],
+        ["IITPAVE Verification Status", checklist_dict.get("iitpave_verification") or "Not Verified"],
+        ["Final Reviewer Notes / Remarks", checklist_dict.get("reviewer_notes") or "No remarks added."]
+    ]
+    add_table(doc, ["Verification Checklist Item", "Status / Remarks"], rows)
+
+
+def write_signature_placeholders(doc) -> None:
+    add_heading(doc, "ENGINEERING SIGN-OFF AND SEAL", level=2)
+    add_p(doc, "")
+    add_p(doc, "")
+    add_p(doc, "  ___________________________________________", bold=True)
+    add_p(doc, "  Signature of Reviewing Engineer")
+    add_p(doc, "")
+    add_p(doc, "  Date: _____________________________________")
+    add_p(doc, "")
+    add_p(doc, "  Seal / Registration No: ____________________")
+

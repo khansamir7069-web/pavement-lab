@@ -35,6 +35,8 @@ MODULES: tuple[tuple[str, str, str], ...] = (
         "Quantities for a road stretch (area × thickness × density)"),
     ("condition",     "Pavement Condition Survey",
         "Distress recording · PCI score · rehab placeholders (ASTM D6433)"),
+    ("submission_center", "Submission Center",
+        "Consultancy checklists, design locking & package delivery"),
     ("specs_admin",   "Specification Database",
         "View / edit mix-type limits, gradations and binder rules"),
     ("reports",       "Reports",

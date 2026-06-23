@@ -61,6 +61,16 @@ class Project(Base):
     binder_grade: Mapped[Optional[str]] = mapped_column(String(40), default=None)        # VG-30, CRMB, …
     binder_properties_json: Mapped[Optional[str]] = mapped_column(Text, default=None)    # {"penetration":65, …}
     status: Mapped[str] = mapped_column(String(20), default="draft")
+    locked: Mapped[bool] = mapped_column(Boolean, default=False)
+    locked_at: Mapped[Optional[str]] = mapped_column(Text, default=None)
+    lock_snapshot_json: Mapped[Optional[str]] = mapped_column(Text, default=None)
+    review_status: Mapped[str] = mapped_column(String(40), default="Draft")
+    checklist_json: Mapped[Optional[str]] = mapped_column(Text, default=None)
+    consultant: Mapped[Optional[str]] = mapped_column(Text, default=None)
+    report_id: Mapped[Optional[str]] = mapped_column(Text, default=None)
+    revisions_json: Mapped[Optional[str]] = mapped_column(Text, default=None)
+    parent_project_id: Mapped[Optional[int]] = mapped_column(Integer, default=None)
+    revision_number: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
 

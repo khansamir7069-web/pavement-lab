@@ -97,6 +97,12 @@ def _project_config_payload(
     }
 
 
+def _check_not_locked(session: Session, project_id: int) -> None:
+    p = session.get(Project, project_id)
+    if p and p.locked:
+        raise ValueError("Cannot modify a locked project.")
+
+
 class Database:
     """Thin façade. Owns the engine + sessionmaker."""
 
@@ -130,6 +136,26 @@ class Database:
                 conn.execute(text("ALTER TABLE projects ADD COLUMN binder_grade VARCHAR(40)"))
             if "binder_properties_json" not in cols:
                 conn.execute(text("ALTER TABLE projects ADD COLUMN binder_properties_json TEXT"))
+            if "locked" not in cols:
+                conn.execute(text("ALTER TABLE projects ADD COLUMN locked BOOLEAN DEFAULT 0"))
+            if "locked_at" not in cols:
+                conn.execute(text("ALTER TABLE projects ADD COLUMN locked_at TEXT"))
+            if "lock_snapshot_json" not in cols:
+                conn.execute(text("ALTER TABLE projects ADD COLUMN lock_snapshot_json TEXT"))
+            if "review_status" not in cols:
+                conn.execute(text("ALTER TABLE projects ADD COLUMN review_status VARCHAR(40) DEFAULT 'Draft'"))
+            if "checklist_json" not in cols:
+                conn.execute(text("ALTER TABLE projects ADD COLUMN checklist_json TEXT"))
+            if "consultant" not in cols:
+                conn.execute(text("ALTER TABLE projects ADD COLUMN consultant TEXT"))
+            if "report_id" not in cols:
+                conn.execute(text("ALTER TABLE projects ADD COLUMN report_id TEXT"))
+            if "revisions_json" not in cols:
+                conn.execute(text("ALTER TABLE projects ADD COLUMN revisions_json TEXT"))
+            if "parent_project_id" not in cols:
+                conn.execute(text("ALTER TABLE projects ADD COLUMN parent_project_id INTEGER"))
+            if "revision_number" not in cols:
+                conn.execute(text("ALTER TABLE projects ADD COLUMN revision_number INTEGER DEFAULT 0"))
 
     @contextmanager
     def session(self) -> Session:
@@ -193,6 +219,10 @@ class Database:
             p = s.get(Project, project_id)
             if not p:
                 return None
+            if p.locked:
+                allowed = {"locked", "locked_at", "lock_snapshot_json", "review_status", "checklist_json", "revisions_json", "consultant", "report_id"}
+                if not set(kwargs.keys()).issubset(allowed):
+                    raise ValueError("Cannot modify a locked project.")
             for k, v in kwargs.items():
                 setattr(p, k, v)
             s.flush()
@@ -220,6 +250,7 @@ class Database:
     def set_module_status(self, project_id: int, module: str, status: str) -> None:
         """Update modules_json: {module_key: 'complete' | 'in_progress' | 'empty'}."""
         with self.session() as s:
+            _check_not_locked(s, project_id)
             p = s.get(Project, project_id)
             if not p:
                 return
@@ -260,6 +291,7 @@ class Database:
             source=source,
         )
         with self.session() as s:
+            _check_not_locked(s, project_id)
             p = s.get(Project, project_id)
             if not p:
                 return None
@@ -332,6 +364,7 @@ class Database:
         result: MixDesignResult,
     ) -> MixDesign:
         with self.session() as s:
+            _check_not_locked(s, project_id)
             md = MixDesign(
                 project_id=project_id,
                 gradation_json=json.dumps(_to_json_safe(inputs_payload.get("gradation"))),
@@ -373,6 +406,7 @@ class Database:
         inputs_dict = _to_json_safe(result.inputs)
         comp_dict = _to_json_safe(result.composition)
         with self.session() as s:
+            _check_not_locked(s, project_id)
             sd = StructuralDesign(
                 project_id=project_id,
                 inputs_json=json.dumps(inputs_dict),
@@ -401,6 +435,7 @@ class Database:
         inputs_dict = _to_json_safe(result.inputs)
         result_dict = _to_json_safe(result)
         with self.session() as s:
+            _check_not_locked(s, project_id)
             sd = StabilizedDesign(
                 project_id=project_id,
                 inputs_json=json.dumps(inputs_dict),
@@ -436,6 +471,7 @@ class Database:
         if isinstance(result_dict, dict):
             result_dict.pop("inputs", None)
         with self.session() as s:
+            _check_not_locked(s, project_id)
             row = MaintenanceDesign(
                 project_id=project_id,
                 sub_module=sub_module,
@@ -480,6 +516,7 @@ class Database:
         if isinstance(result_dict, dict):
             result_dict.pop("inputs", None)
         with self.session() as s:
+            _check_not_locked(s, project_id)
             row = MaterialQuantityDesign(
                 project_id=project_id,
                 inputs_json=json.dumps(inputs_dict),
@@ -512,6 +549,7 @@ class Database:
         if isinstance(result_dict, dict):
             result_dict.pop("inputs", None)
         with self.session() as s:
+            _check_not_locked(s, project_id)
             row = TrafficAnalysis(
                 project_id=project_id,
                 inputs_json=json.dumps(inputs_dict),
@@ -543,6 +581,7 @@ class Database:
         if isinstance(result_dict, dict):
             result_dict.pop("inputs", None)
         with self.session() as s:
+            _check_not_locked(s, project_id)
             row = ConditionSurvey(
                 project_id=project_id,
                 inputs_json=json.dumps(inputs_dict),
@@ -578,6 +617,7 @@ class Database:
         summary_dict = _to_json_safe(summary)
         inputs_dict = _to_json_safe(inputs) if inputs is not None else None
         with self.session() as s:
+            _check_not_locked(s, project_id)
             row = MechanisticValidation(
                 project_id=project_id,
                 inputs_json=json.dumps(inputs_dict) if inputs_dict is not None else None,
@@ -843,6 +883,357 @@ class Database:
         with self.session() as s:
             s.add(AuditLog(user_id=user_id, action=action, object_type=object_type,
                            object_id=object_id, detail=detail))
+
+    def duplicate_project(self, project_id: int) -> int:
+        """Create a complete unlocked clone of the project, renaming it to 'Copy of ...'."""
+        with self.session() as s:
+            p = s.get(Project, project_id)
+            if not p:
+                raise ValueError("Project not found")
+            
+            cloned = Project(
+                client_id=p.client_id,
+                work_name=f"Copy of {p.work_name}",
+                work_order_no=p.work_order_no,
+                work_order_date=p.work_order_date,
+                agency=p.agency,
+                submitted_by=p.submitted_by,
+                mix_type=p.mix_type,
+                modules_json=p.modules_json,
+                config_json=p.config_json,
+                binder_grade=p.binder_grade,
+                binder_properties_json=p.binder_properties_json,
+                status=p.status,
+                locked=False,
+                locked_at=None,
+                lock_snapshot_json=None,
+                review_status="Draft",
+                checklist_json=None,
+                consultant=p.consultant,
+                report_id=p.report_id,
+                revisions_json=None,
+                parent_project_id=None,
+                revision_number=0
+            )
+            s.add(cloned)
+            s.flush()
+            
+            self._clone_child_records(s, p, cloned)
+            return cloned.id
+
+    def create_project_revision(self, parent_id: int, engineer_note: str) -> int:
+        """Create an unlocked project revision from a locked parent project."""
+        with self.session() as s:
+            parent = s.get(Project, parent_id)
+            if not parent:
+                raise ValueError("Parent project not found")
+                
+            try:
+                revisions = json.loads(parent.revisions_json) if parent.revisions_json else []
+            except Exception:
+                revisions = []
+                
+            next_rev_num = int(parent.revision_number or 0) + 1
+            rev_entry = {
+                "revision_number": next_rev_num,
+                "date_time": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+                "engineer_note": engineer_note,
+                "changed_parameters": []
+            }
+            revisions.append(rev_entry)
+            
+            cloned = Project(
+                client_id=parent.client_id,
+                work_name=parent.work_name,
+                work_order_no=parent.work_order_no,
+                work_order_date=parent.work_order_date,
+                agency=parent.agency,
+                submitted_by=parent.submitted_by,
+                mix_type=parent.mix_type,
+                modules_json=parent.modules_json,
+                config_json=parent.config_json,
+                binder_grade=parent.binder_grade,
+                binder_properties_json=parent.binder_properties_json,
+                status=parent.status,
+                locked=False,
+                locked_at=None,
+                lock_snapshot_json=None,
+                review_status="Draft",
+                checklist_json=parent.checklist_json,
+                consultant=parent.consultant,
+                report_id=parent.report_id,
+                revisions_json=json.dumps(revisions),
+                parent_project_id=parent.id,
+                revision_number=next_rev_num
+            )
+            s.add(cloned)
+            s.flush()
+            
+            self._clone_child_records(s, parent, cloned)
+            return cloned.id
+
+    def _clone_child_records(self, session: Session, source: Project, target: Project) -> None:
+        for md in source.mix_designs:
+            session.add(MixDesign(
+                project_id=target.id, gradation_json=md.gradation_json, spgr_json=md.spgr_json,
+                gmb_json=md.gmb_json, gmm_json=md.gmm_json, stability_flow_json=md.stability_flow_json,
+                materials_json=md.materials_json, gsb=md.gsb, gb=md.gb, obc_pct=md.obc_pct,
+                gmb_at_obc=md.gmb_at_obc, gmm_at_obc=md.gmm_at_obc, stability_at_obc_kn=md.stability_at_obc_kn,
+                flow_at_obc_mm=md.flow_at_obc_mm, vma_at_obc_pct=md.vma_at_obc_pct, vfb_at_obc_pct=md.vfb_at_obc_pct,
+                air_voids_at_obc_pct=md.air_voids_at_obc_pct, compliance_pass=md.compliance_pass,
+                summary_json=md.summary_json, computed_at=md.computed_at
+            ))
+        for sd in source.structural_designs:
+            session.add(StructuralDesign(
+                project_id=target.id, inputs_json=sd.inputs_json, design_msa=sd.design_msa,
+                growth_factor=sd.growth_factor, subgrade_mr_mpa=sd.subgrade_mr_mpa,
+                total_pavement_thickness_mm=sd.total_pavement_thickness_mm,
+                composition_json=sd.composition_json, notes=sd.notes, computed_at=sd.computed_at
+            ))
+        for std in source.stabilized_designs:
+            session.add(StabilizedDesign(
+                project_id=target.id, inputs_json=std.inputs_json, results_json=std.results_json,
+                notes=std.notes, computed_at=std.computed_at
+            ))
+        for ta in source.traffic_analyses:
+            session.add(TrafficAnalysis(
+                project_id=target.id, inputs_json=ta.inputs_json, results_json=ta.results_json,
+                design_msa=ta.design_msa, aashto_esal=ta.aashto_esal, traffic_category=ta.traffic_category,
+                notes=ta.notes, computed_at=ta.computed_at
+            ))
+        for md in source.maintenance_designs:
+            session.add(MaintenanceDesign(
+                project_id=target.id, sub_module=md.sub_module, inputs_json=md.inputs_json,
+                results_json=md.results_json, notes=md.notes, computed_at=md.computed_at
+            ))
+        for mq in source.material_quantities:
+            session.add(MaterialQuantityDesign(
+                project_id=target.id, inputs_json=mq.inputs_json, results_json=mq.results_json,
+                total_layer_tonnage_t=mq.total_layer_tonnage_t, total_binder_tonnage_t=mq.total_binder_tonnage_t,
+                notes=mq.notes, computed_at=mq.computed_at
+            ))
+        for cs in source.condition_surveys:
+            session.add(ConditionSurvey(
+                project_id=target.id, inputs_json=cs.inputs_json, results_json=cs.results_json,
+                pci_score=cs.pci_score, condition_category=cs.condition_category,
+                notes=cs.notes, computed_at=cs.computed_at
+            ))
+        for mv in source.mechanistic_validations:
+            session.add(MechanisticValidation(
+                project_id=target.id, inputs_json=mv.inputs_json, summary_json=mv.summary_json,
+                refused=mv.refused, is_placeholder=mv.is_placeholder, fatigue_verdict=mv.fatigue_verdict,
+                rutting_verdict=mv.rutting_verdict, fatigue_life_msa=mv.fatigue_life_msa,
+                rutting_life_msa=mv.rutting_life_msa, design_msa=mv.design_msa,
+                refused_reason=mv.refused_reason, notes=mv.notes, computed_at=mv.computed_at
+            ))
+        for diag in source.iitpave_schema_diagnostics:
+            session.add(IITPaveSchemaDiagnosticsHistory(
+                project_id=target.id, fixture_dir=diag.fixture_dir, report_path=diag.report_path,
+                workflow_status=diag.workflow_status, manifest_status=diag.manifest_status,
+                parser_audit_ready=diag.parser_audit_ready, engineering_calculations_allowed=diag.engineering_calculations_allowed,
+                total_fixture_count=diag.total_fixture_count, verified_fixture_count=diag.verified_fixture_count,
+                mapped_schema_count=diag.mapped_schema_count, blocked_schema_count=diag.blocked_schema_count,
+                unknown_schema_count=diag.unknown_schema_count, unsupported_schema_count=diag.unsupported_schema_count,
+                summary_json=diag.summary_json, operator_message=diag.operator_message, generated_at=diag.generated_at
+            ))
+        for audit in source.iitpave_schema_history_selection_audits:
+            session.add(IITPaveSchemaHistorySelectionAudit(
+                project_id=target.id, report_path=audit.report_path, decision_status=audit.decision_status,
+                available_history_ids_json=audit.available_history_ids_json, selected_history_ids_json=audit.selected_history_ids_json,
+                skipped_unknown_history_ids_json=audit.skipped_unknown_history_ids_json, included_history_count=audit.included_history_count,
+                diagnostic_row_count=audit.diagnostic_row_count, engineering_calculations_allowed=audit.engineering_calculations_allowed,
+                summary_json=audit.summary_json, generated_at=audit.generated_at
+            ))
+        for snap in source.report_revision_snapshots:
+            session.add(ReportRevisionSnapshotRecord(
+                project_id=target.id, report_identifier=snap.report_identifier, revision_label=snap.revision_label,
+                report_path=snap.report_path, provenance_fingerprint=snap.provenance_fingerprint,
+                validation_warnings_json=snap.validation_warnings_json, schema_history_selection_json=snap.schema_history_selection_json,
+                export_provenance_json=snap.export_provenance_json, summary_json=snap.summary_json,
+                engineering_calculations_allowed=snap.engineering_calculations_allowed, generated_at=snap.generated_at
+            ))
+
+    def lock_project(self, project_id: int) -> None:
+        from app.db.project_exchange import export_project
+        with self.session() as s:
+            p = s.get(Project, project_id)
+            if not p:
+                raise ValueError("Project not found")
+            if p.locked:
+                return
+            snapshot = export_project(self, project_id)
+            p.locked = True
+            p.locked_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+            p.lock_snapshot_json = json.dumps(snapshot)
+            
+            if p.parent_project_id:
+                parent = s.get(Project, p.parent_project_id)
+                if parent:
+                    diff = compute_project_diff(parent, p)
+                    try:
+                        revisions = json.loads(p.revisions_json) if p.revisions_json else []
+                        if revisions:
+                            for rev in revisions:
+                                if rev.get("revision_number") == p.revision_number:
+                                    rev["changed_parameters"] = diff
+                                    break
+                            p.revisions_json = json.dumps(revisions)
+                    except Exception:
+                        pass
+            s.flush()
+
+    def unlock_project(self, project_id: int) -> None:
+        with self.session() as s:
+            p = s.get(Project, project_id)
+            if not p:
+                raise ValueError("Project not found")
+            p.locked = False
+            p.locked_at = None
+            p.lock_snapshot_json = None
+            s.flush()
+
+    def save_project_checklist(self, project_id: int, review_status: str, checklist: dict) -> None:
+        with self.session() as s:
+            p = s.get(Project, project_id)
+            if not p:
+                raise ValueError("Project not found")
+            p.review_status = review_status
+            p.checklist_json = json.dumps(checklist)
+            s.flush()
+
+
+def compute_project_diff(parent: Project, child: Project) -> list[dict]:
+    """Compare traffic, structural, and stabilized design parameters between two project instances."""
+    diff = []
+    
+    # 1. Structural Design Inputs
+    parent_sd_input = {}
+    if parent.structural_designs:
+        sd = sorted(parent.structural_designs, key=lambda x: x.computed_at, reverse=True)[0]
+        if sd.inputs_json:
+            try:
+                parent_sd_input = json.loads(sd.inputs_json)
+            except Exception:
+                pass
+                
+    child_sd_input = {}
+    if child.structural_designs:
+        sd = sorted(child.structural_designs, key=lambda x: x.computed_at, reverse=True)[0]
+        if sd.inputs_json:
+            try:
+                child_sd_input = json.loads(sd.inputs_json)
+            except Exception:
+                pass
+                
+    keys_sd = {
+        "design_life_years": "Design Life (years)",
+        "initial_cvpd": "Initial Traffic (CVPD)",
+        "growth_rate_pct": "Traffic Growth Rate (%)",
+        "subgrade_cbr_pct": "Subgrade CBR (%)",
+        "vdf": "Vehicle Damage Factor (VDF)",
+        "ldf": "Lane Distribution Factor (LDF)",
+    }
+    for k, label in keys_sd.items():
+        v1 = parent_sd_input.get(k)
+        v2 = child_sd_input.get(k)
+        if v1 != v2:
+            diff.append({
+                "param": label,
+                "old": str(v1) if v1 is not None else "N/A",
+                "new": str(v2) if v2 is not None else "N/A"
+            })
+            
+    # 2. Structural Layer Thicknesses
+    parent_composition = []
+    if parent.structural_designs:
+        sd = sorted(parent.structural_designs, key=lambda x: x.computed_at, reverse=True)[0]
+        if sd.composition_json:
+            try:
+                val = sd.composition_json
+                if isinstance(val, str):
+                    val = json.loads(val)
+                if isinstance(val, dict):
+                    parent_composition = val.get("layers", [])
+                elif isinstance(val, list):
+                    parent_composition = val
+            except Exception:
+                pass
+                
+    child_composition = []
+    if child.structural_designs:
+        sd = sorted(child.structural_designs, key=lambda x: x.computed_at, reverse=True)[0]
+        if sd.composition_json:
+            try:
+                val = sd.composition_json
+                if isinstance(val, str):
+                    val = json.loads(val)
+                if isinstance(val, dict):
+                    child_composition = val.get("layers", [])
+                elif isinstance(val, list):
+                    child_composition = val
+            except Exception:
+                pass
+                
+    for i in range(max(len(parent_composition), len(child_composition))):
+        p_layer = parent_composition[i] if i < len(parent_composition) else {}
+        c_layer = child_composition[i] if i < len(child_composition) else {}
+        name = p_layer.get("name") or c_layer.get("name") or f"Layer {i+1}"
+        
+        p_thick = p_layer.get("thickness_mm")
+        c_thick = c_layer.get("thickness_mm")
+        if p_thick != c_thick:
+            diff.append({
+                "param": f"{name} Thickness (mm)",
+                "old": str(p_thick) if p_thick is not None else "N/A",
+                "new": str(c_thick) if c_thick is not None else "N/A"
+            })
+            
+        p_mod = p_layer.get("modulus_mpa")
+        c_mod = c_layer.get("modulus_mpa")
+        if p_mod != c_mod:
+            diff.append({
+                "param": f"{name} Modulus (MPa)",
+                "old": str(p_mod) if p_mod is not None else "N/A",
+                "new": str(c_mod) if c_mod is not None else "N/A"
+            })
+            
+    # 3. Stabilized Design Inputs
+    parent_stab_input = {}
+    if parent.stabilized_designs:
+        std = sorted(parent.stabilized_designs, key=lambda x: x.computed_at, reverse=True)[0]
+        if std.inputs_json:
+            try:
+                # Stabilized result is serialized. The inputs are inside `inputs_json` as a serialized dict
+                parent_stab_input = json.loads(std.inputs_json)
+            except Exception:
+                pass
+                
+    child_stab_input = {}
+    if child.stabilized_designs:
+        std = sorted(child.stabilized_designs, key=lambda x: x.computed_at, reverse=True)[0]
+        if std.inputs_json:
+            try:
+                child_stab_input = json.loads(std.inputs_json)
+            except Exception:
+                pass
+                
+    keys_stab = {
+        "ctb_thickness_mm": "CTB Thickness (mm)",
+        "ctb_modulus_mpa": "CTB Modulus (MPa)",
+        "cts_thickness_mm": "CTS Thickness (mm)",
+        "cts_modulus_mpa": "CTS Modulus (MPa)",
+    }
+    for k, label in keys_stab.items():
+        v1 = parent_stab_input.get(k)
+        v2 = child_stab_input.get(k)
+        if v1 != v2:
+            diff.append({
+                "param": label,
+                "old": str(v1) if v1 is not None else "N/A",
+                "new": str(v2) if v2 is not None else "N/A"
+            })
+            
+    return diff
 
 
 _singleton: Database | None = None

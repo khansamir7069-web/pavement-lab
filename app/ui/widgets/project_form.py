@@ -139,6 +139,9 @@ class ProjectForm(QWidget):
         self.btn_binder_props.clicked.connect(self._edit_binder_props)
         binder_row.addWidget(self.btn_binder_props)
 
+        self.consultant = QLineEdit()
+        self.report_id = QLineEdit()
+
         form.addRow("Mix Type (optional)", self.mix_type)
         form.addRow("Binder Grade (optional)", binder_row)
         form.addRow("Name of Work", self.work_name)
@@ -147,6 +150,8 @@ class ProjectForm(QWidget):
         form.addRow("Client", self.client)
         form.addRow("Agency", self.agency)
         form.addRow("Submitted By", self.submitted_by)
+        form.addRow("Consultant", self.consultant)
+        form.addRow("Report ID", self.report_id)
 
         body_layout.addWidget(card)
         body_layout.addStretch(1)
@@ -162,8 +167,11 @@ class ProjectForm(QWidget):
             self.client.clear()
             self.agency.clear()
             self.submitted_by.clear()
+            self.consultant.clear()
+            self.report_id.clear()
             self.mix_type.setCurrentIndex(0)
             self.binder_grade.setCurrentIndex(0)
+            self._set_enabled(True)
             return
         p = self.db.get_project(project_id)
         if not p:
@@ -173,6 +181,8 @@ class ProjectForm(QWidget):
         self.work_order_date.setText(p.work_order_date or "")
         self.agency.setText(p.agency or "")
         self.submitted_by.setText(p.submitted_by or "")
+        self.consultant.setText(p.consultant or "")
+        self.report_id.setText(p.report_id or "")
         idx = self.mix_type.findData(p.mix_type)
         self.mix_type.setCurrentIndex(idx if idx >= 0 else 0)
         bidx = self.binder_grade.findData(p.binder_grade)
@@ -184,6 +194,21 @@ class ProjectForm(QWidget):
                 self._binder_props = {}
         if p.client:
             self.client.setText(p.client.name)
+        self._set_enabled(not p.locked)
+
+    def _set_enabled(self, enabled: bool) -> None:
+        self.work_name.setEnabled(enabled)
+        self.work_order_no.setEnabled(enabled)
+        self.work_order_date.setEnabled(enabled)
+        self.client.setEnabled(enabled)
+        self.agency.setEnabled(enabled)
+        self.submitted_by.setEnabled(enabled)
+        self.consultant.setEnabled(enabled)
+        self.report_id.setEnabled(enabled)
+        self.mix_type.setEnabled(enabled)
+        self.binder_grade.setEnabled(enabled)
+        self.btn_binder_props.setEnabled(enabled)
+        self.btn_save.setEnabled(enabled)
 
     def _edit_binder_props(self) -> None:
         code = self.binder_grade.currentData()
@@ -201,6 +226,8 @@ class ProjectForm(QWidget):
             "work_order_date": self.work_order_date.text().strip(),
             "agency": self.agency.text().strip(),
             "submitted_by": self.submitted_by.text().strip(),
+            "consultant": self.consultant.text().strip(),
+            "report_id": self.report_id.text().strip(),
             "mix_type": self.mix_type.currentData() or "",   # "" = not selected
             "binder_grade": self.binder_grade.currentData() or None,
             "binder_properties_json": (

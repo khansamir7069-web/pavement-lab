@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QFormLayout,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QListWidget,
     QListWidgetItem,
     QMainWindow,
@@ -89,6 +90,7 @@ from .widgets.spec_admin import SpecAdminPanel
 from .widgets.structural_panel import StructuralPanel
 from .widgets.stabilized_panel import StabilizedPanel
 from .widgets.iitpave_status_panel import IITPaveStatusPanel
+from .widgets.submission_center_panel import SubmissionCenterPanel
 
 
 log = logging.getLogger(__name__)
@@ -106,6 +108,7 @@ SIDEBAR_ITEMS = [
     ("Material Quantity", "material_qty"),
     ("Condition Survey", "condition"),
     ("Results & Report", "results"),
+    ("Submission Center", "submission_center"),
     ("Specifications", "specs_admin"),
     ("IITPAVE Integration", "iitpave_status"),
 ]
@@ -237,6 +240,7 @@ class MainWindow(QMainWindow):
         self.traffic = TrafficPanel(self.db)
         self.condition = ConditionSurveyPanel(self.db)
         self.iitpave_status = IITPaveStatusPanel(self.db)
+        self.submission_center = SubmissionCenterPanel(self.db)
 
         # Wire Back buttons on every page's header.
         # Lambdas must swallow Qt's clicked(bool) positional arg with *_.
@@ -253,6 +257,7 @@ class MainWindow(QMainWindow):
             (self.traffic,      "hub"),
             (self.condition,    "hub"),
             (self.iitpave_status, "hub"),
+            (self.submission_center, "hub"),
         )
         for w, target in back_routes:
             hdr = w.findChild(PageHeader)
@@ -275,6 +280,7 @@ class MainWindow(QMainWindow):
                 "traffic": self.traffic,
                 "condition": self.condition,
                 "iitpave_status": self.iitpave_status,
+                "submission_center": self.submission_center,
             }[key]
             idx = self.stack.addWidget(widget)
             self._page_keys[key] = idx
@@ -309,6 +315,8 @@ class MainWindow(QMainWindow):
         self.results.generate_word.connect(self._on_export_word)
         self.results.generate_pdf.connect(self._on_export_pdf)
         self.iitpave_status.config_updated.connect(self._on_iitpave_config_updated)
+        self.submission_center.saved.connect(self._refresh_hub)
+        self.submission_center.project_changed.connect(self._on_open_project)
 
     def _on_iitpave_config_updated(self) -> None:
         self.statusBar().showMessage("IITPAVE configuration updated.")
@@ -323,6 +331,45 @@ class MainWindow(QMainWindow):
             if it.data(Qt.UserRole) == key:
                 self.nav.setCurrentRow(i)
 
+        # Dynamic design lock UI traversal
+        widget = self.stack.currentWidget()
+        if widget:
+            p = self.db.get_project(self._current_project_id) if self._current_project_id else None
+            locked = p.locked if p else False
+
+            # Display lock status in statusBar
+            if locked:
+                self.statusBar().showMessage(f"Project #{self._current_project_id} is LOCKED (Read-Only Mode).")
+            else:
+                if self._current_project_id:
+                    self.statusBar().showMessage(f"Project #{self._current_project_id} loaded.")
+                else:
+                    self.statusBar().showMessage("Ready")
+
+            # submission_center manages its own lock UI state in set_project()
+            if widget != self.submission_center:
+                # Disable buttons
+                for btn in widget.findChildren(QPushButton):
+                    txt = btn.text().lower()
+                    if any(x in txt for x in ["save", "compute", "calculate", "reset", "clear", "delete", "import"]):
+                        if "zip" not in txt and "export" not in txt and "unlock" not in txt:
+                            btn.setEnabled(not locked)
+                
+                # Disable input fields
+                for box in widget.findChildren(QLineEdit):
+                    box.setEnabled(not locked)
+                for box in widget.findChildren(QComboBox):
+                    box.setEnabled(not locked)
+                for box in widget.findChildren(QTextEdit):
+                    box.setEnabled(not locked)
+                from PySide6.QtWidgets import QSpinBox, QDoubleSpinBox, QCheckBox
+                for box in widget.findChildren(QSpinBox):
+                    box.setEnabled(not locked)
+                for box in widget.findChildren(QDoubleSpinBox):
+                    box.setEnabled(not locked)
+                for box in widget.findChildren(QCheckBox):
+                    box.setEnabled(not locked)
+
     def _on_nav_changed(self, row: int) -> None:
         if row < 0:
             return
@@ -332,6 +379,8 @@ class MainWindow(QMainWindow):
             self.dashboard.refresh()
         elif key == "iitpave_status":
             self.iitpave_status.refresh()
+        elif key == "submission_center":
+            self.submission_center.set_project(self._current_project_id)
 
     # ----- project lifecycle -----
 
@@ -461,6 +510,14 @@ class MainWindow(QMainWindow):
                 self._current_project_id, p.work_name if p else ""
             )
             self._show_page("condition")
+        elif key == "submission_center":
+            if self._current_project_id is None:
+                QMessageBox.warning(self, "No project",
+                                    "Please save a project first.")
+                self._show_page("project")
+                return
+            self.submission_center.set_project(self._current_project_id)
+            self._show_page("submission_center")
         else:
             QMessageBox.information(
                 self, "Coming soon",
