@@ -73,6 +73,7 @@ hiddenimports = [
     "sqlalchemy.dialects.sqlite",
     "docx",
     "docx2pdf",
+    "openpyxl",
     "PIL",                                 # Pillow — Phase 11
     "PIL.Image",
     "PIL.JpegImagePlugin",

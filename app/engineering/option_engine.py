@@ -293,4 +293,31 @@ def generate_pavement_options(project_id: int, db) -> List[Dict[str, Any]]:
 
     options.append(opt_d)
 
+    # Phase 4 BOQ Integration
+    try:
+        from app.engineering.boq_engine import generate_boq, format_indian_currency
+        boq_res = generate_boq(project_id, db)
+        if boq_res.get("show_rupees") and boq_res.get("available"):
+            boq_opts = boq_res.get("options", {})
+            if boq_opts.get("Option A", {}).get("available"):
+                opt_a["estimated_cost_indicator"] = boq_opts["Option A"]["formatted_cost"]
+            if boq_opts.get("Option B", {}).get("available"):
+                opt_b["estimated_cost_indicator"] = boq_opts["Option B"]["formatted_cost"]
+            if boq_opts.get("Option C", {}).get("available"):
+                opt_c["estimated_cost_indicator"] = boq_opts["Option C"]["formatted_cost"]
+            if boq_opts.get("Option D", {}).get("available"):
+                opt_d["estimated_cost_indicator"] = boq_opts["Option D"]["formatted_cost"]
+                
+                # Calculate and append savings comparison
+                if boq_opts.get("Option A", {}).get("available"):
+                    cost_a = boq_opts["Option A"]["total_cost"]
+                    cost_d = boq_opts["Option D"]["total_cost"]
+                    savings = cost_a - cost_d
+                    if savings > 0 and cost_a > 0:
+                        pct = (savings / cost_a) * 100
+                        savings_str = format_indian_currency(savings)
+                        opt_d["recommendation_reason"] += f" (Est. Saving: {savings_str} / {pct:.1f}% compared to Option A - Preliminary Engineer Estimate / Consultant BOQ Estimate)"
+    except Exception:
+        pass  # Fail-safe design
+
     return options

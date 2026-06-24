@@ -327,7 +327,7 @@ def test_dpr_export_parity(db, tmp_path):
     path, included = build_combined_report(out_file, db, proj.id, ctx)
     
     assert path.exists()
-    assert "Expert Design Audit Summary" in included
+    assert "Appendix G: Expert Audit Report" in included
 
 def test_dpr_export_fail_safe_missing_audit(db, tmp_path):
     """Verify that if the audit raises an exception, the report generation still succeeds without crashing."""
@@ -381,7 +381,7 @@ def test_dpr_export_fail_safe_missing_audit(db, tmp_path):
         # Build report - should not crash, despite the audit raising an exception
         path, included = build_combined_report(out_file, db, proj.id, ctx)
         assert path.exists()
-        # "Expert Design Audit Summary" should NOT be in the included list as it failed
-        assert "Expert Design Audit Summary" not in included
+        # "Appendix G: Expert Audit Report" should NOT be in the included list as it failed
+        assert "Appendix G: Expert Audit Report" not in included
     finally:
         da.run_project_audit = original_run_audit

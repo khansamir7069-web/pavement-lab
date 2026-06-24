@@ -1,8 +1,8 @@
-"""Material Quantity Calculator — Phase 7.
+"""Material Quantity Calculator — Phase 7 & 4.
 
 One-page form: a layer table where each row is a LayerInput. Compute
 button aggregates tonnages; Save persists to MaterialQuantityDesign;
-Export Word emits the BOQ section via the Phase-6 report layer.
+Export Word/Excel emits the BOQ section.
 """
 from __future__ import annotations
 
@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
     QVBoxLayout,
     QWidget,
+    QFormLayout,
 )
 
 from app.core import (
@@ -35,6 +36,7 @@ from app.core.material_quantity import (
     DEFAULT_DENSITY,
     DEFAULT_SPRAY_RATE_KGM2,
 )
+from app.engineering.boq_engine import get_material_key, format_indian_currency, DEFAULT_RATES
 from .common import Card, PageHeader, styled_button
 
 
@@ -64,6 +66,7 @@ class MaterialQuantityPanel(QWidget):
 
     saved = Signal(int)
     export_requested = Signal(int)
+    export_excel_requested = Signal(int)
 
     def __init__(self, db, parent=None):
         super().__init__(parent)
@@ -71,6 +74,7 @@ class MaterialQuantityPanel(QWidget):
         self._project_id: int | None = None
         self._last_result: MaterialQuantityResult | None = None
         self._build()
+        self._load_rates()
         self._seed_default_rows()
 
     # ----- build -----
@@ -94,8 +98,16 @@ class MaterialQuantityPanel(QWidget):
         self.btn_export = styled_button("Export Word", "secondary")
         self.btn_export.clicked.connect(self._on_export)
         self.btn_export.setEnabled(False)
-        for b in (self.btn_export, self.btn_save, self.btn_compute,
-                  self.btn_remove, self.btn_add):
+        
+        self.btn_export_excel = styled_button("Export Excel", "secondary")
+        self.btn_export_excel.clicked.connect(self._on_export_excel)
+        self.btn_export_excel.setEnabled(False)
+
+        self.btn_toggle_rates = styled_button("Manage Rates", "secondary")
+        self.btn_toggle_rates.clicked.connect(self._toggle_rates_visible)
+
+        for b in (self.btn_toggle_rates, self.btn_export_excel, self.btn_export,
+                  self.btn_save, self.btn_compute, self.btn_remove, self.btn_add):
             self.header.add_action(b)
         lay.addWidget(self.header)
 
@@ -109,6 +121,74 @@ class MaterialQuantityPanel(QWidget):
             "background:#eaf0fa; color:#1f3a68; padding:8px 12px; "
             "border:1px solid #c9d6ec; border-radius:4px;")
         bl.addWidget(self.proj_banner)
+
+        # Project Geometry Card
+        self.geom_card = Card()
+        gl = QHBoxLayout(self.geom_card)
+        gl.setContentsMargins(16, 12, 16, 12); gl.setSpacing(12)
+        gl.addWidget(QLabel("<b>Project Geometry:</b>"))
+        
+        gl.addWidget(QLabel("Road Length (m):"))
+        self.sp_road_length = _spin(1000.0, 0, 1e6, 100, 1)
+        gl.addWidget(self.sp_road_length)
+        
+        gl.addWidget(QLabel("Carriageway Width (m):"))
+        self.sp_carriageway_width = _spin(7.0, 0, 100, 0.5, 2)
+        gl.addWidget(self.sp_carriageway_width)
+        
+        gl.addWidget(QLabel("Shoulder Width (m):"))
+        self.sp_shoulder_width = _spin(1.5, 0, 100, 0.5, 2)
+        gl.addWidget(self.sp_shoulder_width)
+        
+        self.btn_apply_geom = styled_button("Apply to Layers", "secondary")
+        self.btn_apply_geom.clicked.connect(self._apply_geometry_to_layers)
+        gl.addWidget(self.btn_apply_geom)
+        
+        bl.addWidget(self.geom_card)
+
+        # Rate Editor Card (hidden by default)
+        self.rate_card = Card()
+        rl_card = QVBoxLayout(self.rate_card)
+        rl_card.setContentsMargins(16, 12, 16, 12); rl_card.setSpacing(8)
+        
+        hdr_lbl = QLabel("<b>Rate Manager (Sample/Default Rates)</b>")
+        rl_card.addWidget(hdr_lbl)
+        
+        warn_lbl = QLabel(
+            "⚠ <b>WARNING:</b> These are sample/default rates. "
+            "You MUST update project-specific market/SOR rates before final submission."
+        )
+        warn_lbl.setStyleSheet("color: #b7791f; font-weight: bold;")
+        warn_lbl.setWordWrap(True)
+        rl_card.addWidget(warn_lbl)
+        
+        self.rate_form = QFormLayout()
+        self.rate_inputs = {}
+        materials = ["BC", "DBM", "WMM", "GSB", "Bitumen", "Cement", "Aggregate"]
+        for mat in materials:
+            row_lay = QHBoxLayout()
+            sb = _spin(0.0, 0, 1e6, 100, 2)
+            sb.setMinimumWidth(120)
+            
+            uc = QComboBox()
+            uc.addItems(["Tonne", "Cum"])
+            uc.setMinimumWidth(80)
+            
+            row_lay.addWidget(sb)
+            row_lay.addWidget(uc)
+            row_lay.addStretch(1)
+            
+            self.rate_inputs[mat] = (sb, uc)
+            self.rate_form.addRow(f"{mat} Rate (₹):", row_lay)
+            
+        rl_card.addLayout(self.rate_form)
+        
+        btn_save_rates = styled_button("Save Rates", "secondary")
+        btn_save_rates.clicked.connect(self._save_rates)
+        rl_card.addWidget(btn_save_rates)
+        
+        self.rate_card.setVisible(False)
+        bl.addWidget(self.rate_card)
 
         # Input table
         in_card = Card()
@@ -135,12 +215,13 @@ class MaterialQuantityPanel(QWidget):
         rl.addWidget(QLabel("<b>Computed BOQ</b>"))
         self.lbl_totals = QLabel("Total: —")
         self.lbl_totals.setStyleSheet(
-            "font-size:13pt; font-weight:bold; color:#1d7a3a;")
+            "font-size:11pt; font-weight:bold; color:#1d7a3a;")
         rl.addWidget(self.lbl_totals)
-        self.res_tbl = QTableWidget(
-            0, 5)
-        self.res_tbl.setHorizontalHeaderLabels(
-            ["Layer", "Area (m²)", "Layer (t)", "Binder (t)", "Reference"])
+        self.res_tbl = QTableWidget(0, 8)
+        self.res_tbl.setHorizontalHeaderLabels([
+            "Layer", "Thickness (mm)", "Volume (m³)", "Density (t/m³)", 
+            "Quantity", "Unit", "Rate", "Amount"
+        ])
         self.res_tbl.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.res_tbl.verticalHeader().setVisible(False)
         rl.addWidget(self.res_tbl)
@@ -187,6 +268,46 @@ class MaterialQuantityPanel(QWidget):
         if self.tbl.rowCount() == 0:
             self._add_row("DBM")
 
+    # ----- rate editor helpers -----
+    def _toggle_rates_visible(self) -> None:
+        self.rate_card.setVisible(not self.rate_card.isVisible())
+
+    def _load_rates(self) -> None:
+        try:
+            rates = self.db.list_material_rates()
+            for r in rates:
+                if r.material in self.rate_inputs:
+                    sb, uc = self.rate_inputs[r.material]
+                    sb.setValue(r.rate)
+                    uc.setCurrentText(r.unit)
+        except Exception as e:
+            print("Error loading rates:", e)
+
+    def _save_rates(self) -> None:
+        try:
+            for mat, (sb, uc) in self.rate_inputs.items():
+                self.db.save_material_rate(mat, uc.currentText(), sb.value())
+            QMessageBox.information(self, "Rates Saved", "Material rates saved successfully.")
+            if self._last_result:
+                self._render(self._last_result)
+        except Exception as e:
+            QMessageBox.critical(self, "Save Failed", f"Could not save rates: {str(e)}")
+
+    def _apply_geometry_to_layers(self) -> None:
+        L = self.sp_road_length.value()
+        W = self.sp_carriageway_width.value()
+        S = self.sp_shoulder_width.value()
+        for r in range(self.tbl.rowCount()):
+            combo: QComboBox = self.tbl.cellWidget(r, 0)
+            layer_type = combo.currentText()
+            material_key = get_material_key(layer_type)
+            
+            self.tbl.cellWidget(r, 1).setValue(L)
+            if material_key in ("WMM", "GSB"):
+                self.tbl.cellWidget(r, 2).setValue(W + 2 * S)
+            else:
+                self.tbl.cellWidget(r, 2).setValue(W)
+
     # ----- project handling -----
     def set_project(self, pid: int | None, name: str = "") -> None:
         self._project_id = pid
@@ -196,10 +317,12 @@ class MaterialQuantityPanel(QWidget):
         if pid is None:
             self.proj_banner.setText("⚠ No project loaded.")
             self.btn_export.setEnabled(False)
+            self.btn_export_excel.setEnabled(False)
             return
         self.proj_banner.setText(f"<b>Project #{pid}:</b> {name or '(unnamed)'}")
         row = self.db.latest_material_quantity(pid)
         self.btn_export.setEnabled(row is not None)
+        self.btn_export_excel.setEnabled(row is not None)
         if row and row.inputs_json:
             self._prefill(row.inputs_json)
 
@@ -208,6 +331,14 @@ class MaterialQuantityPanel(QWidget):
             d = json.loads(inputs_json)
         except (TypeError, json.JSONDecodeError):
             return
+            
+        if "road_length_m" in d:
+            self.sp_road_length.setValue(float(d["road_length_m"]))
+        if "carriageway_width_m" in d:
+            self.sp_carriageway_width.setValue(float(d["carriageway_width_m"]))
+        if "shoulder_width_m" in d:
+            self.sp_shoulder_width.setValue(float(d["shoulder_width_m"]))
+
         layers = d.get("layers") or []
         if not layers:
             return
@@ -244,7 +375,12 @@ class MaterialQuantityPanel(QWidget):
                 waste_pct=waste,
             ))
         return MaterialQuantityInput(
-            project_id=self._project_id, layers=tuple(layers))
+            project_id=self._project_id,
+            layers=tuple(layers),
+            road_length_m=self.sp_road_length.value(),
+            carriageway_width_m=self.sp_carriageway_width.value(),
+            shoulder_width_m=self.sp_shoulder_width.value()
+        )
 
     def _on_compute(self) -> None:
         try:
@@ -263,26 +399,85 @@ class MaterialQuantityPanel(QWidget):
 
     def _render(self, r: MaterialQuantityResult) -> None:
         self.res_card.setVisible(True)
-        self.lbl_totals.setText(
-            f"Σ Layer = {r.total_layer_tonnage_t:.2f} t   ·   "
-            f"Σ Binder = {r.total_binder_tonnage_t:.2f} t   ·   "
-            f"Area = {r.total_area_m2:.0f} m²"
-        )
+        
+        # Fetch rates from DB
+        db_rates = self.db.list_material_rates()
+        rates = {rate.material: {"rate": rate.rate, "unit": rate.unit} for rate in db_rates}
+        for k, v in DEFAULT_RATES.items():
+            if k not in rates:
+                rates[k] = v
+
         self.res_tbl.setRowCount(len(r.layers))
+        total_boq_amount = 0.0
+        
         for i, lr in enumerate(r.layers):
-            ref = lr.code_refs[0].code_id if lr.code_refs else "—"
+            layer_type = lr.inputs.layer_type
+            thick = lr.inputs.thickness_mm
+            area = lr.area_m2
+            category = lr.category
+            density = lr.inputs.density_t_m3 if lr.inputs.density_t_m3 is not None else DEFAULT_DENSITY.get(layer_type, 2.20)
+            
+            material_key = get_material_key(layer_type)
+            vol = area * (thick / 1000.0) if category != "sprayed_coat" else 0.0
+
+            # Calculate Quantity and Rate
+            if category == "sprayed_coat":
+                qty = lr.binder_tonnage_t
+                unit = "Tonne"
+                r_info = rates.get("Bitumen", DEFAULT_RATES["Bitumen"])
+                rate = r_info.get("rate", 0.0)
+                amount = qty * rate
+                vol_str, dens_str, thick_str = "—", "—", "—"
+            elif layer_type.upper() in ("CTB", "CTS") or material_key == "STABILIZED":
+                qty = lr.layer_tonnage_t
+                unit = "Tonne"
+                cement_pct = 4.5 if layer_type.upper() == "CTB" else 3.0
+                cement_t = qty * cement_pct / 100.0
+                agg_t = qty - cement_t
+                c_rate = rates.get("Cement", {}).get("rate", DEFAULT_RATES["Cement"]["rate"])
+                agg_rate = rates.get("Aggregate", {}).get("rate", DEFAULT_RATES["Aggregate"]["rate"])
+                amount = (cement_t * c_rate) + (agg_t * agg_rate)
+                rate = amount / qty if qty > 0 else agg_rate
+                unit = "Tonne"
+                vol_str = f"{vol:.1f}"
+                dens_str = f"{density:.2f}"
+                thick_str = f"{thick:.0f}"
+            else:
+                qty = lr.layer_tonnage_t
+                r_info = rates.get(material_key, DEFAULT_RATES.get(material_key, {}))
+                unit = r_info.get("unit", "Tonne")
+                rate = r_info.get("rate", 0.0)
+                if unit.lower() in ("cum", "m3"):
+                    qty = vol
+                amount = qty * rate
+                vol_str = f"{vol:.1f}"
+                dens_str = f"{density:.2f}"
+                thick_str = f"{thick:.0f}"
+
+            total_boq_amount += amount
+
             cells = [
-                lr.inputs.layer_type,
-                f"{lr.area_m2:.1f}",
-                f"{lr.layer_tonnage_t:.2f}",
-                f"{lr.binder_tonnage_t:.2f}",
-                ref,
+                layer_type,
+                thick_str,
+                vol_str,
+                dens_str,
+                f"{qty:.2f}",
+                unit,
+                f"₹{rate:,.2f}",
+                f"₹{amount:,.2f}"
             ]
             for c, txt in enumerate(cells):
                 it = QTableWidgetItem(txt)
                 if c > 0:
-                    it.setTextAlignment(Qt.AlignCenter)
+                    it.setTextAlignment(Qt.AlignCenter if c in (1, 3, 5) else Qt.AlignRight)
                 self.res_tbl.setItem(i, c, it)
+
+        self.lbl_totals.setText(
+            f"Preliminary Engineer Estimate / Consultant BOQ Estimate: {format_indian_currency(total_boq_amount)}\n"
+            f"Σ Layer = {r.total_layer_tonnage_t:.2f} t   ·   "
+            f"Σ Binder = {r.total_binder_tonnage_t:.2f} t   ·   "
+            f"Area = {r.total_area_m2:.0f} m²"
+        )
         self.lbl_notes.setText(r.notes)
 
     def _on_save(self) -> None:
@@ -294,6 +489,7 @@ class MaterialQuantityPanel(QWidget):
             self.db.set_module_status(
                 self._project_id, "material_qty", "complete")
             self.btn_export.setEnabled(True)
+            self.btn_export_excel.setEnabled(True)
             QMessageBox.information(self, "Saved",
                 "Material-quantity BOQ saved to this project.")
             self.saved.emit(self._project_id)
@@ -305,5 +501,11 @@ class MaterialQuantityPanel(QWidget):
             return
         self.export_requested.emit(self._project_id)
 
+    def _on_export_excel(self) -> None:
+        if self._project_id is None:
+            return
+        self.export_excel_requested.emit(self._project_id)
+
     def last_result(self) -> MaterialQuantityResult | None:
         return self._last_result
+

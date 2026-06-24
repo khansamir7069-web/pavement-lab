@@ -313,6 +313,7 @@ class MainWindow(QMainWindow):
         self.maintenance.export_requested.connect(self._on_export_maintenance)
         self.material_qty.saved.connect(self._on_material_qty_saved)
         self.material_qty.export_requested.connect(self._on_export_material_qty)
+        self.material_qty.export_excel_requested.connect(self._on_export_material_excel)
         self.traffic.saved.connect(self._on_traffic_saved)
         self.traffic.export_requested.connect(self._on_export_traffic)
         self.condition.saved.connect(self._on_condition_saved)
@@ -789,6 +790,30 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(f"Material-quantity Word saved: {out}")
         except Exception as e:
             log.exception("Material-qty export failed")
+            QMessageBox.critical(self, "Export failed", str(e))
+
+    def _on_export_material_excel(self, project_id: int) -> None:
+        from app.reports.excel_exporter import build_boq_excel
+        row = self.db.latest_material_quantity(project_id)
+        if row is None:
+            QMessageBox.information(
+                self, "Nothing to export",
+                "Save a material-quantity BOQ first.")
+            return
+        default = REPORTS_DIR / f"Preliminary_Estimate_BOQ_{project_id}.xlsx"
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save Preliminary Estimate BOQ Spreadsheet",
+            str(default), "Excel Workbook (*.xlsx)"
+        )
+        if not path:
+            return
+        try:
+            meta = self._project_meta_for_report(project_id)
+            out = build_boq_excel(Path(path), project_id, self.db, meta)
+            QMessageBox.information(self, "Spreadsheet exported", f"Saved to:\n{out}")
+            self.statusBar().showMessage(f"Preliminary Estimate BOQ Excel saved: {out}")
+        except Exception as e:
+            log.exception("Excel export failed")
             QMessageBox.critical(self, "Export failed", str(e))
 
     def _select_iitpave_schema_history_for_report(

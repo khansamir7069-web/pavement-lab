@@ -394,3 +394,13 @@ class AuditLog(Base):
     object_id: Mapped[Optional[int]] = mapped_column(Integer)
     detail: Mapped[Optional[str]] = mapped_column(Text)
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+
+class MaterialRate(Base):
+    __tablename__ = "material_rates"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    material: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    unit: Mapped[str] = mapped_column(String(50), nullable=False)
+    rate: Mapped[float] = mapped_column(Float, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
+

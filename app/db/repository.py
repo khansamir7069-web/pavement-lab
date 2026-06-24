@@ -39,7 +39,9 @@ from .schema import (
     StabilizedDesign,
     TrafficAnalysis,
     User,
+    MaterialRate,
 )
+
 
 
 def _to_json_safe(obj):
@@ -118,6 +120,43 @@ class Database:
         Base.metadata.create_all(self.engine)
         self._migrate_schema()
         self._Session = sessionmaker(bind=self.engine, expire_on_commit=False)
+        self.initialize_default_rates()
+
+    def initialize_default_rates(self) -> None:
+        defaults = [
+            {"material": "GSB", "unit": "Cum", "rate": 1500.0},
+            {"material": "WMM", "unit": "Cum", "rate": 1800.0},
+            {"material": "DBM", "unit": "Tonne", "rate": 7500.0},
+            {"material": "BC", "unit": "Tonne", "rate": 8500.0},
+            {"material": "Bitumen", "unit": "Tonne", "rate": 60000.0},
+            {"material": "Cement", "unit": "Tonne", "rate": 7000.0},
+            {"material": "Aggregate", "unit": "Tonne", "rate": 1200.0},
+        ]
+        with self.session() as s:
+            for d in defaults:
+                existing = s.scalars(
+                    select(MaterialRate).where(MaterialRate.material == d["material"])
+                ).first()
+                if not existing:
+                    s.add(MaterialRate(material=d["material"], unit=d["unit"], rate=d["rate"]))
+
+    def list_material_rates(self) -> list[MaterialRate]:
+        with self.session() as s:
+            return list(s.scalars(select(MaterialRate).order_by(MaterialRate.material)).all())
+
+    def save_material_rate(self, material: str, unit: str, rate: float) -> MaterialRate:
+        with self.session() as s:
+            row = s.scalars(
+                select(MaterialRate).where(MaterialRate.material == material)
+            ).first()
+            if row:
+                row.unit = unit
+                row.rate = rate
+            else:
+                row = MaterialRate(material=material, unit=unit, rate=rate)
+                s.add(row)
+            s.flush()
+            return row
 
     def _migrate_schema(self) -> None:
         """Idempotently add columns introduced after the first schema version.

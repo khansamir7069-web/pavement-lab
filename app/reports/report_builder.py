@@ -713,12 +713,7 @@ def build_combined_report(
     mix_material_calc=None,
     schema_history_selection_ids: Sequence[int] | None = None,
 ) -> tuple[Path, list[str]]:
-    """Build a single Word document for every module that has saved data.
-
-    Returns ``(output_path, included_sections)``.
-    The mix-design section is included only if a live ``MixDesignResult``
-    is supplied — the DB summary alone does not have the full chart payload.
-    """
+    """Build a single Word document for every module that has saved data."""
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -772,106 +767,10 @@ def build_combined_report(
     material_qty = _rehydrate_material_qty(mq_row)
     tr_row = db.latest_traffic_analysis(project_id)
     traffic = _rehydrate_traffic(tr_row)
-    cs_row = db.latest_condition_survey(project_id)
-    condition = _rehydrate_condition(cs_row)
-    schema_history_review = build_iitpave_schema_history_review(
-        project_id,
-        db.list_iitpave_schema_diagnostics(project_id),
-        selected_history_ids=schema_history_selection_ids,
-    )
-    schema_history_provenance_summary = build_iitpave_schema_history_report_summary(
-        schema_history_review,
-        selection=schema_history_review.selection,
-        report_path=out_path,
-    )
-
-    have_mix = mix_result_live is not None
-    have_any = any((have_mix, traffic, structural, stabilized, overlay, cold_mix, micro,
-                    material_qty, condition, schema_history_review.items))
-    if not have_any:
-        raise ValueError(
-            "No module data found for this project — compute and save at "
-            "least one module before exporting a combined report."
-        )
-
-    doc = new_portrait_document()
-
-    # ---- Standalone Cover Page ----
-    add_p(doc, "\n" * 2)
-    add_heading(doc, "SAMPAVE ENGINEERING SUITE", level=1, align=WD_ALIGN_PARAGRAPH.CENTER)
-    add_heading(doc, "PROFESSIONAL PAVEMENT DESIGN REPORT", level=2, align=WD_ALIGN_PARAGRAPH.CENTER)
-    add_p(doc, "\n" * 1)
+    condition = _rehydrate_condition(db.latest_condition_survey(project_id))
     
-    # Project Info
-    add_p(doc, "Name of Work:", bold=True, size=11, align=WD_ALIGN_PARAGRAPH.CENTER)
-    add_p(doc, p.work_name or "(Untitled Project)", bold=True, size=15, align=WD_ALIGN_PARAGRAPH.CENTER)
-    add_p(doc, "\n" * 1)
-    
-    consultant_name = p.consultant or "Pavement Engineering Consultants"
-    report_id_str = p.report_id or f"RP-{project_id}-{datetime.now().strftime('%Y%m%d')}"
-    
-    add_kv_table(doc, (
-        ("Client Name",      ctx.client),
-        ("Consulting Firm",  consultant_name),
-        ("Report Identifier", report_id_str),
-        ("Work Order No.",   ctx.work_order_no),
-        ("Work Order Date",  ctx.work_order_date),
-        ("Submission Date",  ctx.report_date),
-    ))
-    
-    add_p(doc, "\n" * 2)
-    add_p(doc, "========================================================================", size=10, align=WD_ALIGN_PARAGRAPH.CENTER)
-    add_p(doc, "IMPORTANT NOTICE: Submission package is decision-support documentation. "
-               "Final field execution requires review and sign-off by a qualified pavement engineer.",
-          bold=True, size=10, align=WD_ALIGN_PARAGRAPH.CENTER)
-    add_p(doc, "========================================================================", size=10, align=WD_ALIGN_PARAGRAPH.CENTER)
-    
-    doc.add_page_break()
-
-    # Contents preview
-    add_heading(doc, "Contents of this Report", level=2)
-    toc_rows: list[list[str]] = [
-        ["Executive Summary", "Project summary and engineering disclaimer"]
-    ]
-    if audit_result and getattr(audit_result, "findings", None):
-        toc_rows.append(["Expert Design Audit Summary", "Engineering score, risk level, and design findings"])
-    if has_pavement_options:
-        toc_rows.append(["Pavement Alternative Comparison", "Comparison of Conventional, Stabilized, and Mechanistic pavement options"])
-
-    if have_mix:
-        toc_rows.append(["Bituminous Mix Design",
-                         "MoRTH Section 500 / IRC:111 / Marshall Mix Design"])
-    if traffic:
-        toc_rows.append(["Traffic / ESAL / MSA Analysis", "IRC:37-2018 / AASHTO-1993"])
-    if structural:
-        toc_rows.append(["Flexible Pavement Structural Design",
-                         "IRC:37-2018"])
-    if stabilized:
-        toc_rows.append(["Stabilized Pavement Design (CTB/CTS)", "IRC:37-2018 / mechanistic analysis"])
-    if overlay:
-        toc_rows.append(["Overlay Design (BBD)", "IRC:81-1997"])
-    if cold_mix:
-        toc_rows.append(["Cold Mix Design", "IRC:SP:100-2014"])
-    if micro:
-        toc_rows.append(["Micro-Surfacing Design", "IRC:SP:81"])
-    if material_qty:
-        toc_rows.append(["Bill of Material Quantities",
-                         "MoRTH-400 / MoRTH-500 / IRC:111"])
-    if condition:
-        toc_rows.append(["Pavement Condition Survey",
-                         "ASTM D6433 / IRC:82-1982 (placeholder PCI)"])
-    if schema_history_review.items:
-        toc_rows.append([
-            "IITPAVE Schema Diagnostics History",
-            "Audit-only parser/fixture traceability; calculations blocked",
-        ])
-    toc_rows.append([
-        "Report Provenance and Traceability",
-        "Audit metadata; no engineering calculations",
-    ])
     # Phase 12 synthesis — derived on-demand from the rehydrated
-    # condition + traffic + maintenance results. Not persisted (no DB
-    # schema change in Phase 15 P2).
+    # condition + traffic + maintenance results.
     rehab_synthesis = None
     if condition is not None:
         from app.core import (
@@ -887,37 +786,17 @@ def build_combined_report(
                 micro_surfacing_design=micro,
             )
         )
-        toc_rows.append([
-            "Rehabilitation Recommendations",
-            "IRC:82-1982 / IRC:81-1997 / IRC:115 / IRC:SP:81 / IRC:SP:101",
-        ])
-        
-    toc_rows.append(["Assumptions Sheet", "Poisson's ratios, moduli, and growth presets"])
-    toc_rows.append(["Limitations of the Report", "Engineering screening disclaimers"])
-    toc_rows.append(["Engineer Review Checklist", "Checklist verification list"])
-    toc_rows.append(["Engineering Sign-Off and Seal", "Reviewer signatures"])
 
-    from ._docx_common import add_table
-    add_table(doc, ["Section", "Governing Reference"], toc_rows)
-    
-    doc.add_page_break()
-    write_executive_summary_section(doc, p, structural, stabilized, mech_val)
-
-    included: list[str] = []
-    schema_history_summary = None
-
-    # ---- Expert Design Audit Summary Section ----
-    if audit_result and getattr(audit_result, "findings", None):
-        doc.add_page_break()
-        write_expert_design_audit_section(doc, audit_result)
-        included.append("Expert Design Audit Summary")
-
-    # ---- Pavement Alternative Comparison Section ----
-    if has_pavement_options:
-        doc.add_page_break()
-        write_pavement_alternative_comparison_section(doc, pavement_options, p)
-        included.append("Pavement Alternative Comparison")
-
+    schema_history_review = build_iitpave_schema_history_review(
+        project_id,
+        db.list_iitpave_schema_diagnostics(project_id),
+        selected_history_ids=schema_history_selection_ids,
+    )
+    schema_history_provenance_summary = build_iitpave_schema_history_report_summary(
+        schema_history_review,
+        selection=schema_history_review.selection,
+        report_path=out_path,
+    )
 
     provenance_summary = build_combined_report_provenance_summary(
         db=db,
@@ -927,225 +806,453 @@ def build_combined_report(
         out_path=out_path,
         schema_history_summary=schema_history_provenance_summary,
     )
-    doc.add_page_break()
-    write_combined_report_provenance_section(doc, provenance_summary)
 
-    # ---- Mix design (uses existing word_report internals) ----
-    if have_mix:
-        from . import word_report
-        from app.core import MIX_SPECS
-
-        # Need a chart set if not supplied
-        chart_set = mix_chart_set or build_chart_set(
-            mix_result_live.summary, mix_result_live.obc)
-        chart_image_dir = out_path.parent / f"{out_path.stem}_charts"
-
-        doc.add_page_break()
-        # Build a temporary mix-design doc to source content from? Simpler:
-        # we directly call the existing helpers to draw the section onto our
-        # current doc — but build_mix_design_docx is a one-shot file builder.
-        # Cleanest path: build the mix-design docx separately and tell the
-        # user the combined report will reference it. Better path: refactor
-        # word_report to expose a section writer. We do the latter inline
-        # via the existing public function on a sub-doc, then we won't
-        # double-load python-docx images here — just emit a short bridge
-        # section pointing to the standalone mix-design file generated next
-        # to the combined doc.
-        mix_path = out_path.with_name(f"{out_path.stem}_MixDesign.docx")
-        # F4: refuse to render a mix-design report under the hidden DBM-II
-        # default. If a live mix-design result is being included, the caller
-        # must supply mix_type_key explicitly.
-        if not ctx.mix_type_key:
-            raise ValueError(
-                "Combined report includes a live mix-design result but "
-                "ctx.mix_type_key is empty. Set ReportContext.mix_type_key "
-                "to the project's mix type (e.g. 'BC-II') before calling "
-                "build_combined_report()."
-            )
-        word_report.build_mix_design_docx(
-            mix_path,
-            word_report.ReportContext(
-                project_title=ctx.project_title,
-                mix_type_key=ctx.mix_type_key,
-                work_name=ctx.work_name,
-                work_order_no=ctx.work_order_no,
-                work_order_date=ctx.work_order_date,
-                client=ctx.client,
-                agency=ctx.agency,
-                submitted_by=ctx.submitted_by,
-                lab_name=ctx.lab_name,
-                report_date=ctx.report_date,
-                binder_grade=ctx.binder_grade,
-                binder_properties=ctx.binder_properties,
-                materials={},
-            ),
-            mix_result_live,
-            chart_set,
-            chart_image_dir,
-            material_calc=mix_material_calc,
+    have_mix = mix_result_live is not None
+    have_any = any((have_mix, traffic, structural, stabilized, overlay, cold_mix, micro,
+                    material_qty, condition, schema_history_review.items))
+    if not have_any:
+        raise ValueError(
+            "No module data found for this project — compute and save at "
+            "least one module before exporting a combined report."
         )
-        add_heading(doc, "Bituminous Mix Design", level=1,
-                    align=WD_ALIGN_PARAGRAPH.CENTER)
-        add_p(doc,
-              "Mix design details — including 6 Marshall charts, gradation, "
-              "specific-gravity tables, OBC and compliance — are issued as a "
-              f"companion file: {mix_path.name}. Refer to that document for "
-              "the full Bituminous Mix Design section. Design basis: MoRTH "
-              "Section 500 / IRC:111.",
-              size=10)
-        # OBC summary inline so the combined doc is self-explanatory.
-        # F4: mix_type_key is guaranteed non-empty here (raised above).
-        obc = mix_result_live.obc
-        spec_name = MIX_SPECS.get(ctx.mix_type_key)
-        spec_label = spec_name.name if spec_name else ctx.mix_type_key
-        add_kv_table(doc, (
-            ("Mix Type", spec_label),
-            ("Optimum Bitumen Content (OBC)", f"{obc.obc_pct:.2f} %"),
-            ("Target Air Voids", f"{obc.target_air_voids_pct:.1f} %"),
-            ("Bulk SG (Gsb)", f"{mix_result_live.bulk_sg_blend:.3f}"),
-            ("Compliance",
-             "PASS" if mix_result_live.compliance.overall_pass else "FAIL"),
-        ))
-        included.append("Bituminous Mix Design (companion file)")
 
-    # ---- Traffic (precedes structural — its MSA feeds the structural design) ----
+    # Load local branding config
+    from app.core.branding import get_branding_profile
+    brand = get_branding_profile()
+    brand_company = brand.get("company_name") or p.consultant or ctx.agency or "Pavement Engineering Consultants"
+    brand_engineer = brand.get("engineer_name") or ctx.submitted_by or "N/A"
+    brand_logo = brand.get("logo_path") or ""
+
+    doc = new_portrait_document()
+
+    # ---- 1. Standalone Cover Page ----
+    add_p(doc, "\n" * 1)
+    if brand_logo:
+        logo_path = Path(brand_logo)
+        if logo_path.is_file():
+            try:
+                p_logo = doc.add_paragraph()
+                p_logo.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                run_logo = p_logo.add_run()
+                run_logo.add_picture(str(logo_path), width=Inches(1.5))
+                add_p(doc, "\n")
+            except Exception:
+                pass
+
+    add_heading(doc, brand_company.upper(), level=1, align=WD_ALIGN_PARAGRAPH.CENTER)
+    add_heading(doc, "PROFESSIONAL PAVEMENT DESIGN REPORT", level=2, align=WD_ALIGN_PARAGRAPH.CENTER)
+    add_p(doc, "\n")
+    
+    add_kv_table(doc, (
+        ("Project Name",      p.work_name or "(Untitled Project)"),
+        ("Client Name",       p.client.name if p.client else (ctx.client or "N/A")),
+        ("Location",          p.location or "N/A"),
+        ("Consultant",        brand_company),
+        ("Report Number",     p.report_id or "N/A"),
+        ("Revision Number",   f"R{p.revision_number}"),
+        ("Submission Date",   ctx.report_date),
+    ))
+    
+    add_p(doc, "\n" * 1)
+    add_p(doc, "========================================================================", size=10, align=WD_ALIGN_PARAGRAPH.CENTER)
+    add_p(doc, "Engineering Decision-Support Report — Final approval/sign-off by qualified pavement engineer required.",
+          bold=True, size=10, align=WD_ALIGN_PARAGRAPH.CENTER)
+    add_p(doc, "========================================================================", size=10, align=WD_ALIGN_PARAGRAPH.CENTER)
+    
+    doc.add_page_break()
+
+    # ---- 2. Standalone Document Control Page ----
+    add_heading(doc, "DOCUMENT CONTROL SHEET", level=1, align=WD_ALIGN_PARAGRAPH.LEFT)
+    add_p(doc, "\n")
+    
+    doc_control_rows = [
+        ("Prepared By", brand_engineer),
+        ("Checked By", p.checked_by or "N/A"),
+        ("Approved By", "Qualified Reviewing Engineer / Client Authority")
+    ]
+    add_kv_table(doc, doc_control_rows)
+    
+    add_p(doc, "\n" * 2)
+    add_heading(doc, "Revision History Table", level=2)
+    
+    rev_rows = []
+    r0_date = p.created_at.strftime("%Y-%m-%d") if p.created_at else "N/A"
+    r0_eng = p.submitted_by or brand_engineer or "N/A"
+    rev_rows.append(["R0", r0_date, "Initial Design Submission", r0_eng])
+    
+    revisions_list = []
+    if p.revisions_json:
+        try:
+            revisions_list = json.loads(p.revisions_json)
+        except Exception:
+            pass
+            
+    for r in revisions_list:
+        rev_num = r.get("revision_number", 1)
+        rev_id = f"R{rev_num}"
+        dt_str = r.get("created_date") or r.get("date_time") or ""
+        if "T" in dt_str:
+            try:
+                dt = datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
+                date_str = dt.strftime("%Y-%m-%d")
+            except Exception:
+                date_str = dt_str[:10]
+        else:
+            date_str = dt_str or "N/A"
+            
+        eng = r.get("engineer") or r.get("engineer_name") or "N/A"
+        desc = r.get("description") or r.get("engineer_note") or "N/A"
+        
+        # If engineer_note is a JSON string, extract details
+        if isinstance(desc, str) and desc.strip().startswith("{"):
+            try:
+                note_data = json.loads(desc)
+                desc = note_data.get("description") or desc
+                eng = note_data.get("engineer") or eng
+            except Exception:
+                pass
+                
+        rev_rows.append([rev_id, date_str, desc, eng])
+        
+    add_table(doc, ["Rev", "Date", "Description", "Engineer"], rev_rows)
+    doc.add_page_break()
+
+    # ---- 3. Contents Page ----
+    add_heading(doc, "Contents of this Report", level=2)
+    toc_rows: list[list[str]] = [
+        ["Executive Summary", "Project summary and engineering disclaimer"],
+        ["Appendix A: Traffic Calculation", "Commercial traffic projection and MSA calculation"],
+        ["Appendix B: Subgrade Evaluation", "Subgrade CBR and Resilient Modulus (Mr) details"],
+        ["Appendix C: Pavement Design Summary", "Empirical structural design layers & alternative comparison"],
+        ["Appendix D: IITPAVE Verification", "Linear elastic mechanistic strain checks and life verdicts"],
+        ["Appendix E: Mix Design", "Optimum Binder Content & companion mix report reference"],
+        ["Appendix F: BOQ & Cost Estimate", "Preliminary material quantities & cost estimate summary"],
+        ["Appendix G: Expert Audit Report", "Consultant design validation suitabilty score & findings"]
+    ]
+    
+    if overlay or cold_mix or micro:
+        toc_rows.append(["Maintenance & Rehabilitation Design", "BBD overlay / Cold mix / Micro-surfacing options"])
+    if condition:
+        toc_rows.append(["Pavement Condition Survey", "PCI distress index survey and condition state summary"])
+    if schema_history_review.items:
+        toc_rows.append(["IITPAVE Schema Diagnostics History", "Audit-only parser/fixture traceability"])
+        
+    toc_rows.append(["Assumptions Sheet", "Poisson's ratios, moduli, and growth presets"])
+    toc_rows.append(["Limitations of the Report", "Engineering screening disclaimers"])
+    toc_rows.append(["Engineer Review Checklist", "Checklist verification list"])
+    toc_rows.append(["Engineering Sign-Off and Seal", "Reviewer signatures"])
+
+    add_table(doc, ["Section / Appendix", "Governing Reference / Description"], toc_rows)
+    doc.add_page_break()
+    
+    # ---- 4. Executive Summary ----
+    write_executive_summary_section(doc, p, structural, stabilized, mech_val, db=db)
+
+    included: list[str] = []
+    schema_history_summary = None
+
+    # ---- APPENDIX A: TRAFFIC CALCULATION ----
+    doc.add_page_break()
+    add_heading(doc, "APPENDIX A: TRAFFIC CALCULATION", level=1, align=WD_ALIGN_PARAGRAPH.CENTER)
     if traffic:
-        doc.add_page_break()
         write_traffic_section(doc, TrafficReportContext(
             project_title=ctx.project_title, work_name=ctx.work_name,
             work_order_no=ctx.work_order_no, work_order_date=ctx.work_order_date,
             client=ctx.client, agency=ctx.agency, submitted_by=ctx.submitted_by,
             lab_name=ctx.lab_name, report_date=ctx.report_date,
-        ), traffic, include_header=True)
-        included.append("Traffic / ESAL / MSA Analysis")
+        ), traffic, include_header=False)
+        
+        # Traceability
+        traffic_inputs = [
+            ("Initial Commercial Traffic (A)", f"{traffic.inputs.initial_cvpd:g} CVPD"),
+            ("Annual Growth Rate (r)", f"{traffic.inputs.growth_rate_pct:g} %"),
+            ("Vehicle Damage Factor (F)", f"{traffic.vdf_used:g}"),
+            ("Lane Distribution Factor (D)", f"{traffic.ldf_used:g}"),
+            ("Design Life (n)", f"{traffic.inputs.design_life_years} years")
+        ]
+        traffic_outputs = [
+            ("Cumulative Design Traffic (N)", f"{traffic.design_msa:.2f} MSA")
+        ]
+        add_traceability_block(doc, "Traffic Projection", traffic_inputs, traffic_outputs, "IRC:37-2018 (Clause 4.6)")
+        included.append("Appendix A: Traffic Calculation")
+    else:
+        add_p(doc, "No traffic analysis recorded for this project.")
 
-    # ---- Structural ----
+    # ---- APPENDIX B: SUBGRADE EVALUATION ----
+    doc.add_page_break()
+    add_heading(doc, "APPENDIX B: SUBGRADE EVALUATION", level=1, align=WD_ALIGN_PARAGRAPH.CENTER)
     if structural:
-        doc.add_page_break()
-        write_structural_section(doc, _struct_ctx(ctx, execution_time=exec_time_str), structural,
-                                 include_header=True)
-        included.append("Flexible Pavement Structural Design")
+        add_heading(doc, "Subgrade Characterization", level=2)
+        add_p(doc, "The subgrade strength is evaluated in terms of the California Bearing Ratio (CBR) and Resilient Modulus (M_R).")
+        subg_data = [
+            ["Subgrade CBR (4-day soaked)", f"{structural.inputs.subgrade_cbr_pct:g}", "%"],
+            ["Resilient Modulus (M_R)", f"{structural.subgrade_mr_mpa:.1f}", "MPa"]
+        ]
+        add_table(doc, ["Property Description", "Design Value", "Unit"], subg_data)
+        add_p(doc, "")
+        
+        # Traceability
+        subg_inputs = [
+            ("California Bearing Ratio (CBR)", f"{structural.inputs.subgrade_cbr_pct:g} %")
+        ]
+        subg_outputs = [
+            ("Resilient Modulus (Mr)", f"{structural.subgrade_mr_mpa:.1f} MPa")
+        ]
+        add_traceability_block(doc, "Subgrade Resilient Modulus", subg_inputs, subg_outputs, "IRC:37-2018 (Annex E)")
+        included.append("Appendix B: Subgrade Evaluation")
+    else:
+        add_p(doc, "No subgrade strength evaluations recorded.")
 
-    # ---- Stabilized ----
-    if stabilized:
-        doc.add_page_break()
-        write_stabilized_section(doc, _stab_ctx(ctx, execution_time=exec_time_str), stabilized,
-                                 include_header=True)
-        included.append("Stabilized Pavement Design (CTB/CTS)")
-
-    # ---- Engineering Intelligence Checker (Phase M) ----
-    has_intel_struct = structural and hasattr(structural, "intelligence") and structural.intelligence
-    has_intel_stab = stabilized and hasattr(stabilized, "intelligence") and stabilized.intelligence
+    # ---- APPENDIX C: PAVEMENT DESIGN SUMMARY ----
+    doc.add_page_break()
+    add_heading(doc, "APPENDIX C: PAVEMENT DESIGN SUMMARY", level=1, align=WD_ALIGN_PARAGRAPH.CENTER)
     
-    if has_intel_struct or has_intel_stab:
-        doc.add_page_break()
-        add_heading(doc, "ENGINEERING INTELLIGENCE REVIEW", level=1, align=WD_ALIGN_PARAGRAPH.CENTER)
-        add_p(
-            doc,
-            "Design screening checks based on static layer modular ratios, thicknesses, "
-            "and material tier compatibility.",
-            size=10, align=WD_ALIGN_PARAGRAPH.CENTER, italic=True
+    has_c_content = False
+    if structural:
+        write_structural_section(doc, _struct_ctx(ctx, execution_time=exec_time_str), structural, include_header=False)
+        # Traceability
+        struct_inputs = [
+            ("Cumulative Design Traffic (N)", f"{structural.design_msa:.2f} MSA"),
+            ("Subgrade Resilient Modulus (Mr)", f"{structural.subgrade_mr_mpa:.1f} MPa")
+        ]
+        struct_outputs = [
+            ("Total Pavement Thickness", f"{structural.total_pavement_thickness_mm:.0f} mm")
+        ]
+        add_traceability_block(doc, "Flexible Pavement Structural Thickness", struct_inputs, struct_outputs, "IRC:37-2018 (Pavement Catalogue / Plates)")
+        has_c_content = True
+        
+    if stabilized:
+        add_p(doc, "\n")
+        write_stabilized_section(doc, _stab_ctx(ctx, execution_time=exec_time_str), stabilized, include_header=False)
+        has_c_content = True
+        
+    if has_pavement_options:
+        add_p(doc, "\n")
+        write_pavement_alternative_comparison_section(doc, pavement_options, p)
+        has_c_content = True
+        
+    if has_c_content:
+        included.append("Appendix C: Pavement Design Summary")
+    else:
+        add_p(doc, "No structural pavement designs have been finalized.")
+
+    # ---- APPENDIX D: IITPAVE VERIFICATION ----
+    doc.add_page_break()
+    add_heading(doc, "APPENDIX D: IITPAVE VERIFICATION", level=1, align=WD_ALIGN_PARAGRAPH.CENTER)
+    if mech_val and not mech_val.refused:
+        add_heading(doc, "Mechanistic Validation Outcomes", level=2)
+        add_p(doc, "The designed pavement layer composition has been validated using the linear elastic analysis program IITPAVE.")
+        
+        iit_data = [
+            ["Fatigue Life (MSA)", f"{mech_val.fatigue_life_msa:.2f}"],
+            ["Rutting Life (MSA)", f"{mech_val.rutting_life_msa:.2f}"],
+            ["Design Life (MSA)", f"{mech_val.design_msa:.2f}"],
+            ["Tensile Strain (Microstrain)", f"{mech_val.tensile_strain_micro:.1f}"],
+            ["Compressive Strain (Microstrain)", f"{mech_val.compressive_strain_micro:.1f}"],
+            ["Fatigue Check Verdict", mech_val.fatigue_verdict],
+            ["Rutting Check Verdict", mech_val.rutting_verdict]
+        ]
+        add_table(doc, ["Verification Metric", "Value / Verdict"], iit_data)
+        add_p(doc, "")
+        
+        # Traceability
+        iit_inputs = [
+            ("Design Traffic", f"{mech_val.design_msa} MSA"),
+            ("Subgrade Mr", f"{mech_val.subgrade_mr_mpa} MPa")
+        ]
+        iit_outputs = [
+            ("Fatigue Life", f"{mech_val.fatigue_life_msa:.2f} MSA"),
+            ("Rutting Life", f"{mech_val.rutting_life_msa:.2f} MSA")
+        ]
+        add_traceability_block(doc, "IITPAVE Mechanistic Safety Verification", iit_inputs, iit_outputs, "IRC:37-2018 (Section 6 & IITPAVE Engine)")
+        included.append("Appendix D: IITPAVE Verification")
+    else:
+        add_p(doc, "IITPAVE mechanistic validation was not performed. Pavement design is prepared under empirical Decision Support Mode guidelines.")
+
+    # ---- APPENDIX E: MIX DESIGN ----
+    doc.add_page_break()
+    add_heading(doc, "APPENDIX E: MIX DESIGN", level=1, align=WD_ALIGN_PARAGRAPH.CENTER)
+    if have_mix:
+        from . import word_report
+        from app.core import MIX_SPECS
+        
+        chart_set = mix_chart_set or build_chart_set(mix_result_live.summary, mix_result_live.obc)
+        chart_image_dir = out_path.parent / f"{out_path.stem}_charts"
+        
+        mix_path = out_path.with_name(f"{out_path.stem}_MixDesign.docx")
+        if not ctx.mix_type_key:
+            raise ValueError("Combined report includes mix design but mix_type_key is empty.")
+            
+        word_report.build_mix_design_docx(
+            mix_path,
+            word_report.ReportContext(
+                project_title=ctx.project_title, mix_type_key=ctx.mix_type_key,
+                work_name=ctx.work_name, work_order_no=ctx.work_order_no,
+                work_order_date=ctx.work_order_date, client=ctx.client,
+                agency=ctx.agency, submitted_by=ctx.submitted_by,
+                lab_name=ctx.lab_name, report_date=ctx.report_date,
+                binder_grade=ctx.binder_grade, binder_properties=ctx.binder_properties,
+                materials={},
+            ),
+            mix_result_live, chart_set, chart_image_dir, material_calc=mix_material_calc
         )
         
-        first = True
-        if has_intel_struct:
-            from .intelligence_report import write_intelligence_section
-            write_intelligence_section(doc, structural.intelligence, section_title="Flexible Pavement Design", include_header=True)
-            first = False
-            included.append("Engineering Intelligence Review (Flexible)")
-            
-        if has_intel_stab:
-            if not first:
-                add_p(doc, "") # blank spacing paragraph
-            from .intelligence_report import write_intelligence_section
-            write_intelligence_section(doc, stabilized.intelligence, section_title="Stabilized Pavement Design", include_header=True)
-            included.append("Engineering Intelligence Review (Stabilized)")
+        spec_name = MIX_SPECS.get(ctx.mix_type_key)
+        spec_label = spec_name.name if spec_name else ctx.mix_type_key
+        
+        add_heading(doc, "Bituminous Mix Summary", level=2)
+        add_p(doc, f"Detailed Marshall Mix Design charts and gradation tables are exported in companion file: {mix_path.name}.")
+        
+        add_kv_table(doc, (
+            ("Mix Type", spec_label),
+            ("Optimum Bitumen Content (OBC)", f"{mix_result_live.obc.obc_pct:.2f} %"),
+            ("Target Air Voids", f"{mix_result_live.obc.target_air_voids_pct:.1f} %"),
+            ("Bulk SG (Gsb)", f"{mix_result_live.bulk_sg_blend:.3f}"),
+            ("Compliance", "PASS" if mix_result_live.compliance.overall_pass else "FAIL"),
+        ))
+        
+        # Traceability
+        mix_inputs = [
+            ("Gradation Standard", "MoRTH Section 500"),
+            ("Binder Properties", ctx.binder_grade or "N/A")
+        ]
+        mix_outputs = [
+            ("Optimum Binder Content (OBC)", f"{mix_result_live.obc.obc_pct:.2f} %"),
+            ("Overall Compliance Check", "PASS" if mix_result_live.compliance.overall_pass else "FAIL")
+        ]
+        add_traceability_block(doc, "Marshall Mix Design", mix_inputs, mix_outputs, "MoRTH Section 500 / IRC:111 / Marshall Method")
+        included.append("Appendix E: Mix Design")
+    else:
+        add_p(doc, "No bituminous mix design data recorded.")
 
-    # ---- Maintenance sections ----
+    # ---- APPENDIX F: BOQ & COST ESTIMATE ----
+    doc.add_page_break()
+    add_heading(doc, "APPENDIX F: BOQ & COST ESTIMATE", level=1, align=WD_ALIGN_PARAGRAPH.CENTER)
+    if material_qty:
+        mq_ctx = MaterialQuantityReportContext(
+            project_title=ctx.project_title, work_name=ctx.work_name,
+            work_order_no=ctx.work_order_no, work_order_date=ctx.work_order_date,
+            client=ctx.client, agency=ctx.agency, submitted_by=ctx.submitted_by,
+            lab_name=ctx.lab_name, report_date=ctx.report_date,
+        )
+        write_material_quantity_section(doc, mq_ctx, material_qty, include_header=False)
+        
+        # Cost Estimate
+        boq_res = {}
+        try:
+            from app.engineering.boq_engine import generate_boq
+            boq_res = generate_boq(project_id, db)
+        except Exception:
+            pass
+            
+        if boq_res.get("available"):
+            add_heading(doc, "Preliminary Pavement Cost Estimate", level=2)
+            add_p(doc, "Estimated preliminary material cost based on pavement geometry and base SOR rates:")
+            
+            est_cost_str = boq_res.get("total_project_cost_formatted") or f"Rs. {boq_res.get('total_project_cost', 0):,.2f}"
+            cost_km_str = f"Rs. {boq_res.get('cost_per_km', 0):,.2f} / km" if boq_res.get("cost_per_km") else "—"
+            
+            cost_data = [
+                ["Total Project Estimated Cost", est_cost_str],
+                ["Cost per Kilometre", cost_km_str]
+            ]
+            add_table(doc, ["Metric Description", "Value (Preliminary Estimate)"], cost_data)
+            
+            # Traceability
+            boq_inputs = [
+                ("Pavement Geometry Length", f"{boq_res.get('road_length_m', 1000)} m"),
+                ("Carriageway Width", f"{boq_res.get('carriageway_width_m', 7.0)} m")
+            ]
+            boq_outputs = [
+                ("Preliminary Estimated Cost", est_cost_str)
+            ]
+            add_traceability_block(doc, "Preliminary BOQ Costing", boq_inputs, boq_outputs, "MoRTH Specification & SOR Standard")
+            
+        included.append("Appendix F: BOQ & Cost Estimate")
+    else:
+        add_p(doc, "No materials estimation or BOQ calculations recorded.")
+
+    # ---- APPENDIX G: EXPERT AUDIT REPORT ----
+    doc.add_page_break()
+    add_heading(doc, "APPENDIX G: EXPERT AUDIT REPORT", level=1, align=WD_ALIGN_PARAGRAPH.CENTER)
+    if audit_result:
+        write_expert_design_audit_section(doc, audit_result)
+        # Traceability
+        audit_inputs = [
+            ("Pavement Project Design Parameters", "SQLite DB Snapshot")
+        ]
+        audit_outputs = [
+            ("Engineering Suitability Score", f"{audit_result.score}/100"),
+            ("Design Risk Level", audit_result.risk_level),
+            ("Readiness Status", audit_result.readiness_status)
+        ]
+        add_traceability_block(doc, "Pavement Design Audit", audit_inputs, audit_outputs, "Senior Highway Consultant Guidelines Checklist")
+        included.append("Appendix G: Expert Audit Report")
+    else:
+        add_p(doc, "Design audit report not available.")
+
+    # ---- Report Provenance ----
+    doc.add_page_break()
+    write_combined_report_provenance_section(doc, provenance_summary)
+    included.append("Report Provenance and Traceability")
+
+    # ---- Maintenance / Rehab design sections (for backward compatibility) ----
     maint_ctx = _maint_ctx(ctx)
     if overlay:
         doc.add_page_break()
-        add_heading(doc, "MAINTENANCE / REHABILITATION",
-                    level=1, align=WD_ALIGN_PARAGRAPH.CENTER)
+        add_heading(doc, "MAINTENANCE / REHABILITATION", level=1, align=WD_ALIGN_PARAGRAPH.CENTER)
         write_overlay_section(doc, maint_ctx, overlay)
         included.append("Overlay Design (BBD)")
     if cold_mix:
         if not overlay:
             doc.add_page_break()
-            add_heading(doc, "MAINTENANCE / REHABILITATION",
-                        level=1, align=WD_ALIGN_PARAGRAPH.CENTER)
+            add_heading(doc, "MAINTENANCE / REHABILITATION", level=1, align=WD_ALIGN_PARAGRAPH.CENTER)
         write_cold_mix_section(doc, maint_ctx, cold_mix)
         included.append("Cold Mix Design")
     if micro:
         if not (overlay or cold_mix):
             doc.add_page_break()
-            add_heading(doc, "MAINTENANCE / REHABILITATION",
-                        level=1, align=WD_ALIGN_PARAGRAPH.CENTER)
+            add_heading(doc, "MAINTENANCE / REHABILITATION", level=1, align=WD_ALIGN_PARAGRAPH.CENTER)
         write_micro_surfacing_section(doc, maint_ctx, micro)
         included.append("Micro-Surfacing Design")
 
-    if material_qty:
-        doc.add_page_break()
-        mq_ctx = MaterialQuantityReportContext(
-            project_title=ctx.project_title,
-            work_name=ctx.work_name,
-            work_order_no=ctx.work_order_no,
-            work_order_date=ctx.work_order_date,
-            client=ctx.client, agency=ctx.agency,
-            submitted_by=ctx.submitted_by,
-            lab_name=ctx.lab_name, report_date=ctx.report_date,
-        )
-        write_material_quantity_section(doc, mq_ctx, material_qty,
-                                        include_header=True)
-        included.append("Bill of Material Quantities")
-
-    # ---- Pavement Condition Survey (Phase 10 — placeholder PCI) ----
+    # ---- Condition Survey ----
     if condition:
         doc.add_page_break()
         cs_ctx = ConditionReportContext(
-            project_title=ctx.project_title,
-            work_name=ctx.work_name,
-            work_order_no=ctx.work_order_no,
-            work_order_date=ctx.work_order_date,
-            client=ctx.client, agency=ctx.agency,
-            submitted_by=ctx.submitted_by,
+            project_title=ctx.project_title, work_name=ctx.work_name,
+            work_order_no=ctx.work_order_no, work_order_date=ctx.work_order_date,
+            client=ctx.client, agency=ctx.agency, submitted_by=ctx.submitted_by,
             lab_name=ctx.lab_name, report_date=ctx.report_date,
         )
         write_condition_section(doc, cs_ctx, condition, include_header=True)
         included.append("Pavement Condition Survey")
 
-    # ---- Rehabilitation Recommendations (Phase 12 synthesis) ----
+    # ---- Rehab Synthesis ----
     if rehab_synthesis is not None:
         doc.add_page_break()
         rh_ctx = RehabReportContext(
-            project_title=ctx.project_title,
-            work_name=ctx.work_name,
-            work_order_no=ctx.work_order_no,
-            work_order_date=ctx.work_order_date,
-            client=ctx.client, agency=ctx.agency,
-            submitted_by=ctx.submitted_by,
+            project_title=ctx.project_title, work_name=ctx.work_name,
+            work_order_no=ctx.work_order_no, work_order_date=ctx.work_order_date,
+            client=ctx.client, agency=ctx.agency, submitted_by=ctx.submitted_by,
             lab_name=ctx.lab_name, report_date=ctx.report_date,
         )
         write_rehab_section(doc, rh_ctx, rehab_synthesis, include_header=True)
         included.append("Rehabilitation Recommendations")
 
-    # ---- IITPAVE Schema Diagnostics History (audit-only recall) ----
+    # ---- IITPAVE Schema Diagnostics History ----
     if schema_history_review.items:
         doc.add_page_break()
         schema_history_summary = write_iitpave_schema_history_section(
-            doc,
-            _schema_history_ctx(ctx),
-            schema_history_review,
-            include_header=True,
-            selection=schema_history_review.selection,
-            report_path=out_path,
+            doc, _schema_history_ctx(ctx), schema_history_review,
+            include_header=True, selection=schema_history_review.selection,
+            report_path=out_path
         )
         included.append("IITPAVE Schema Diagnostics History")
     elif schema_history_review.selection and schema_history_review.selection.available_history_ids:
         schema_history_summary = build_iitpave_schema_history_report_summary(
-            schema_history_review,
-            selection=schema_history_review.selection,
-            report_path=out_path,
+            schema_history_review, selection=schema_history_review.selection,
+            report_path=out_path
         )
 
     # ---- Assumptions ----
@@ -1169,28 +1276,78 @@ def build_combined_report(
     included.append("Signature & Seal Placeholders")
 
     doc.save(out_path)
-    if schema_history_summary is not None and hasattr(
-        db, "save_iitpave_schema_history_selection_audit"
-    ):
+    if schema_history_summary is not None and hasattr(db, "save_iitpave_schema_history_selection_audit"):
         db.save_iitpave_schema_history_selection_audit(
-            project_id=project_id,
-            report_path=str(out_path),
-            summary=schema_history_summary,
+            project_id=project_id, report_path=str(out_path), summary=schema_history_summary
         )
     if hasattr(db, "save_report_revision_snapshot"):
         db.save_report_revision_snapshot(
             project_id=project_id,
             snapshot=ReportRevisionSnapshot.from_provenance(
-                provenance_summary,
-                report_identifier=f"combined_report:{project_id}:{out_path.name}",
-            ),
+                provenance_summary, report_identifier=f"combined_report:{project_id}:{out_path.name}"
+            )
         )
     return out_path, included
 
 
-def write_executive_summary_section(doc, p, structural, stabilized, mech_val) -> None:
+def add_traceability_block(doc, title: str, inputs: list[tuple[str, str]], outputs: list[tuple[str, str]], reference: str) -> None:
+    """Add a structured calculation traceability section to the document."""
+    add_heading(doc, f"Calculation Traceability — {title}", level=3)
+    rows = []
+    for name, val in inputs:
+        rows.append(["Input Source Data", name, str(val)])
+    for name, val in outputs:
+        rows.append(["Calculation Result", name, str(val)])
+    rows.append(["Reference Standard", "Standard Citation", reference])
+    add_table(doc, ["Traceability Parameter", "Property Name", "Value"], rows)
+    add_p(doc, "")
+
+
+def write_executive_summary_section(doc, p, structural, stabilized, mech_val, db=None) -> None:
     add_heading(doc, "EXECUTIVE SUMMARY", level=1)
     
+    # 1. Fetch Design Audit Score (fail-safe)
+    audit_score = "N/A"
+    if db is not None:
+        try:
+            from app.engineering.design_audit import run_project_audit
+            audit = run_project_audit(p.id, db)
+            audit_score = f"{audit.score}/100 ({audit.readiness_status})"
+        except Exception:
+            pass
+            
+    # 2. Fetch Estimated Cost (fail-safe)
+    est_cost = "N/A"
+    if db is not None:
+        try:
+            from app.engineering.boq_engine import generate_boq
+            boq = generate_boq(p.id, db)
+            if boq.get("available") and boq.get("show_rupees"):
+                est_cost = boq.get("total_project_cost_formatted") or f"Rs. {boq.get('total_project_cost', 0):,.2f}"
+            elif boq.get("available"):
+                est_cost = f"Cost Index: {boq.get('cost_index', 'N/A')}"
+        except Exception:
+            pass
+
+    road_type = p.highway_type or p.road_category or "N/A"
+    traffic_msa = f"{structural.design_msa:.2f} MSA" if structural else "N/A"
+    subgrade_cbr = f"{p.subgrade_cbr:.1f} %" if p.subgrade_cbr else "N/A"
+    selected_opt = p.selected_design_option or "Option A (Conventional Flexible)"
+    
+    # Table Summary
+    summary_data = [
+        ["Road Type / Category", road_type],
+        ["Design Traffic", traffic_msa],
+        ["Subgrade CBR", subgrade_cbr],
+        ["Selected Pavement Option", selected_opt],
+        ["Engineering Audit Score", audit_score],
+        ["Estimated Cost (Preliminary Estimate)", est_cost]
+    ]
+    
+    add_p(doc, "The key pavement design parameters and project outcomes are summarized in the table below:")
+    add_table(doc, ["Pavement Metric", "Design Value / Outcome"], summary_data)
+    
+    add_p(doc, "\n")
     summary_para = (
         f"This professional pavement design report presents the mechanistic and empirical design parameters "
         f"established for the work '{p.work_name or 'Untitled work'}'. The evaluation incorporates design traffic analysis, "
@@ -1204,7 +1361,7 @@ def write_executive_summary_section(doc, p, structural, stabilized, mech_val) ->
     if stabilized:
         summary_para += "A cement-stabilized design (CTB/CTS) has been analyzed as an alternative to achieve structural thickness optimization. "
     
-    if mech_val:
+    if mech_val and not mech_val.refused:
         summary_para += f"Mechanistic verification has been successfully conducted using IITPAVE under Mechanistic Verified Mode."
     else:
         summary_para += f"The design calculations have been prepared under Decision Support Mode guidelines."
@@ -1385,5 +1542,82 @@ def write_pavement_alternative_comparison_section(doc, options: list[dict], proj
     except Exception as e:
         import logging
         logging.getLogger(__name__).exception("Failed to write pavement alternative comparison section: %s", e)
+
+
+def write_cost_estimation_section(doc, project_id: int, db) -> None:
+    try:
+        from app.engineering.boq_engine import generate_boq
+        boq_res = generate_boq(project_id, db)
+        if not boq_res.get("available") or not boq_res.get("show_rupees"):
+            return
+            
+        add_heading(doc, "PRELIMINARY COST ESTIMATE SUMMARY", level=1)
+        add_p(
+            doc,
+            "This section presents a preliminary commercial estimate and option cost comparison "
+            "for the pavement design configurations. All cost figures are based on default/sample "
+            "rates or rates updated by the consultant in the Rate Manager. These estimates do "
+            "not constitute a final tender or detailed project report (DPR) cost schedule, but serve "
+            "to guide the alternative design selection process."
+        )
+        
+        # Options Cost Table
+        add_heading(doc, "Option Cost Comparison Summary (Preliminary Engineer Estimate / Consultant BOQ Estimate)", level=2)
+        
+        table_rows = []
+        options_data = boq_res.get("options", {})
+        for opt_key in ["Option A", "Option B", "Option C", "Option D"]:
+            opt = options_data.get(opt_key, {})
+            if opt.get("available"):
+                thick = sum(ly.get('thickness_mm', 0.0) for ly in opt.get('layers', []))
+                table_rows.append([
+                    opt_key,
+                    f"{thick:.0f} mm",
+                    f"{opt.get('bitumen_t', 0.0):.2f} t",
+                    f"{opt.get('cement_t', 0.0):.2f} t",
+                    opt.get("formatted_cost", "—")
+                ])
+                
+        if table_rows:
+            add_table(
+                doc,
+                ['Pavement Option', 'Thickness', 'Bitumen', 'Cement', 'Preliminary Cost Estimate'],
+                table_rows
+            )
+            
+        add_p(doc, "")
+        
+        # Rates Table
+        add_heading(doc, "Pavement Construction Unit Rates (Sample/Default SOR Rates)", level=2)
+        
+        rates_rows = []
+        rates = boq_res.get("rates", {})
+        for mat in ["BC", "DBM", "WMM", "GSB", "Bitumen", "Cement", "Aggregate"]:
+            r_info = rates.get(mat, {})
+            if r_info:
+                rates_rows.append([
+                    mat,
+                    r_info.get("unit", "Tonne"),
+                    f"₹{r_info.get('rate', 0.0):,.2f}",
+                    "Sample/Default Rate (Needs project-specific update)"
+                ])
+                
+        if rates_rows:
+            add_table(
+                doc,
+                ['Material Item', 'Unit', 'Unit Rate', 'Remarks / Source'],
+                rates_rows
+            )
+            
+        add_p(doc, "")
+        add_p(
+            doc,
+            "Note: Cement-treated base and subgrade layers (CTB/CTS) are analyzed based on their constituent "
+            "cement and aggregate rates as configured in the Rate Manager. The rates must be verified locally before final project submission."
+        )
+        
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).exception("Failed to write cost estimation section: %s", e)
 
 

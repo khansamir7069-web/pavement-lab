@@ -1,6 +1,6 @@
 """Submission panel — Stage 10.
 
-Handles project locking, revision creation, readiness checklist, and final delivery ZIP generation.
+Handles project locking, revision creation, readiness checklist, branding, and final delivery package generation.
 """
 from __future__ import annotations
 
@@ -19,12 +19,58 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QVBoxLayout,
     QWidget,
+    QLineEdit,
+    QGridLayout,
+    QDialog,
+    QFormLayout,
+    QTextEdit,
+    QDialogButtonBox,
 )
 
 from app.config import REPORTS_DIR
 from app.reports.report_builder import build_combined_report, CombinedReportContext
 from app.core.project_archive import generate_project_archive
 from .common import PageHeader, Card, styled_button
+
+
+class RevisionCreationDialog(QDialog):
+    """Dialog prompting the user for details when creating a project revision."""
+
+    def __init__(self, default_engineer: str = "", parent: QWidget | None = None):
+        super().__init__(parent)
+        self.setWindowTitle("Create Project Revision")
+        self.setMinimumWidth(420)
+
+        lay = QVBoxLayout(self)
+
+        form = QFormLayout()
+        self.txt_engineer = QLineEdit(default_engineer)
+        form.addRow("Engineer Name:", self.txt_engineer)
+
+        self.txt_desc = QLineEdit()
+        self.txt_desc.setPlaceholderText("e.g. Updated subgrade CBR based on fresh soil test")
+        form.addRow("Description of Change:", self.txt_desc)
+
+        self.txt_reason = QTextEdit()
+        self.txt_reason.setPlaceholderText("e.g. Site conditions changed; client requested revision")
+        self.txt_reason.setMaximumHeight(85)
+        form.addRow("Reason for Revision:", self.txt_reason)
+
+        lay.addLayout(form)
+
+        # Dialog Buttons
+        self.buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        self.buttons.accepted.connect(self.accept)
+        self.buttons.rejected.connect(self.reject)
+        lay.addWidget(self.buttons)
+
+    def get_data(self) -> dict:
+        return {
+            "engineer": self.txt_engineer.text().strip(),
+            "description": self.txt_desc.text().strip(),
+            "reason": self.txt_reason.toPlainText().strip()
+        }
+
 
 class SubmissionPanel(QWidget):
     """Stage 10 Submission Panel."""
@@ -37,6 +83,7 @@ class SubmissionPanel(QWidget):
         self.db = db
         self._project_id: int | None = None
         self._build()
+        self._load_branding_ui()
 
     def _build(self) -> None:
         lay = QVBoxLayout(self)
@@ -93,7 +140,57 @@ class SubmissionPanel(QWidget):
 
         bl.addWidget(lock_card)
 
-        # 3. Project Readiness Card
+        # 3. Consultant Profile & Branding Card
+        brand_card = Card()
+        brand_layout = QVBoxLayout(brand_card)
+        brand_layout.setContentsMargins(16, 12, 16, 12)
+        brand_layout.setSpacing(8)
+
+        brand_layout.addWidget(QLabel("<b>Consultant Profile & Branding Settings</b>"))
+
+        grid = QGridLayout()
+        grid.setSpacing(6)
+
+        grid.addWidget(QLabel("Company Name:"), 0, 0)
+        self.txt_company = QLineEdit()
+        grid.addWidget(self.txt_company, 0, 1)
+
+        grid.addWidget(QLabel("Engineer Name:"), 1, 0)
+        self.txt_engineer = QLineEdit()
+        grid.addWidget(self.txt_engineer, 1, 1)
+
+        grid.addWidget(QLabel("Registration No (Optional):"), 2, 0)
+        self.txt_reg_no = QLineEdit()
+        grid.addWidget(self.txt_reg_no, 2, 1)
+
+        grid.addWidget(QLabel("Address:"), 3, 0)
+        self.txt_address = QLineEdit()
+        grid.addWidget(self.txt_address, 3, 1)
+
+        grid.addWidget(QLabel("Contact Info:"), 4, 0)
+        self.txt_contact = QLineEdit()
+        grid.addWidget(self.txt_contact, 4, 1)
+
+        grid.addWidget(QLabel("Logo Image:"), 5, 0)
+        logo_lay = QHBoxLayout()
+        self.txt_logo_path = QLineEdit()
+        self.txt_logo_path.setReadOnly(True)
+        self.txt_logo_path.setPlaceholderText("Select image for cover page...")
+        logo_lay.addWidget(self.txt_logo_path)
+        btn_logo = QPushButton("Browse...")
+        btn_logo.clicked.connect(self._on_browse_logo)
+        logo_lay.addWidget(btn_logo)
+        grid.addLayout(logo_lay, 5, 1)
+
+        brand_layout.addLayout(grid)
+
+        self.btn_save_brand = QPushButton("Save Profile")
+        self.btn_save_brand.clicked.connect(self._on_save_branding)
+        brand_layout.addWidget(self.btn_save_brand)
+
+        bl.addWidget(brand_card)
+
+        # 4. Project Readiness Card
         self.readiness_card = Card()
         rl = QVBoxLayout(self.readiness_card)
         rl.setContentsMargins(20, 16, 20, 16)
@@ -104,23 +201,31 @@ class SubmissionPanel(QWidget):
         rl.addWidget(self.lbl_readiness)
         bl.addWidget(self.readiness_card)
 
-        # 4. Export Delivery Package Card
+        # 5. Export Delivery Package Card
         export_card = Card()
         el = QHBoxLayout(export_card)
         el.setContentsMargins(16, 12, 16, 12)
         v_el = QVBoxLayout()
-        v_el.addWidget(QLabel("<b>ZIP Delivery Package</b>"))
+        v_el.addWidget(QLabel("<b>Submission Deliverables Exporter</b>"))
         v_el.addWidget(QLabel(
             "<span style='color:#6a7180; font-size:9pt;'>"
-            "Compiles Word report, inputs JSON, IITPAVE logs, summaries, "
-            "and sign-off templates with disclaimers into a single ZIP."
+            "Generate professional Word design reports or compile the complete structured "
+            "highway consultancy submission package (.zip)."
             "</span>"
         ))
         el.addLayout(v_el)
 
-        self.btn_export_zip = styled_button("Export Package (.zip)")
+        v_buttons = QVBoxLayout()
+        self.btn_export_dpr = QPushButton("Generate DPR (.docx)")
+        self.btn_export_dpr.setProperty("class", "Secondary")
+        self.btn_export_dpr.clicked.connect(self._on_export_dpr)
+        v_buttons.addWidget(self.btn_export_dpr)
+
+        self.btn_export_zip = styled_button("Generate Package (.zip)")
         self.btn_export_zip.clicked.connect(self._on_export_zip)
-        el.addWidget(self.btn_export_zip)
+        v_buttons.addWidget(self.btn_export_zip)
+
+        el.addLayout(v_buttons)
 
         bl.addWidget(export_card)
         bl.addStretch(1)
@@ -128,9 +233,46 @@ class SubmissionPanel(QWidget):
         scroll.setWidget(body)
         lay.addWidget(scroll, stretch=1)
 
+    def _load_branding_ui(self) -> None:
+        try:
+            from app.core.branding import get_branding_profile
+            brand = get_branding_profile()
+            self.txt_company.setText(brand.get("company_name", ""))
+            self.txt_logo_path.setText(brand.get("logo_path", ""))
+            self.txt_address.setText(brand.get("address", ""))
+            self.txt_contact.setText(brand.get("contact", ""))
+            self.txt_engineer.setText(brand.get("engineer_name", ""))
+            self.txt_reg_no.setText(brand.get("registration_number", ""))
+        except Exception:
+            pass
+
+    def _on_browse_logo(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Select Logo Image", "", "Images (*.png *.jpg *.jpeg *.bmp)"
+        )
+        if path:
+            self.txt_logo_path.setText(path)
+
+    def _on_save_branding(self) -> None:
+        profile = {
+            "company_name": self.txt_company.text().strip(),
+            "logo_path": self.txt_logo_path.text().strip(),
+            "address": self.txt_address.text().strip(),
+            "contact": self.txt_contact.text().strip(),
+            "engineer_name": self.txt_engineer.text().strip(),
+            "registration_number": self.txt_reg_no.text().strip()
+        }
+        try:
+            from app.core.branding import save_branding_profile
+            save_branding_profile(profile)
+            QMessageBox.information(self, "Success", "Consultant branding profile saved successfully.")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to save branding profile: {e}")
+
     def set_project(self, pid: int | None, name: str = "") -> None:
         self._project_id = pid
         self.btn_export_zip.setEnabled(pid is not None)
+        self.btn_export_dpr.setEnabled(pid is not None)
 
         if pid is None:
             self.proj_banner.setText("⚠ No project loaded.")
@@ -179,52 +321,102 @@ class SubmissionPanel(QWidget):
     def _check_readiness(self, project: Any) -> None:
         status = self.db.get_module_status(project.id) or {}
         
-        checks = []
-        missing = []
-
-        # 1. Project Metadata
-        if project.work_name and project.client_id and project.consultant and project.report_id:
-            checks.append("✔ Project Metadata (Name, Client, Consultant, Report ID) complete.")
-        else:
-            missing.append("• Missing project metadata: ensure Client, Consultant, and Report ID are filled.")
-
-        # 2. Mix Design
-        if status.get("mix_design") == "complete":
-            checks.append("✔ Bituminous Mix Design saved.")
-        else:
-            missing.append("• Mix Design has not been completed/saved.")
-
-        # 3. Traffic Analysis
-        if status.get("traffic") == "complete":
-            checks.append("✔ Traffic / MSA calculations completed.")
-        else:
-            missing.append("• Traffic / MSA analysis has not been completed.")
-
-        # 4. Structural Design
-        if status.get("structural") == "complete":
-            checks.append("✔ Structural design completed.")
-        else:
-            missing.append("• Flexible structural design has not been saved.")
-
-        # 5. Stabilized Design (Optional)
-        if status.get("stabilized") == "complete":
-            checks.append("✔ Stabilized CTB/CTS design completed.")
-
-        # 6. IITPAVE Verification
+        # Calculate completion %
+        completed_count = 0
+        total_modules = 5
+        
+        has_traffic = status.get("traffic") == "complete"
+        if has_traffic:
+            completed_count += 1
+            
+        has_subgrade = project.subgrade_cbr is not None and project.subgrade_cbr > 0.0
+        if has_subgrade:
+            completed_count += 1
+            
+        has_structural = status.get("structural") == "complete"
+        if has_structural:
+            completed_count += 1
+            
         mech_val = self.db.latest_mechanistic_validation(project.id)
-        if mech_val:
-            checks.append(f"✔ Mechanistic validation recorded (Fatigue: {mech_val.fatigue_verdict}, Rutting: {mech_val.rutting_verdict}).")
-        else:
-            missing.append("• Mechanistic validation (IITPAVE check) has not been run or saved.")
+        has_iitpave = mech_val is not None and not mech_val.refused
+        if has_iitpave:
+            completed_count += 1
+            
+        mq_row = self.db.latest_material_quantity(project.id)
+        has_boq = mq_row is not None
+        if has_boq:
+            completed_count += 1
+            
+        progress_pct = int((completed_count / total_modules) * 100)
 
-        html = ""
-        if checks:
-            html += "<p style='color:#1d7a3a;'>" + "<br>".join(checks) + "</p>"
+        # Audit Status
+        audit_status = "Not Run"
+        audit_color = "#6a7180"
+        try:
+            from app.engineering.design_audit import run_project_audit
+            audit = run_project_audit(project.id, self.db)
+            audit_status = f"{audit.readiness_status} (Score: {audit.score}/100, Risk: {audit.risk_level})"
+            if audit.risk_level == "GREEN":
+                audit_color = "#1d7a3a"
+            elif audit.risk_level == "YELLOW":
+                audit_color = "#b28a00"
+            else:
+                audit_color = "#b22222"
+        except Exception:
+            pass
+            
+        boq_status = "Complete" if has_boq else "Incomplete"
+        boq_color = "#1d7a3a" if has_boq else "#b22222"
+        
+        dpr_status = "Ready for Export" if (has_traffic and has_structural) else "Incomplete (Traffic and Structural design required)"
+        dpr_color = "#1d7a3a" if (has_traffic and has_structural) else "#b22222"
+        
+        html = f"""
+        <table width="100%" cellpadding="4" style="font-size:10pt; border-collapse: collapse;">
+            <tr style="border-bottom: 1px solid #eee;">
+                <td width="35%"><b>Workflow Completion:</b></td>
+                <td>
+                    <div style="background-color: #e0e0e0; border-radius: 4px; width: 100%; height: 16px;">
+                        <div style="background-color: #2980b9; border-radius: 4px; width: {progress_pct}%; height: 16px; text-align: center; color: white; font-weight: bold; font-size: 8pt; line-height: 16px;">
+                            {progress_pct}%
+                        </div>
+                    </div>
+                </td>
+            </tr>
+            <tr style="border-bottom: 1px solid #eee;">
+                <td><b>Design Audit Status:</b></td>
+                <td style="color: {audit_color}; font-weight: bold;">{audit_status}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #eee;">
+                <td><b>BOQ / Costing Status:</b></td>
+                <td style="color: {boq_color}; font-weight: bold;">{boq_status}</td>
+            </tr>
+            <tr>
+                <td><b>DPR Report Status:</b></td>
+                <td style="color: {dpr_color}; font-weight: bold;">{dpr_status}</td>
+            </tr>
+        </table>
+        """
+        
+        missing = []
+        if not project.work_name or not project.client_id or not project.consultant or not project.report_id:
+            missing.append("• Project metadata is incomplete (check Client, Consultant, and Report ID).")
+        if not has_traffic:
+            missing.append("• Traffic / MSA analysis has not been completed.")
+        if not has_subgrade:
+            missing.append("• Subgrade CBR and Resilient Modulus (Mr) have not been set.")
+        if not has_structural:
+            missing.append("• Structural design has not been saved.")
+        if not has_boq:
+            missing.append("• Material Quantity / BOQ estimation has not been run.")
+        if not has_iitpave:
+            missing.append("• IITPAVE mechanistic check has not been run.")
+            
         if missing:
-            html += "<p style='color:#b22222; font-weight:bold;'>Missing Checks / Recommendations:<br>" + "<br>".join(missing) + "</p>"
+            html += "<p style='color:#b22222; margin-top:10px; font-weight:bold;'>Review Checklist Warnings:<br>" + "<br>".join(missing) + "</p>"
         else:
-            html += "<p style='color:#1d7a3a; font-weight:bold;'>✔ All readiness validation checks passed! Ready for final ZIP submission packaging.</p>"
-
+            html += "<p style='color:#1d7a3a; margin-top:10px; font-weight:bold;'>✔ All readiness validation checks passed! Ready for final ZIP submission packaging.</p>"
+            
         self.lbl_readiness.setText(html)
 
     def _on_lock_toggle(self) -> None:
@@ -237,7 +429,6 @@ class SubmissionPanel(QWidget):
 
         try:
             if p.locked:
-                # Warning before unlocking
                 ans = QMessageBox.warning(
                     self,
                     "Unlock Design Confirmation",
@@ -252,7 +443,6 @@ class SubmissionPanel(QWidget):
                     self.db.set_module_status(self._project_id, "submission", "empty")
                     QMessageBox.information(self, "Unlocked", "Design unlocked successfully.")
             else:
-                # Lock project
                 self.db.lock_project(self._project_id)
                 self.db.set_module_status(self._project_id, "submission", "complete")
                 QMessageBox.information(
@@ -276,31 +466,90 @@ class SubmissionPanel(QWidget):
             QMessageBox.warning(self, "Failed", "Project must be locked to create a revision copy.")
             return
 
-        ans = QMessageBox.question(
-            self,
-            "Create Revision Copy",
-            "This will create a new editable branch/revision copy of the project. "
-            "The locked snapshot of this version will remain archived for audit auditability.\n\n"
-            "Do you want to create a revision branch now?",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.Yes
-        )
-        if ans != QMessageBox.Yes:
+        from app.core.branding import get_branding_profile
+        brand = get_branding_profile()
+        default_eng = brand.get("engineer_name") or p.submitted_by or ""
+
+        dlg = RevisionCreationDialog(default_eng, self)
+        if dlg.exec() != QDialog.Accepted:
             return
 
+        data = dlg.get_data()
+        if not data["engineer"] or not data["description"]:
+            QMessageBox.warning(self, "Invalid Inputs", "Engineer Name and Description of Change are required.")
+            return
+
+        note_dict = {
+            "engineer": data["engineer"],
+            "description": data["description"],
+            "reason": data["reason"]
+        }
+        note_str = json.dumps(note_dict)
+
         try:
-            new_proj = self.db.create_project_revision(self._project_id)
+            new_pid = self.db.create_project_revision(self._project_id, note_str)
             QMessageBox.information(
                 self,
                 "Revision Created",
-                f"New revision created!\n\n"
-                f"Active project switched to Revision #{new_proj.revision_number} (Project #{new_proj.id}).\n"
+                f"New revision branch created successfully!\n\n"
+                f"Active project switched to Revision #{p.revision_number + 1} (Project #{new_pid}).\n"
                 f"This copy is unlocked and ready for edits."
             )
-            # Notify main window to reload and switch active project
-            self.project_changed.emit(new_proj.id)
+            self.project_changed.emit(new_pid)
         except Exception as e:
             QMessageBox.critical(self, "Revision failed", str(e))
+
+    def _on_export_dpr(self) -> None:
+        if self._project_id is None:
+            return
+        p = self.db.get_project(self._project_id)
+        if not p:
+            return
+
+        # File picker to save Word document
+        default_name = f"NH_DPR_Project_{self._project_id}.docx"
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save Professional DPR Report",
+            str(Path.home() / "Desktop" / default_name),
+            "Word Documents (*.docx)"
+        )
+        if not path:
+            return
+
+        try:
+            meta = {
+                "project_title": p.work_name or "Pavement Report",
+                "work_name": p.work_name or "",
+                "work_order_no": p.work_order_no or "",
+                "work_order_date": p.work_order_date or "",
+                "client": (p.client.name if p.client else ""),
+                "agency": p.agency or "",
+                "submitted_by": p.submitted_by or "",
+                "report_date": datetime.now().strftime("%d-%b-%Y"),
+                "binder_grade": p.binder_grade or "",
+                "mix_type_key": p.mix_type or "",
+            }
+            ctx = CombinedReportContext(**meta)
+            
+            build_combined_report(
+                Path(path),
+                self.db,
+                self._project_id,
+                ctx,
+            )
+            QMessageBox.information(
+                self,
+                "Success",
+                f"Professional DPR Report generated successfully!\n\n"
+                f"File saved to:\n{path}"
+            )
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Report Generation Failed",
+                f"Failed to compile report Word document: {e}"
+            )
 
     def _on_export_zip(self) -> None:
         if self._project_id is None:
@@ -349,13 +598,13 @@ class SubmissionPanel(QWidget):
             "ZIP Archives (*.zip)"
         )
         if not path:
-            # Clean up temp file
             if temp_docx_path.exists():
                 temp_docx_path.unlink()
             return
 
         try:
-            generate_project_archive(self.db, self._project_id, Path(path), temp_docx_path)
+            # FIX swapped arguments bug: report_path is temp_docx_path, archive_out_path is Path(path)
+            generate_project_archive(self.db, self._project_id, temp_docx_path, Path(path))
             QMessageBox.information(
                 self,
                 "Success",
