@@ -85,6 +85,8 @@ class Project(Base):
     is_legacy: Mapped[bool] = mapped_column(Boolean, default=False)
     subgrade_cbr: Mapped[Optional[float]] = mapped_column(Float, default=None)
     subgrade_mr: Mapped[Optional[float]] = mapped_column(Float, default=None)
+    selected_design_option: Mapped[Optional[str]] = mapped_column(Text, default=None)
+
 
 
     client: Mapped[Optional[Client]] = relationship(back_populates="projects")

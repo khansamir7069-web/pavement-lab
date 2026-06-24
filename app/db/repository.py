@@ -175,6 +175,9 @@ class Database:
             if "is_legacy" not in cols:
                 conn.execute(text("ALTER TABLE projects ADD COLUMN is_legacy BOOLEAN DEFAULT 0"))
                 conn.execute(text("UPDATE projects SET is_legacy = 1"))
+            if "selected_design_option" not in cols:
+                conn.execute(text("ALTER TABLE projects ADD COLUMN selected_design_option TEXT"))
+
 
     def initialize_workflow_statuses(self, project_id: int) -> dict:
         with self.session() as s:
@@ -316,6 +319,15 @@ class Database:
                 setattr(p, k, v)
             s.flush()
             return p
+
+    def update_selected_design_option(self, project_id: int, option_name: str) -> None:
+        with self.session() as s:
+            _check_not_locked(s, project_id)
+            p = s.get(Project, project_id)
+            if p:
+                p.selected_design_option = option_name
+                s.flush()
+
 
     def delete_project(self, project_id: int) -> bool:
         with self.session() as s:

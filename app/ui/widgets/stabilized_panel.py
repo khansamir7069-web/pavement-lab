@@ -228,9 +228,61 @@ class StabilizedPanel(QWidget):
         self.health_card.setVisible(False)
         bl.addWidget(self.health_card)
 
+        # ----- Pavement Alternative Selection Panel -----
+        self.options_card = Card()
+        ol = QVBoxLayout(self.options_card)
+        ol.setContentsMargins(20, 16, 20, 16); ol.setSpacing(8)
+        
+        self.lbl_options_title = QLabel("<b>Pavement Alternative Selection System</b>")
+        self.lbl_options_title.setStyleSheet("font-size:11.5pt; color:#1f3a68;")
+        ol.addWidget(self.lbl_options_title)
+
+        # Options comparison table
+        self.options_table = QTableWidget(0, 7)
+        self.options_table.setHorizontalHeaderLabels([
+            "Option",
+            "Thickness",
+            "Layers",
+            "Approx Cost Index",
+            "Engineering Score",
+            "IITPAVE Status",
+            "Recommendation"
+        ])
+        self.options_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.options_table.verticalHeader().setVisible(False)
+        self.options_table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.options_table.setSelectionMode(QTableWidget.SingleSelection)
+        self.options_table.setMinimumHeight(180)
+        ol.addWidget(self.options_table)
+
+        # Smart recommendation text label
+        self.lbl_smart_rec = QLabel("")
+        self.lbl_smart_rec.setWordWrap(True)
+        self.lbl_smart_rec.setStyleSheet(
+            "background:#eafaf1; color:#1b5e20; padding:8px 12px; "
+            "border:1px solid #c8e6c9; border-radius:4px; font-size:9.5pt; font-style:italic;"
+        )
+        self.lbl_smart_rec.setVisible(False)
+        ol.addWidget(self.lbl_smart_rec)
+
+        # Actions buttons layout
+        btn_layout = QHBoxLayout()
+        self.btn_gen_options = styled_button("Generate Options", "secondary")
+        self.btn_gen_options.clicked.connect(self._on_generate_options)
+        self.btn_mark_selected = styled_button("Mark As Selected Design", "primary")
+        self.btn_mark_selected.clicked.connect(self._on_mark_selected)
+        self.btn_mark_selected.setEnabled(False)
+        btn_layout.addWidget(self.btn_gen_options)
+        btn_layout.addWidget(self.btn_mark_selected)
+        btn_layout.addStretch(1)
+        ol.addLayout(btn_layout)
+
+        bl.addWidget(self.options_card)
+
         bl.addStretch(1)
         scroll.setWidget(body)
         lay.addWidget(scroll, stretch=1)
+
 
     def set_project(self, pid: int | None, name: str = "") -> None:
         self._project_id = pid
@@ -238,6 +290,11 @@ class StabilizedPanel(QWidget):
         self.btn_save.setEnabled(False)
         self.res_card.setVisible(False)
         self.health_card.setVisible(False)
+        
+        # Reset Options Table
+        self.options_table.setRowCount(0)
+        self.lbl_smart_rec.setVisible(False)
+        self.btn_mark_selected.setEnabled(False)
 
         if pid is None:
             self.proj_banner.setText("⚠ No project loaded.")
@@ -285,6 +342,10 @@ class StabilizedPanel(QWidget):
                 self._on_compute()
             except Exception:
                 pass
+
+        # Auto-generate options comparison for alternative selection stage
+        self._on_generate_options()
+
 
     def _collect(self) -> StabilizedInput:
         return StabilizedInput(
@@ -466,3 +527,98 @@ class StabilizedPanel(QWidget):
         if self._project_id is None or self._last_result is None:
             return
         self.export_requested.emit(self._project_id)
+
+    def _on_generate_options(self) -> None:
+        if self._project_id is None:
+            return
+        
+        from app.engineering.option_engine import generate_pavement_options
+        options = generate_pavement_options(self._project_id, self.db)
+        if not options:
+            self.options_table.setRowCount(0)
+            self.lbl_smart_rec.setVisible(False)
+            return
+
+        self.options_table.setRowCount(0)
+        self.options_table.setRowCount(len(options))
+
+        for row_idx, opt in enumerate(options):
+            # Option Name
+            item_name = QTableWidgetItem(opt["option_name"])
+            self.options_table.setItem(row_idx, 0, item_name)
+
+            # Thickness
+            thick_val = opt["total_pavement_thickness"]
+            thick_str = f"{thick_val:.0f} mm" if thick_val > 0 else "—"
+            self.options_table.setItem(row_idx, 1, QTableWidgetItem(thick_str))
+
+            # Layers
+            self.options_table.setItem(row_idx, 2, QTableWidgetItem(opt["layers"]))
+
+            # Approx Cost Index
+            self.options_table.setItem(row_idx, 3, QTableWidgetItem(opt["estimated_cost_indicator"]))
+
+            # Engineering Score
+            score_val = opt["engineering_score"]
+            score_str = str(score_val) if score_val > 0 else "N/A"
+            self.options_table.setItem(row_idx, 4, QTableWidgetItem(score_str))
+
+            # IITPAVE Status
+            self.options_table.setItem(row_idx, 5, QTableWidgetItem(opt["iitpave_status"]))
+
+            # Recommendation
+            self.options_table.setItem(row_idx, 6, QTableWidgetItem(opt["recommendation_reason"]))
+
+        # Select first option by default, or the previously selected design if persisted
+        project = self.db.get_project(self._project_id)
+        selected_opt_name = project.selected_design_option if project else None
+
+        default_row = 0
+        if selected_opt_name:
+            for row_idx in range(len(options)):
+                if options[row_idx]["option_name"] == selected_opt_name:
+                    default_row = row_idx
+                    break
+
+        self.options_table.selectRow(default_row)
+        self.btn_mark_selected.setEnabled(True)
+
+        # Highlight recommendations and display smart recommendation box
+        opt_d = next((o for o in options if o["design_type"] == "Recommended Option"), None)
+
+        if opt_d and opt_d["total_pavement_thickness"] > 0:
+            self.lbl_smart_rec.setText(
+                f"<b>💡 Consultant Smart Recommendation:</b><br>{opt_d['recommendation_reason']}"
+            )
+            self.lbl_smart_rec.setVisible(True)
+        else:
+            self.lbl_smart_rec.setVisible(False)
+
+    def _on_mark_selected(self) -> None:
+        if self._project_id is None:
+            return
+
+        selected_ranges = self.options_table.selectedRanges()
+        if not selected_ranges:
+            QMessageBox.warning(self, "Warning", "Please select a design option from the table first.")
+            return
+
+        row_idx = selected_ranges[0].topRow()
+        item = self.options_table.item(row_idx, 0)
+        if not item:
+            return
+
+        option_name = item.text()
+        try:
+            self.db.update_selected_design_option(self._project_id, option_name)
+            # Update workflow status for alternative selection stage
+            self.db.update_module_status(self._project_id, "stabilized", "complete")
+            self.saved.emit(self._project_id)
+            QMessageBox.information(
+                self,
+                "Design Selection Persisted",
+                f"Design Alternative <b>{option_name}</b> has been officially selected for this project."
+            )
+        except Exception as e:
+            QMessageBox.critical(self, "Persist failed", str(e))
+

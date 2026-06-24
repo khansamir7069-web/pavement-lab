@@ -726,6 +726,27 @@ def build_combined_report(
     if p is None:
         raise ValueError(f"Project #{project_id} not found.")
 
+    # Run Expert Design Audit (fail-safe)
+    audit_result = None
+    try:
+        from app.engineering.design_audit import run_project_audit
+        audit_result = run_project_audit(project_id, db)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).exception("Failed to run design audit for report: %s", e)
+
+    # Run Pavement Alternative Comparison (fail-safe)
+    pavement_options = []
+    has_pavement_options = False
+    try:
+        from app.engineering.option_engine import generate_pavement_options
+        pavement_options = generate_pavement_options(project_id, db)
+        has_pavement_options = any(opt.get("total_pavement_thickness", 0.0) > 0 for opt in pavement_options)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).exception("Failed to generate pavement options for report: %s", e)
+
+
     # Discover persisted modules
     sd_row = db.latest_structural_design(project_id)
     ov_row = db.latest_maintenance_design(project_id, "overlay")
@@ -812,6 +833,11 @@ def build_combined_report(
     toc_rows: list[list[str]] = [
         ["Executive Summary", "Project summary and engineering disclaimer"]
     ]
+    if audit_result and getattr(audit_result, "findings", None):
+        toc_rows.append(["Expert Design Audit Summary", "Engineering score, risk level, and design findings"])
+    if has_pavement_options:
+        toc_rows.append(["Pavement Alternative Comparison", "Comparison of Conventional, Stabilized, and Mechanistic pavement options"])
+
     if have_mix:
         toc_rows.append(["Bituminous Mix Design",
                          "MoRTH Section 500 / IRC:111 / Marshall Mix Design"])
@@ -879,6 +905,19 @@ def build_combined_report(
 
     included: list[str] = []
     schema_history_summary = None
+
+    # ---- Expert Design Audit Summary Section ----
+    if audit_result and getattr(audit_result, "findings", None):
+        doc.add_page_break()
+        write_expert_design_audit_section(doc, audit_result)
+        included.append("Expert Design Audit Summary")
+
+    # ---- Pavement Alternative Comparison Section ----
+    if has_pavement_options:
+        doc.add_page_break()
+        write_pavement_alternative_comparison_section(doc, pavement_options, p)
+        included.append("Pavement Alternative Comparison")
+
 
     provenance_summary = build_combined_report_provenance_summary(
         db=db,
@@ -1261,4 +1300,90 @@ def write_signature_placeholders(doc) -> None:
     add_p(doc, "  Date: _____________________________________")
     add_p(doc, "")
     add_p(doc, "  Seal / Registration No: ____________________")
+
+
+def write_expert_design_audit_section(doc, audit_result) -> None:
+    try:
+        if not audit_result or not getattr(audit_result, "findings", None):
+            return
+        
+        add_heading(doc, "EXPERT DESIGN AUDIT SUMMARY", level=1)
+        
+        # Add summary info
+        summary_info = [
+            ("Engineering Score", f"{getattr(audit_result, 'score', 0)} / 100"),
+            ("Risk Level", str(getattr(audit_result, "risk_level", "UNKNOWN"))),
+            ("Readiness Status", str(getattr(audit_result, "readiness_status", "UNKNOWN")))
+        ]
+        add_kv_table(doc, summary_info)
+        add_p(doc, "")  # blank line
+        
+        # Add findings table
+        findings_rows = []
+        for f in audit_result.findings:
+            findings_rows.append([
+                str(getattr(f, "severity", "")).upper(),
+                str(getattr(f, "module", "")).capitalize(),
+                str(getattr(f, "issue", "")),
+                str(getattr(f, "recommendation", "")),
+                str(getattr(f, "engineering_reason", ""))
+            ])
+            
+        if findings_rows:
+            add_table(
+                doc,
+                ["Severity", "Module", "Issue", "Recommendation", "Engineering Reason"],
+                findings_rows
+            )
+            
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).exception("Failed to write expert design audit section: %s", e)
+
+
+def write_pavement_alternative_comparison_section(doc, options: list[dict], project) -> None:
+    try:
+        if not options:
+            return
+
+        # Lazy import of reporting helpers if needed, but they are already in the file namespace
+        add_heading(doc, "PAVEMENT ALTERNATIVE COMPARISON", level=1)
+        add_p(doc, "This section presents a comparative analysis of the four design alternatives evaluated for the project:")
+
+        # Build option comparison table
+        table_rows = []
+        for opt in options:
+            total_thick = opt.get("total_pavement_thickness", 0.0)
+            thick_str = f"{total_thick:.0f} mm" if total_thick > 0 else "—"
+            table_rows.append([
+                str(opt.get("option_name", "")),
+                thick_str,
+                str(opt.get("layers", "")),
+                str(opt.get("estimated_cost_indicator", "")),
+                str(opt.get("engineering_score", "")),
+                str(opt.get("iitpave_status", "")),
+                str(opt.get("recommendation_reason", ""))
+            ])
+
+        add_table(
+            doc,
+            ["Option", "Thickness", "Layers", "Approx Cost Index", "Engineering Score", "IITPAVE Status", "Recommendation"],
+            table_rows
+        )
+        add_p(doc, "")  # blank line
+
+        # Display selected option
+        selected_opt = getattr(project, "selected_design_option", None) or "None Selected"
+        add_p(doc, f"Selected Pavement Design Option: {selected_opt}", bold=True)
+
+        # Display cost-optimized recommendation if present
+        opt_d = next((o for o in options if o.get("design_type") == "Recommended Option"), None)
+
+        if opt_d and opt_d.get("total_pavement_thickness", 0.0) > 0:
+            add_p(doc, f"Consultant Recommendation Reason: {opt_d.get('recommendation_reason', '')}")
+
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).exception("Failed to write pavement alternative comparison section: %s", e)
+
 

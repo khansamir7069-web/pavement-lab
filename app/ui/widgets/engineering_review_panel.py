@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -15,7 +16,13 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QTextEdit,
     QVBoxLayout,
+    QHBoxLayout,
     QWidget,
+    QTableWidget,
+    QTableWidgetItem,
+    QHeaderView,
+    QPushButton,
+    QFileDialog,
 )
 
 from .common import Card, PageHeader, styled_button
@@ -99,6 +106,53 @@ class EngineeringReviewPanel(QWidget):
         form.addRow("Reviewer Notes & Remarks", self.txt_notes)
 
         bl.addWidget(form_card)
+
+        # Expert Audit Card
+        self.audit_card = Card()
+        audit_layout = QVBoxLayout(self.audit_card)
+        audit_layout.setContentsMargins(20, 16, 20, 16)
+        audit_layout.setSpacing(12)
+
+        audit_header = QHBoxLayout()
+        audit_title = QLabel("<b>Expert Design Audit Summary</b>")
+        audit_title.setStyleSheet("font-size: 11pt; color: #1f3a68;")
+        audit_header.addWidget(audit_title)
+        
+        self.btn_run_audit = QPushButton("Run Audit")
+        self.btn_run_audit.setProperty("class", "Secondary")
+        self.btn_run_audit.clicked.connect(self._run_audit)
+        audit_header.addWidget(self.btn_run_audit)
+        
+        self.btn_export_audit = QPushButton("Export Audit Summary")
+        self.btn_export_audit.setProperty("class", "Secondary")
+        self.btn_export_audit.clicked.connect(self._export_audit)
+        audit_header.addWidget(self.btn_export_audit)
+        
+        audit_layout.addLayout(audit_header)
+
+        # Status row
+        status_layout = QHBoxLayout()
+        self.lbl_audit_score = QLabel("Engineering Score: N/A")
+        self.lbl_audit_score.setStyleSheet("font-size: 10pt; font-weight: bold;")
+        self.lbl_risk_level = QLabel("Risk Level: N/A")
+        self.lbl_risk_level.setStyleSheet("font-size: 10pt; font-weight: bold;")
+        self.lbl_readiness_status = QLabel("Readiness Status: N/A")
+        self.lbl_readiness_status.setStyleSheet("font-size: 10pt; font-weight: bold;")
+        
+        status_layout.addWidget(self.lbl_audit_score)
+        status_layout.addWidget(self.lbl_risk_level)
+        status_layout.addWidget(self.lbl_readiness_status)
+        audit_layout.addLayout(status_layout)
+
+        # Findings table
+        self.findings_table = QTableWidget()
+        self.findings_table.setColumnCount(4)
+        self.findings_table.setHorizontalHeaderLabels(["Severity", "Module", "Issue", "Recommendation & Reason"])
+        self.findings_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Stretch)
+        self.findings_table.setMinimumHeight(200)
+        audit_layout.addWidget(self.findings_table)
+
+        bl.addWidget(self.audit_card)
         bl.addStretch(1)
 
         scroll.setWidget(body)
@@ -132,6 +186,7 @@ class EngineeringReviewPanel(QWidget):
         self.txt_notes.setPlainText(checklist_dict.get("reviewer_notes", ""))
 
         self._set_enabled(not p.locked)
+        self._run_audit()
 
     def _set_enabled(self, enabled: bool) -> None:
         self.cb_design_review.setEnabled(enabled)
@@ -140,7 +195,6 @@ class EngineeringReviewPanel(QWidget):
         self.cb_material_verification.setEnabled(enabled)
         self.iitpave_status.setEnabled(enabled)
         self.txt_notes.setEnabled(enabled)
-        # Allow saving & updating review_status even if locked
         self.review_status.setEnabled(True)
         self.btn_save.setEnabled(True)
 
@@ -164,5 +218,87 @@ class EngineeringReviewPanel(QWidget):
             self.db.set_module_status(self._project_id, "engineering_review", "complete")
             QMessageBox.information(self, "Saved", "Checklist and workflow status saved successfully.")
             self.saved.emit(self._project_id)
+            self._run_audit()
         except Exception as e:
             QMessageBox.critical(self, "Save Failed", str(e))
+
+    def _run_audit(self) -> None:
+        if self._project_id is None:
+            # Clear UI elements
+            self.lbl_audit_score.setText("Engineering Score: N/A")
+            self.lbl_risk_level.setText("Risk Level: N/A")
+            self.lbl_readiness_status.setText("Readiness Status: N/A")
+            self.findings_table.setRowCount(0)
+            return
+        
+        from app.engineering.design_audit import run_project_audit
+        res = run_project_audit(self._project_id, self.db)
+        
+        self.lbl_audit_score.setText(f"Engineering Score: {res.score}/100")
+        
+        color_map = {
+            "GREEN": "#1d7a3a",
+            "YELLOW": "#b56900",
+            "RED": "#c22d2d"
+        }
+        color = color_map.get(res.risk_level, "#333333")
+        self.lbl_risk_level.setText(f"Risk Level: <span style='color:{color}; font-weight:bold;'>{res.risk_level}</span>")
+        self.lbl_readiness_status.setText(f"Readiness Status: {res.readiness_status}")
+        
+        self.findings_table.setRowCount(len(res.findings))
+        for i, f in enumerate(res.findings):
+            item_sev = QTableWidgetItem(f.severity.upper())
+            sev_colors = {
+                "critical": "#c22d2d",
+                "warning": "#b56900",
+                "info": "#1d7a3a"
+            }
+            item_sev.setForeground(QColor(sev_colors.get(f.severity, "#333333")))
+            item_sev.setTextAlignment(Qt.AlignCenter)
+            self.findings_table.setItem(i, 0, item_sev)
+            
+            item_mod = QTableWidgetItem(f.module.title())
+            item_mod.setTextAlignment(Qt.AlignCenter)
+            self.findings_table.setItem(i, 1, item_mod)
+            
+            self.findings_table.setItem(i, 2, QTableWidgetItem(f.issue))
+            
+            rec_text = f"Recommendation: {f.recommendation}\nReason: {f.engineering_reason}"
+            item_rec = QTableWidgetItem(rec_text)
+            self.findings_table.setItem(i, 3, item_rec)
+
+    def _export_audit(self) -> None:
+        if self._project_id is None:
+            return
+        from app.engineering.design_audit import run_project_audit
+        res = run_project_audit(self._project_id, self.db)
+        
+        default = f"Audit_Summary_Project_{self._project_id}.txt"
+        path, _ = QFileDialog.getSaveFileName(self, "Export Audit Summary", default, "Text Files (*.txt)")
+        if not path:
+            return
+            
+        try:
+            lines = [
+                f"SAMPAVE DESIGN AUDIT SUMMARY REPORT",
+                f"Project ID: {self._project_id}",
+                f"Engineering Score: {res.score}/100",
+                f"Risk Level: {res.risk_level}",
+                f"Readiness Status: {res.readiness_status}",
+                "==================================================",
+                f"Total Findings: {len(res.findings)}",
+                ""
+            ]
+            for idx, f in enumerate(res.findings, 1):
+                lines.append(f"{idx}. [{f.severity.upper()}] in Module: {f.module.upper()}")
+                lines.append(f"   Issue: {f.issue}")
+                lines.append(f"   Recommendation: {f.recommendation}")
+                lines.append(f"   Engineering Reason: {f.engineering_reason}")
+                lines.append("")
+                
+            with open(path, "w", encoding="utf-8") as file:
+                file.write("\n".join(lines))
+                
+            QMessageBox.information(self, "Export Successful", f"Audit summary exported to:\n{path}")
+        except Exception as e:
+            QMessageBox.critical(self, "Export Failed", str(e))
