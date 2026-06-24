@@ -20,6 +20,11 @@ from pathlib import Path
 block_cipher = None
 ROOT = Path(SPECPATH).resolve().parent.parent   # build/installer -> repo root
 
+from PyInstaller.utils.hooks import collect_submodules, collect_dynamic_libs, collect_data_files
+
+numpy_hidden = collect_submodules("numpy")
+numpy_binaries = collect_dynamic_libs("numpy")
+numpy_datas = collect_data_files("numpy")
 
 # ---------------------------------------------------------------------------
 # Bundled data
@@ -51,7 +56,7 @@ datas = [
     # per build/installer/bundle_iitpave.md.
     (str(ROOT / "app" / "external"),
         "app/external"),
-]
+] + numpy_datas
 
 
 # ---------------------------------------------------------------------------
@@ -71,7 +76,7 @@ hiddenimports = [
     "PIL",                                 # Pillow — Phase 11
     "PIL.Image",
     "PIL.JpegImagePlugin",
-]
+] + numpy_hidden
 
 
 # ---------------------------------------------------------------------------
@@ -87,7 +92,7 @@ excludes = [
 a = Analysis(
     [str(ROOT / "run.py")],
     pathex=[str(ROOT)],
-    binaries=[],
+    binaries=numpy_binaries,
     datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],
