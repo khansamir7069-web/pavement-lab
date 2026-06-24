@@ -24,6 +24,8 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
     QVBoxLayout,
     QWidget,
+    QComboBox,
+    QDialog,
 )
 
 from app.core import (
@@ -39,10 +41,11 @@ from app.core import (
     MaterialCalcInput,
     MIX_SPECS,
     MIX_TYPES,
+    BINDER_GRADES,
     StabilityFlowInput,
     StabilitySpecimen,
 )
-from .common import PageHeader, PlaceholderBanner, styled_button
+from .common import Card, PageHeader, PlaceholderBanner, styled_button
 
 
 # Fallback gradation envelope used only before a project mix type is selected.
@@ -819,13 +822,16 @@ class InputsPanel(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.project_id = None
+        self.db = None
+        
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
         header = PageHeader(
             "Mix Design Inputs",
-            "Edit lab data per tab, then click Compute to run the engine.",
+            "Select mix and binder properties, edit lab data per tab, then click Compute.",
         )
         self.btn_compute = styled_button("Compute Mix Design")
         self.btn_compute.clicked.connect(self.compute_requested.emit)
@@ -834,6 +840,35 @@ class InputsPanel(QWidget):
         header.add_action(self.btn_reset)
         header.add_action(self.btn_compute)
         layout.addWidget(header)
+
+        # Selectors Card for Mix Type & Binder Grade (moved from Project Setup form)
+        selectors_card = Card()
+        selectors_layout = QHBoxLayout(selectors_card)
+        selectors_layout.setContentsMargins(16, 8, 16, 8)
+        selectors_layout.setSpacing(12)
+
+        selectors_layout.addWidget(QLabel("<b>Mix Type:</b>"))
+        self.mix_type = QComboBox()
+        self.mix_type.addItem("— Not selected —", None)
+        for key, spec in MIX_SPECS.items():
+            self.mix_type.addItem(f"{key} — {spec.name}", key)
+        self.mix_type.currentIndexChanged.connect(self._on_mix_type_changed)
+        selectors_layout.addWidget(self.mix_type, stretch=1)
+
+        selectors_layout.addWidget(QLabel("<b>Binder Grade:</b>"))
+        self.binder_grade = QComboBox()
+        self.binder_grade.addItem("— Not selected —", None)
+        for code, b in BINDER_GRADES.items():
+            self.binder_grade.addItem(f"{code} — {b.full_name}", code)
+        selectors_layout.addWidget(self.binder_grade, stretch=1)
+
+        self._binder_props = {}
+        self.btn_binder_props = QPushButton("Edit Properties…")
+        self.btn_binder_props.setProperty("class", "Secondary")
+        self.btn_binder_props.clicked.connect(self._edit_binder_props)
+        selectors_layout.addWidget(self.btn_binder_props)
+
+        layout.addWidget(selectors_card)
 
         self.tabs = QTabWidget()
         self.tab_gradation = GradationTab()
@@ -852,6 +887,46 @@ class InputsPanel(QWidget):
         self.tabs.addTab(self.tab_sf, "5. Stability / Flow")
         self.tabs.addTab(self.tab_material, "6. Material Calc")
         layout.addWidget(self.tabs, stretch=1)
+
+    def _on_mix_type_changed(self) -> None:
+        key = self.mix_type.currentData()
+        self.set_mix_type(key or "")
+
+    def _edit_binder_props(self) -> None:
+        code = self.binder_grade.currentData()
+        if not code:
+            self._binder_props = {}
+            return
+        from .project_form import BinderPropertiesDialog
+        dlg = BinderPropertiesDialog(code, self._binder_props, self)
+        if dlg.exec() == QDialog.Accepted:
+            self._binder_props = dlg.collect()
+
+    def set_project(self, project_id: int, db) -> None:
+        self.project_id = project_id
+        self.db = db
+        p = self.db.get_project(project_id)
+        if p:
+            self.mix_type.blockSignals(True)
+            self.binder_grade.blockSignals(True)
+
+            idx = self.mix_type.findData(p.mix_type)
+            self.mix_type.setCurrentIndex(idx if idx >= 0 else 0)
+            bidx = self.binder_grade.findData(p.binder_grade)
+            self.binder_grade.setCurrentIndex(bidx if bidx >= 0 else 0)
+
+            if p.binder_properties_json:
+                import json
+                try:
+                    self._binder_props = json.loads(p.binder_properties_json)
+                except Exception:
+                    self._binder_props = {}
+            else:
+                self._binder_props = {}
+
+            self.mix_type.blockSignals(False)
+            self.binder_grade.blockSignals(False)
+            self.set_mix_type(p.mix_type or "")
 
     def set_mix_type(self, mix_type_key: str) -> None:
         """Drive the inputs panel from a selected mix type (F1).

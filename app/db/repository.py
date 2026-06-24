@@ -152,10 +152,99 @@ class Database:
                 conn.execute(text("ALTER TABLE projects ADD COLUMN report_id TEXT"))
             if "revisions_json" not in cols:
                 conn.execute(text("ALTER TABLE projects ADD COLUMN revisions_json TEXT"))
-            if "parent_project_id" not in cols:
-                conn.execute(text("ALTER TABLE projects ADD COLUMN parent_project_id INTEGER"))
-            if "revision_number" not in cols:
-                conn.execute(text("ALTER TABLE projects ADD COLUMN revision_number INTEGER DEFAULT 0"))
+            if "location" not in cols:
+                conn.execute(text("ALTER TABLE projects ADD COLUMN location TEXT"))
+            if "road_category" not in cols:
+                conn.execute(text("ALTER TABLE projects ADD COLUMN road_category VARCHAR(100)"))
+            if "highway_type" not in cols:
+                conn.execute(text("ALTER TABLE projects ADD COLUMN highway_type VARCHAR(100)"))
+            if "carriageway" not in cols:
+                conn.execute(text("ALTER TABLE projects ADD COLUMN carriageway VARCHAR(100)"))
+            if "design_standard" not in cols:
+                conn.execute(text("ALTER TABLE projects ADD COLUMN design_standard VARCHAR(100)"))
+            if "design_life" not in cols:
+                conn.execute(text("ALTER TABLE projects ADD COLUMN design_life INTEGER"))
+            if "checked_by" not in cols:
+                conn.execute(text("ALTER TABLE projects ADD COLUMN checked_by VARCHAR(200)"))
+            if "project_date" not in cols:
+                conn.execute(text("ALTER TABLE projects ADD COLUMN project_date VARCHAR(50)"))
+            if "subgrade_cbr" not in cols:
+                conn.execute(text("ALTER TABLE projects ADD COLUMN subgrade_cbr FLOAT"))
+            if "subgrade_mr" not in cols:
+                conn.execute(text("ALTER TABLE projects ADD COLUMN subgrade_mr FLOAT"))
+            if "is_legacy" not in cols:
+                conn.execute(text("ALTER TABLE projects ADD COLUMN is_legacy BOOLEAN DEFAULT 0"))
+                conn.execute(text("UPDATE projects SET is_legacy = 1"))
+
+    def initialize_workflow_statuses(self, project_id: int) -> dict:
+        with self.session() as s:
+            p = s.get(Project, project_id)
+            if not p:
+                return {}
+            is_legacy = bool(p.is_legacy)
+            try:
+                status = json.loads(p.modules_json) if p.modules_json else {}
+            except json.JSONDecodeError:
+                status = {}
+
+            # 1. Project Setup
+            if "project" not in status:
+                status["project"] = "complete"
+
+            # 2. Traffic Survey / MSA
+            if "traffic" not in status:
+                from app.db.schema import TrafficAnalysis
+                has_data = s.scalars(select(TrafficAnalysis).where(TrafficAnalysis.project_id == project_id)).first() is not None
+                status["traffic"] = "complete" if has_data else ("needs_review" if is_legacy else "empty")
+
+            # 3. Subgrade / CBR
+            if "subgrade" not in status:
+                has_data = p.subgrade_cbr is not None or p.subgrade_mr is not None
+                status["subgrade"] = "complete" if has_data else ("needs_review" if is_legacy else "empty")
+
+            # 4. Pavement Structural Design
+            if "structural" not in status:
+                from app.db.schema import StructuralDesign
+                has_data = s.scalars(select(StructuralDesign).where(StructuralDesign.project_id == project_id)).first() is not None
+                status["structural"] = "complete" if has_data else ("needs_review" if is_legacy else "empty")
+
+            # 5. Alternative Selection
+            if "stabilized" not in status:
+                from app.db.schema import StabilizedDesign
+                has_data = s.scalars(select(StabilizedDesign).where(StabilizedDesign.project_id == project_id)).first() is not None
+                status["stabilized"] = "complete" if has_data else ("needs_review" if is_legacy else "empty")
+
+            # 6. IITPAVE Verification
+            if "iitpave_status" not in status:
+                from app.db.schema import MechanisticValidation
+                has_data = s.scalars(select(MechanisticValidation).where(MechanisticValidation.project_id == project_id)).first() is not None
+                status["iitpave_status"] = "complete" if has_data else ("needs_review" if is_legacy else "empty")
+
+            # 7. Mix Design
+            if "mix_design" not in status:
+                from app.db.schema import MixDesign
+                has_data = s.scalars(select(MixDesign).where(MixDesign.project_id == project_id)).first() is not None
+                status["mix_design"] = "complete" if has_data else ("needs_review" if is_legacy else "empty")
+
+            # 8. BOQ
+            if "material_qty" not in status:
+                from app.db.schema import MaterialQuantityDesign
+                has_data = s.scalars(select(MaterialQuantityDesign).where(MaterialQuantityDesign.project_id == project_id)).first() is not None
+                status["material_qty"] = "complete" if has_data else ("needs_review" if is_legacy else "empty")
+
+            # 9. Engineering Review
+            if "engineering_review" not in status:
+                has_data = p.review_status in ("Reviewed", "Approved for Submission") or p.checklist_json is not None
+                status["engineering_review"] = "complete" if has_data else ("needs_review" if is_legacy else "empty")
+
+            # 10. Submission
+            if "submission" not in status:
+                has_data = bool(p.locked)
+                status["submission"] = "complete" if has_data else ("needs_review" if is_legacy else "empty")
+
+            p.modules_json = json.dumps(status)
+            s.flush()
+            return status
 
     @contextmanager
     def session(self) -> Session:
@@ -264,12 +353,17 @@ class Database:
     def get_module_status(self, project_id: int) -> dict:
         with self.session() as s:
             p = s.get(Project, project_id)
-            if not p or not p.modules_json:
+            if not p:
                 return {}
             try:
-                return json.loads(p.modules_json)
+                mods = json.loads(p.modules_json) if p.modules_json else {}
             except json.JSONDecodeError:
-                return {}
+                mods = {}
+            stages = ["project", "traffic", "subgrade", "structural", "stabilized", "iitpave_status", "mix_design", "material_qty", "engineering_review", "submission"]
+            if not mods or not all(stage in mods for stage in stages):
+                s.rollback()
+                return self.initialize_workflow_statuses(project_id)
+            return mods
 
     def attach_project_config(
         self,

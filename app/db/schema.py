@@ -74,6 +74,19 @@ class Project(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
 
+    location: Mapped[Optional[str]] = mapped_column(Text, default=None)
+    road_category: Mapped[Optional[str]] = mapped_column(String(100), default=None)
+    highway_type: Mapped[Optional[str]] = mapped_column(String(100), default=None)
+    carriageway: Mapped[Optional[str]] = mapped_column(String(100), default=None)
+    design_standard: Mapped[Optional[str]] = mapped_column(String(100), default=None)
+    design_life: Mapped[Optional[int]] = mapped_column(Integer, default=None)
+    checked_by: Mapped[Optional[str]] = mapped_column(String(200), default=None)
+    project_date: Mapped[Optional[str]] = mapped_column(String(50), default=None)
+    is_legacy: Mapped[bool] = mapped_column(Boolean, default=False)
+    subgrade_cbr: Mapped[Optional[float]] = mapped_column(Float, default=None)
+    subgrade_mr: Mapped[Optional[float]] = mapped_column(Float, default=None)
+
+
     client: Mapped[Optional[Client]] = relationship(back_populates="projects")
     mix_designs: Mapped[list["MixDesign"]] = relationship(back_populates="project", cascade="all, delete-orphan")
     structural_designs: Mapped[list["StructuralDesign"]] = relationship(

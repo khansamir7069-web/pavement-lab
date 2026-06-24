@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QTextEdit,
     QVBoxLayout,
     QWidget,
+    QSpinBox,
 )
 
 from app.core import BINDER_GRADES, MIX_SPECS, MIX_TYPES, PROPERTY_LABELS
@@ -91,7 +92,7 @@ class ProjectForm(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        header = PageHeader("Project", "Project metadata and materials")
+        header = PageHeader("Project Setup", "Project metadata and engineering parameters")
         self.btn_save = styled_button("Save Project")
         self.btn_save.clicked.connect(self._on_save)
         header.add_action(self.btn_save)
@@ -107,51 +108,65 @@ class ProjectForm(QWidget):
         form.setContentsMargins(20, 16, 20, 16)
         form.setLabelAlignment(Qt.AlignLeft)
 
+        # Fields definition
         self.work_name = QLineEdit()
-        self.work_order_no = QLineEdit()
-        self.work_order_date = QLineEdit()
         self.client = QLineEdit()
-        self.agency = QLineEdit()
-        self.submitted_by = QLineEdit()
-        self.mix_type = QComboBox()
-        self.mix_type.addItem("— Not selected (set later in module) —", None)
-        # F6 (Phase-9 audit close-out): annotate non-IRC-verified mixes with
-        # a [placeholder] suffix so the engineer is told before selecting.
-        # The combo's *data* attribute stays the bare mix code, so existing
-        # saved projects round-trip unchanged via findData(p.mix_type).
-        for key, spec in MIX_SPECS.items():
-            rec = MIX_TYPES.get(key)
-            status = (rec.status if rec else "").strip()
-            suffix = "  [placeholder]" if status == "placeholder_editable" else ""
-            self.mix_type.addItem(f"{key} — {spec.name}{suffix}", key)
+        self.location = QLineEdit()
+        
+        self.road_category = QComboBox()
+        for cat in ["NH / SH", "Expressway", "MDR", "ODR", "Village Road", "Urban Arterial", "Other"]:
+            self.road_category.addItem(cat)
+            
+        self.highway_type = QComboBox()
+        for hw in ["National Highway (NH)", "State Highway (SH)", "Major District Road (MDR)", "Other District Road (ODR)", "Village Road"]:
+            self.highway_type.addItem(hw)
+            
+        self.carriageway = QComboBox()
+        for cw in ["Single Lane", "Intermediate Lane", "Two-lane carriageway", "Multi-lane carriageway"]:
+            self.carriageway.addItem(cw)
+            
+        self.design_standard = QComboBox()
+        for std in ["IRC:37-2018", "IRC:37-2012", "AASHTO Guide"]:
+            self.design_standard.addItem(std)
+            
+        self.design_life = QSpinBox()
+        self.design_life.setRange(1, 50)
+        self.design_life.setValue(15)
+        self.design_life.setSuffix(" yr")
+        
+        self.consultant = QLineEdit()
+        self.checked_by = QLineEdit()
+        self.report_id = QLineEdit()
+        
+        self.project_date = QLineEdit()
+        from datetime import datetime
+        self.project_date.setText(datetime.now().strftime("%d-%b-%Y"))
 
-        # Binder grade combo + properties editor button
+        # Hidden fields for backward compatibility with tests/scripts
+        self.mix_type = QComboBox()
+        self.mix_type.addItem("— Not selected —", None)
+        for key, spec in MIX_SPECS.items():
+            self.mix_type.addItem(f"{key} — {spec.name}", key)
         self.binder_grade = QComboBox()
         self.binder_grade.addItem("— Not selected —", None)
         for code, b in BINDER_GRADES.items():
             self.binder_grade.addItem(f"{code} — {b.full_name}", code)
         self._binder_props: dict = {}
-
-        binder_row = QHBoxLayout()
-        binder_row.addWidget(self.binder_grade, stretch=1)
         self.btn_binder_props = QPushButton("Edit Properties…")
-        self.btn_binder_props.setProperty("class", "Secondary")
-        self.btn_binder_props.clicked.connect(self._edit_binder_props)
-        binder_row.addWidget(self.btn_binder_props)
 
-        self.consultant = QLineEdit()
-        self.report_id = QLineEdit()
-
-        form.addRow("Mix Type (optional)", self.mix_type)
-        form.addRow("Binder Grade (optional)", binder_row)
-        form.addRow("Name of Work", self.work_name)
-        form.addRow("Work Order No.", self.work_order_no)
-        form.addRow("Work Order Date", self.work_order_date)
-        form.addRow("Client", self.client)
-        form.addRow("Agency", self.agency)
-        form.addRow("Submitted By", self.submitted_by)
-        form.addRow("Consultant", self.consultant)
+        # Form layout assignment (No Mix Type or Binder Grade shown here)
+        form.addRow("Project Name", self.work_name)
+        form.addRow("Client Name", self.client)
+        form.addRow("Location", self.location)
+        form.addRow("Road Category", self.road_category)
+        form.addRow("Highway Type", self.highway_type)
+        form.addRow("Carriageway", self.carriageway)
+        form.addRow("Design Standard", self.design_standard)
+        form.addRow("Design Life", self.design_life)
+        form.addRow("Consultant Name", self.consultant)
+        form.addRow("Checked By", self.checked_by)
         form.addRow("Report ID", self.report_id)
+        form.addRow("Date", self.project_date)
 
         body_layout.addWidget(card)
         body_layout.addStretch(1)
@@ -162,27 +177,54 @@ class ProjectForm(QWidget):
         self._binder_props = {}
         if project_id is None:
             self.work_name.clear()
-            self.work_order_no.clear()
-            self.work_order_date.clear()
             self.client.clear()
-            self.agency.clear()
-            self.submitted_by.clear()
+            self.location.clear()
+            self.road_category.setCurrentIndex(0)
+            self.highway_type.setCurrentIndex(0)
+            self.carriageway.setCurrentIndex(2)
+            self.design_standard.setCurrentIndex(0)
+            self.design_life.setValue(15)
             self.consultant.clear()
+            self.checked_by.clear()
             self.report_id.clear()
+            from datetime import datetime
+            self.project_date.setText(datetime.now().strftime("%d-%b-%Y"))
             self.mix_type.setCurrentIndex(0)
             self.binder_grade.setCurrentIndex(0)
             self._set_enabled(True)
             return
+
         p = self.db.get_project(project_id)
         if not p:
             return
         self.work_name.setText(p.work_name or "")
-        self.work_order_no.setText(p.work_order_no or "")
-        self.work_order_date.setText(p.work_order_date or "")
-        self.agency.setText(p.agency or "")
-        self.submitted_by.setText(p.submitted_by or "")
+        self.location.setText(p.location or "")
+        
+        ridx = self.road_category.findText(p.road_category or "NH / SH")
+        self.road_category.setCurrentIndex(ridx if ridx >= 0 else 0)
+        
+        hidx = self.highway_type.findText(p.highway_type or "")
+        self.highway_type.setCurrentIndex(hidx if hidx >= 0 else 0)
+        
+        cidx = self.carriageway.findText(p.carriageway or "Two-lane carriageway")
+        self.carriageway.setCurrentIndex(cidx if cidx >= 0 else 2)
+        
+        sidx = self.design_standard.findText(p.design_standard or "IRC:37-2018")
+        self.design_standard.setCurrentIndex(sidx if sidx >= 0 else 0)
+        
+        self.design_life.setValue(int(p.design_life) if p.design_life is not None else 15)
         self.consultant.setText(p.consultant or "")
+        self.checked_by.setText(p.checked_by or "")
         self.report_id.setText(p.report_id or "")
+        
+        if p.project_date:
+            self.project_date.setText(p.project_date)
+        elif p.created_at:
+            self.project_date.setText(p.created_at.strftime("%d-%b-%Y"))
+        else:
+            from datetime import datetime
+            self.project_date.setText(datetime.now().strftime("%d-%b-%Y"))
+
         idx = self.mix_type.findData(p.mix_type)
         self.mix_type.setCurrentIndex(idx if idx >= 0 else 0)
         bidx = self.binder_grade.findData(p.binder_grade)
@@ -194,20 +236,23 @@ class ProjectForm(QWidget):
                 self._binder_props = {}
         if p.client:
             self.client.setText(p.client.name)
+        else:
+            self.client.clear()
         self._set_enabled(not p.locked)
 
     def _set_enabled(self, enabled: bool) -> None:
         self.work_name.setEnabled(enabled)
-        self.work_order_no.setEnabled(enabled)
-        self.work_order_date.setEnabled(enabled)
         self.client.setEnabled(enabled)
-        self.agency.setEnabled(enabled)
-        self.submitted_by.setEnabled(enabled)
+        self.location.setEnabled(enabled)
+        self.road_category.setEnabled(enabled)
+        self.highway_type.setEnabled(enabled)
+        self.carriageway.setEnabled(enabled)
+        self.design_standard.setEnabled(enabled)
+        self.design_life.setEnabled(enabled)
         self.consultant.setEnabled(enabled)
+        self.checked_by.setEnabled(enabled)
         self.report_id.setEnabled(enabled)
-        self.mix_type.setEnabled(enabled)
-        self.binder_grade.setEnabled(enabled)
-        self.btn_binder_props.setEnabled(enabled)
+        self.project_date.setEnabled(enabled)
         self.btn_save.setEnabled(enabled)
 
     def _edit_binder_props(self) -> None:
@@ -222,18 +267,25 @@ class ProjectForm(QWidget):
     def _on_save(self) -> None:
         data = {
             "work_name": self.work_name.text().strip() or "(Untitled)",
-            "work_order_no": self.work_order_no.text().strip(),
-            "work_order_date": self.work_order_date.text().strip(),
-            "agency": self.agency.text().strip(),
-            "submitted_by": self.submitted_by.text().strip(),
+            "location": self.location.text().strip(),
+            "road_category": self.road_category.currentText(),
+            "highway_type": self.highway_type.currentText(),
+            "carriageway": self.carriageway.currentText(),
+            "design_standard": self.design_standard.currentText(),
+            "design_life": self.design_life.value(),
             "consultant": self.consultant.text().strip(),
+            "checked_by": self.checked_by.text().strip(),
             "report_id": self.report_id.text().strip(),
-            "mix_type": self.mix_type.currentData() or "",   # "" = not selected
-            "binder_grade": self.binder_grade.currentData() or None,
-            "binder_properties_json": (
-                json.dumps(self._binder_props) if self._binder_props else None
-            ),
+            "project_date": self.project_date.text().strip(),
         }
+        # In new project setup, keep binder and mix type from hidden fields if set programmatically
+        if self.mix_type.currentData():
+            data["mix_type"] = self.mix_type.currentData()
+        if self.binder_grade.currentData():
+            data["binder_grade"] = self.binder_grade.currentData()
+            if self._binder_props:
+                data["binder_properties_json"] = json.dumps(self._binder_props)
+
         client_name = self.client.text().strip()
         if client_name:
             c = self.db.upsert_client(name=client_name)

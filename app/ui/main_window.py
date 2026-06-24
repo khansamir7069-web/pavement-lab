@@ -90,7 +90,9 @@ from .widgets.spec_admin import SpecAdminPanel
 from .widgets.structural_panel import StructuralPanel
 from .widgets.stabilized_panel import StabilizedPanel
 from .widgets.iitpave_status_panel import IITPaveStatusPanel
-from .widgets.submission_center_panel import SubmissionCenterPanel
+from .widgets.subgrade_panel import SubgradePanel
+from .widgets.engineering_review_panel import EngineeringReviewPanel
+from .widgets.submission_panel import SubmissionPanel
 
 
 log = logging.getLogger(__name__)
@@ -98,19 +100,17 @@ log = logging.getLogger(__name__)
 
 SIDEBAR_ITEMS = [
     ("Dashboard", "dashboard"),
-    ("Project", "project"),
     ("Module Hub", "hub"),
-    ("Mix Design Inputs", "inputs"),
-    ("Traffic / MSA", "traffic"),
-    ("Structural Design", "structural"),
-    ("Stabilized Pavement", "stabilized"),
-    ("Maintenance", "maintenance"),
-    ("Material Quantity", "material_qty"),
-    ("Condition Survey", "condition"),
-    ("Results & Report", "results"),
-    ("Submission Center", "submission_center"),
-    ("Specifications", "specs_admin"),
-    ("IITPAVE Integration", "iitpave_status"),
+    ("1. Project Setup", "project"),
+    ("2. Traffic Survey / MSA", "traffic"),
+    ("3. Subgrade / CBR", "subgrade"),
+    ("4. Pavement Structural Design", "structural"),
+    ("5. Alternative Selection", "stabilized"),
+    ("6. IITPAVE Verification", "iitpave_status"),
+    ("7. Mix Design", "inputs"),
+    ("8. BOQ", "material_qty"),
+    ("9. Engineering Review", "engineering_review"),
+    ("10. Submission", "submission"),
 ]
 
 
@@ -240,7 +240,9 @@ class MainWindow(QMainWindow):
         self.traffic = TrafficPanel(self.db)
         self.condition = ConditionSurveyPanel(self.db)
         self.iitpave_status = IITPaveStatusPanel(self.db)
-        self.submission_center = SubmissionCenterPanel(self.db)
+        self.subgrade = SubgradePanel(self.db)
+        self.engineering_review = EngineeringReviewPanel(self.db)
+        self.submission = SubmissionPanel(self.db)
 
         # Wire Back buttons on every page's header.
         # Lambdas must swallow Qt's clicked(bool) positional arg with *_.
@@ -248,7 +250,7 @@ class MainWindow(QMainWindow):
         back_routes = (
             (self.project_form, "dashboard"),
             (self.inputs,       "hub"),
-            (self.results,      "hub"),
+            (self.results,      "inputs"),
             (self.spec_admin,   "hub"),
             (self.structural,   "hub"),
             (self.stabilized,   "hub"),
@@ -257,32 +259,37 @@ class MainWindow(QMainWindow):
             (self.traffic,      "hub"),
             (self.condition,    "hub"),
             (self.iitpave_status, "hub"),
-            (self.submission_center, "hub"),
+            (self.subgrade,     "hub"),
+            (self.engineering_review, "hub"),
+            (self.submission,   "hub"),
         )
         for w, target in back_routes:
             hdr = w.findChild(PageHeader)
             if hdr is not None:
                 hdr.enable_back(lambda *_, t=target: self._show_page(t))
 
-        self._page_keys: dict[str, int] = {}
-        for label, key in SIDEBAR_ITEMS:
-            widget = {
-                "dashboard": self.dashboard,
-                "project": self.project_form,
-                "hub": self.hub,
-                "inputs": self.inputs,
-                "results": self.results,
-                "specs_admin": self.spec_admin,
-                "structural": self.structural,
-                "stabilized": self.stabilized,
-                "maintenance": self.maintenance,
-                "material_qty": self.material_qty,
-                "traffic": self.traffic,
-                "condition": self.condition,
-                "iitpave_status": self.iitpave_status,
-                "submission_center": self.submission_center,
-            }[key]
-            idx = self.stack.addWidget(widget)
+        # Stack pages mapping (contains all pages, even legacy ones)
+        all_pages = {
+            "dashboard": self.dashboard,
+            "project": self.project_form,
+            "hub": self.hub,
+            "inputs": self.inputs,
+            "results": self.results,
+            "specs_admin": self.spec_admin,
+            "structural": self.structural,
+            "stabilized": self.stabilized,
+            "maintenance": self.maintenance,
+            "material_qty": self.material_qty,
+            "condition": self.condition,
+            "iitpave_status": self.iitpave_status,
+            "subgrade": self.subgrade,
+            "engineering_review": self.engineering_review,
+            "submission": self.submission,
+        }
+        
+        self._page_keys = {}
+        for key, w in all_pages.items():
+            idx = self.stack.addWidget(w)
             self._page_keys[key] = idx
 
         # Status
@@ -314,9 +321,16 @@ class MainWindow(QMainWindow):
         self.inputs.reset_requested.connect(self._on_reset_inputs)
         self.results.generate_word.connect(self._on_export_word)
         self.results.generate_pdf.connect(self._on_export_pdf)
-        self.iitpave_status.config_updated.connect(self._on_iitpave_config_updated)
-        self.submission_center.saved.connect(self._refresh_hub)
-        self.submission_center.project_changed.connect(self._on_open_project)
+        self.subgrade.saved.connect(self._refresh_hub)
+        self.engineering_review.saved.connect(self._refresh_hub)
+        self.submission.saved.connect(self._refresh_hub)
+        self.submission.project_changed.connect(self._on_open_project)
+        self.hub.status_changed.connect(self._on_hub_status_changed)
+
+    def _on_hub_status_changed(self, key: str, status: str) -> None:
+        if self._current_project_id is not None:
+            self.db.set_module_status(self._current_project_id, key, status)
+            self._refresh_hub()
 
     def _on_iitpave_config_updated(self) -> None:
         self.statusBar().showMessage("IITPAVE configuration updated.")
@@ -335,19 +349,37 @@ class MainWindow(QMainWindow):
         widget = self.stack.currentWidget()
         if widget:
             p = self.db.get_project(self._current_project_id) if self._current_project_id else None
-            locked = p.locked if p else False
+            project_locked = p.locked if p else False
+            
+            module_status = self.db.get_module_status(self._current_project_id) if self._current_project_id else {}
+            status_key = {
+                "project": "project",
+                "traffic": "traffic",
+                "subgrade": "subgrade",
+                "structural": "structural",
+                "stabilized": "stabilized",
+                "iitpave_status": "iitpave_status",
+                "inputs": "mix_design",
+                "results": "mix_design",
+                "material_qty": "material_qty",
+                "engineering_review": "engineering_review",
+                "submission": "submission",
+            }.get(key, key)
+            
+            module_locked = module_status.get(status_key) == "locked"
+            locked = project_locked or module_locked
 
             # Display lock status in statusBar
             if locked:
-                self.statusBar().showMessage(f"Project #{self._current_project_id} is LOCKED (Read-Only Mode).")
+                self.statusBar().showMessage(f"Project #{self._current_project_id} stage '{status_key}' is LOCKED.")
             else:
                 if self._current_project_id:
                     self.statusBar().showMessage(f"Project #{self._current_project_id} loaded.")
                 else:
                     self.statusBar().showMessage("Ready")
 
-            # submission_center manages its own lock UI state in set_project()
-            if widget != self.submission_center:
+            # submission manages its own lock UI state in set_project()
+            if widget != self.submission:
                 # Disable buttons
                 for btn in widget.findChildren(QPushButton):
                     txt = btn.text().lower()
@@ -375,12 +407,23 @@ class MainWindow(QMainWindow):
             return
         key = self.nav.item(row).data(Qt.UserRole)
         self.stack.setCurrentIndex(self._page_keys[key])
+        
+        p = self.db.get_project(self._current_project_id) if self._current_project_id else None
+        work_name = p.work_name if p else ""
+        
         if key == "dashboard":
             self.dashboard.refresh()
         elif key == "iitpave_status":
             self.iitpave_status.refresh()
-        elif key == "submission_center":
-            self.submission_center.set_project(self._current_project_id)
+        elif key == "subgrade":
+            self.subgrade.set_project(self._current_project_id, work_name)
+        elif key == "inputs":
+            if self._current_project_id:
+                self.inputs.set_project(self._current_project_id, self.db)
+        elif key == "engineering_review":
+            self.engineering_review.set_project(self._current_project_id, work_name)
+        elif key == "submission":
+            self.submission.set_project(self._current_project_id, work_name)
 
     # ----- project lifecycle -----
 
@@ -414,110 +457,104 @@ class MainWindow(QMainWindow):
         )
 
     def _on_module_selected(self, key: str) -> None:
-        """Route user from Hub into the chosen module."""
+        """Route user from Hub into the chosen module with sequence gates."""
+        if self._current_project_id is None:
+            QMessageBox.warning(self, "No project", "Please save a project first.")
+            self._show_page("project")
+            return
+
+        p = self.db.get_project(self._current_project_id)
+        if not p:
+            return
+
+        is_legacy = bool(p.is_legacy)
+        status = self.db.get_module_status(self._current_project_id)
+
+        # Gate 1: Mix Design requires Pavement Structural Design
         if key == "mix_design":
-            if self._current_project_id is None:
-                QMessageBox.warning(self, "No project", "Please save a project first.")
-                self._show_page("project")
-                return
-            # Ensure project has a mix_type — if not, force user back to project form.
-            p = self.db.get_project(self._current_project_id)
-            if not p or not p.mix_type:
-                QMessageBox.information(
-                    self, "Mix type required",
-                    "This project has no Mix Type set. Please pick one in the Project form."
-                )
-                self._show_page("project")
-                return
-            # F1 wire-up: drive the inputs panel from the selected mix type
-            # (sieve set, gradation envelope, placeholder warning banner).
-            self.inputs.set_mix_type(p.mix_type)
+            if status.get("structural") != "complete":
+                if not is_legacy:
+                    QMessageBox.warning(
+                        self, "Sequence Gate",
+                        "Structural design is not finalized.\nComplete pavement design before mix design."
+                    )
+                    return
+                else:
+                    QMessageBox.warning(
+                        self, "Sequence Gate Warning",
+                        "Warning: Structural design is not finalized.\nProceeding in decision-support mode for migrated project."
+                    )
+
+            self.inputs.set_project(self._current_project_id, self.db)
             self._show_page("inputs")
+
+        # Gate 2: IITPAVE Verification requires layer configuration
+        elif key == "iitpave_status":
+            has_layers = (
+                self.db.latest_structural_design(self._current_project_id) is not None
+                or self.db.latest_stabilized_design(self._current_project_id) is not None
+            )
+            if status.get("structural") != "complete" and status.get("stabilized") != "complete":
+                if not is_legacy:
+                    QMessageBox.warning(
+                        self, "Sequence Gate",
+                        "Layer configuration required before verification."
+                    )
+                    return
+                else:
+                    if not has_layers:
+                        QMessageBox.warning(
+                            self, "Sequence Gate",
+                            "Layer configuration required before verification (no design data exists)."
+                        )
+                        return
+                    else:
+                        QMessageBox.warning(
+                            self, "Sequence Gate Warning",
+                            "Warning: Layer configuration is not marked completed.\nProceeding since design data exists."
+                        )
+
+            self.iitpave_status.refresh()
+            self._show_page("iitpave_status")
+
+        elif key == "subgrade":
+            self.subgrade.set_project(self._current_project_id, p.work_name)
+            self._show_page("subgrade")
+
+        elif key == "engineering_review":
+            self.engineering_review.set_project(self._current_project_id, p.work_name)
+            self._show_page("engineering_review")
+
+        elif key == "submission":
+            self.submission.set_project(self._current_project_id, p.work_name)
+            self._show_page("submission")
+
         elif key == "reports":
-            if self._current_project_id is None:
-                QMessageBox.warning(self, "No project",
-                                    "Please save a project first.")
-                self._show_page("project")
-                return
             self._on_export_combined_report(self._current_project_id)
+
         elif key == "specs_admin":
-            # Spec admin needs no project — opens directly
             self.spec_admin.refresh()
             self._show_page("specs_admin")
+
         elif key == "structural":
-            if self._current_project_id is None:
-                QMessageBox.warning(self, "No project",
-                                    "Please save a project first.")
-                self._show_page("project")
-                return
-            p = self.db.get_project(self._current_project_id)
-            self.structural.set_project(
-                self._current_project_id, p.work_name if p else ""
-            )
+            self.structural.set_project(self._current_project_id, p.work_name)
             self._show_page("structural")
+
         elif key == "stabilized":
-            if self._current_project_id is None:
-                QMessageBox.warning(self, "No project",
-                                    "Please save a project first.")
-                self._show_page("project")
-                return
-            p = self.db.get_project(self._current_project_id)
-            self.stabilized.set_project(
-                self._current_project_id, p.work_name if p else ""
-            )
+            self.stabilized.set_project(self._current_project_id, p.work_name)
             self._show_page("stabilized")
+
         elif key == "maintenance":
-            if self._current_project_id is None:
-                QMessageBox.warning(self, "No project",
-                                    "Please save a project first.")
-                self._show_page("project")
-                return
-            p = self.db.get_project(self._current_project_id)
-            self.maintenance.set_project(
-                self._current_project_id, p.work_name if p else ""
-            )
+            self.maintenance.set_project(self._current_project_id, p.work_name)
             self._show_page("maintenance")
+
         elif key == "material_qty":
-            if self._current_project_id is None:
-                QMessageBox.warning(self, "No project",
-                                    "Please save a project first.")
-                self._show_page("project")
-                return
-            p = self.db.get_project(self._current_project_id)
-            self.material_qty.set_project(
-                self._current_project_id, p.work_name if p else ""
-            )
+            self.material_qty.set_project(self._current_project_id, p.work_name)
             self._show_page("material_qty")
-        elif key == "traffic":
-            if self._current_project_id is None:
-                QMessageBox.warning(self, "No project",
-                                    "Please save a project first.")
-                self._show_page("project")
-                return
-            p = self.db.get_project(self._current_project_id)
-            self.traffic.set_project(
-                self._current_project_id, p.work_name if p else ""
-            )
-            self._show_page("traffic")
+
         elif key == "condition":
-            if self._current_project_id is None:
-                QMessageBox.warning(self, "No project",
-                                    "Please save a project first.")
-                self._show_page("project")
-                return
-            p = self.db.get_project(self._current_project_id)
-            self.condition.set_project(
-                self._current_project_id, p.work_name if p else ""
-            )
+            self.condition.set_project(self._current_project_id, p.work_name)
             self._show_page("condition")
-        elif key == "submission_center":
-            if self._current_project_id is None:
-                QMessageBox.warning(self, "No project",
-                                    "Please save a project first.")
-                self._show_page("project")
-                return
-            self.submission_center.set_project(self._current_project_id)
-            self._show_page("submission_center")
         else:
             QMessageBox.information(
                 self, "Coming soon",
@@ -1314,9 +1351,7 @@ class MainWindow(QMainWindow):
         # F1 wire-up: re-apply mix-type-driven standards envelope after reset,
         # while leaving operator-entered lab-data fields blank.
         if self._current_project_id is not None:
-            p = self.db.get_project(self._current_project_id)
-            if p and p.mix_type:
-                self.inputs.set_mix_type(p.mix_type)
+            self.inputs.set_project(self._current_project_id, self.db)
         self._show_page("inputs")
 
     def _on_compute(self) -> None:
@@ -1326,6 +1361,20 @@ class MainWindow(QMainWindow):
             self._show_page("project")
             return
         try:
+            # At the beginning of _on_compute, extract from self.inputs:
+            mix_type = self.inputs.mix_type.currentData()
+            binder_grade = self.inputs.binder_grade.currentData()
+            binder_props = self.inputs._binder_props
+            
+            # Save to db so downstream calculations see the updated values
+            import json
+            self.db.update_project(
+                self._current_project_id,
+                mix_type=mix_type,
+                binder_grade=binder_grade,
+                binder_properties_json=json.dumps(binder_props)
+            )
+
             payload = self.inputs.collect_all()
             coarse, fine, bit = payload["spgr"]
             # bitumen SG for GmmInput requires the value — let engine compute it
@@ -1334,16 +1383,14 @@ class MainWindow(QMainWindow):
             grad = payload["gradation"]
 
             p = self.db.get_project(self._current_project_id)
-            # F4: refuse to compute without an explicit mix type. The hub
-            # guard at _on_module_selected redirects users back to the
-            # project form, so reaching here without mix_type is a bug.
+            # F4: refuse to compute without an explicit mix type.
             if not p or not p.mix_type:
                 QMessageBox.warning(
                     self, "Mix type required",
                     "This project has no Mix Type set. Please pick one in "
-                    "the Project form before computing the mix design."
+                    "the Mix Design panel before computing."
                 )
-                self._show_page("project")
+                self._show_page("inputs")
                 return
             mix_type = p.mix_type
             proj = ProjectInfo(
