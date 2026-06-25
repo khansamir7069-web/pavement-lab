@@ -73,15 +73,16 @@ class IITPaveStatusPanel(QWidget):
         
         status_row = QHBoxLayout()
         self.lbl_detection_badge = QLabel("Not Detected")
-        self.lbl_detection_badge.setAlignment(Qt.AlignCenter)
-        self.lbl_detection_badge.setFixedSize(140, 24)
+        self.lbl_detection_badge.setVisible(False)
         
         self.lbl_mode_badge = QLabel("Decision Support Mode")
-        self.lbl_mode_badge.setAlignment(Qt.AlignCenter)
-        self.lbl_mode_badge.setFixedSize(160, 24)
+        self.lbl_mode_badge.setVisible(False)
         
-        status_row.addWidget(self.lbl_detection_badge)
-        status_row.addWidget(self.lbl_mode_badge)
+        self.lbl_engine_status = QLabel("")
+        self.lbl_engine_status.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        self.lbl_engine_status.setMinimumHeight(32)
+        
+        status_row.addWidget(self.lbl_engine_status)
         status_row.addStretch()
         sl.addLayout(status_row)
         
@@ -251,6 +252,10 @@ class IITPaveStatusPanel(QWidget):
         if validation.selected_path:
             self.lbl_detection_badge.setText("Detected")
             self.lbl_detection_badge.setStyleSheet("background:#d4efdf; color:#196f3d; font-weight:bold; border-radius:4px; padding:2px;")
+            
+            self.lbl_engine_status.setText("IITPAVE Connected — Real Mechanistic Analysis")
+            self.lbl_engine_status.setStyleSheet("background:#d4efdf; color:#196f3d; font-weight:bold; border-radius:4px; padding:6px 12px; font-size:10pt; border: 1px solid #196f3d;")
+            
             self.lbl_selected_path.setText(f"Active Executable: <b>{validation.selected_path}</b>")
             
             # Version probing
@@ -259,6 +264,10 @@ class IITPaveStatusPanel(QWidget):
         else:
             self.lbl_detection_badge.setText("Not Detected")
             self.lbl_detection_badge.setStyleSheet("background:#f9d5d5; color:#a81f1f; font-weight:bold; border-radius:4px; padding:2px;")
+            
+            self.lbl_engine_status.setText("Decision Support Mode — IITPAVE executable not connected")
+            self.lbl_engine_status.setStyleSheet("background:#fef5d1; color:#a67c00; font-weight:bold; border-radius:4px; padding:6px 12px; font-size:10pt; border: 1px solid #a67c00;")
+            
             self.lbl_selected_path.setText("Active Executable: <b>None (Checks are blocked from running)</b>")
             self.lbl_detected_version.setText("Detected Version Info: <b>None</b>")
             

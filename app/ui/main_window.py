@@ -159,6 +159,12 @@ class MainWindow(QMainWindow):
             QListWidgetItem(label, self.nav).setData(Qt.UserRole, key)
         sb_layout.addWidget(self.nav, stretch=1)
 
+        # Developer / Debug Tools container (hidden behind Ctrl+Shift+D by default)
+        self.dev_tools_widget = QWidget()
+        dev_lay = QVBoxLayout(self.dev_tools_widget)
+        dev_lay.setContentsMargins(0, 0, 0, 0)
+        dev_lay.setSpacing(6)
+
         # Import button at bottom of sidebar
         self.btn_import = QPushButton("⬆  Import Summary Excel")
         self.btn_import.setObjectName("ImportBtn")
@@ -167,7 +173,7 @@ class MainWindow(QMainWindow):
             "(Pb %, Gmm, Gmb, VIM, VMA, VFB, Stability, Flow, MQ)."
         )
         self.btn_import.clicked.connect(self._on_import_summary)
-        sb_layout.addWidget(self.btn_import)
+        dev_lay.addWidget(self.btn_import)
 
         self.btn_iitpave_schema = QPushButton("IITPAVE Schema Diagnostics")
         self.btn_iitpave_schema.setObjectName("ImportBtn")
@@ -177,7 +183,7 @@ class MainWindow(QMainWindow):
             "are performed."
         )
         self.btn_iitpave_schema.clicked.connect(self._on_iitpave_schema_diagnostics)
-        sb_layout.addWidget(self.btn_iitpave_schema)
+        dev_lay.addWidget(self.btn_iitpave_schema)
 
         self.btn_iitpave_schema_history = QPushButton("IITPAVE Schema History")
         self.btn_iitpave_schema_history.setObjectName("ImportBtn")
@@ -186,7 +192,7 @@ class MainWindow(QMainWindow):
             "active project. No engineering calculations are performed."
         )
         self.btn_iitpave_schema_history.clicked.connect(self._on_iitpave_schema_history)
-        sb_layout.addWidget(self.btn_iitpave_schema_history)
+        dev_lay.addWidget(self.btn_iitpave_schema_history)
 
         self.btn_iitpave_schema_report_audit = QPushButton("IITPAVE Report Audit")
         self.btn_iitpave_schema_report_audit.setObjectName("ImportBtn")
@@ -197,7 +203,7 @@ class MainWindow(QMainWindow):
         self.btn_iitpave_schema_report_audit.clicked.connect(
             self._on_iitpave_schema_report_audit
         )
-        sb_layout.addWidget(self.btn_iitpave_schema_report_audit)
+        dev_lay.addWidget(self.btn_iitpave_schema_report_audit)
 
         self.btn_report_revisions = QPushButton("Report Revisions")
         self.btn_report_revisions.setObjectName("ImportBtn")
@@ -205,7 +211,7 @@ class MainWindow(QMainWindow):
             "Review read-only report revision snapshots for the active project."
         )
         self.btn_report_revisions.clicked.connect(self._on_report_revisions)
-        sb_layout.addWidget(self.btn_report_revisions)
+        dev_lay.addWidget(self.btn_report_revisions)
 
         self.btn_deployment_diagnostics = QPushButton("Deployment Diagnostics")
         self.btn_deployment_diagnostics.setObjectName("ImportBtn")
@@ -214,11 +220,20 @@ class MainWindow(QMainWindow):
             "No installer, activation, licensing, or cloud deployment is performed."
         )
         self.btn_deployment_diagnostics.clicked.connect(self._on_deployment_diagnostics)
-        sb_layout.addWidget(self.btn_deployment_diagnostics)
+        dev_lay.addWidget(self.btn_deployment_diagnostics)
 
-        version_lbl = QLabel(f"v{__version__}")
+        self.dev_tools_widget.setVisible(False)
+        sb_layout.addWidget(self.dev_tools_widget)
+
+        # Wire developer tools shortcut Ctrl+Shift+D
+        from PySide6.QtGui import QKeySequence, QShortcut
+        self.shortcut_dev = QShortcut(QKeySequence("Ctrl+Shift+D"), self)
+        self.shortcut_dev.activated.connect(self._toggle_developer_tools)
+
+        version_lbl = QLabel(f"RoadX Professional Suite v{__version__}\nby SKM Technologies")
         version_lbl.setObjectName("SidebarTag")
         version_lbl.setAlignment(Qt.AlignCenter)
+        version_lbl.setStyleSheet("color: #718096; font-size: 8pt; margin-top: 10px; margin-bottom: 10px;")
         sb_layout.addWidget(version_lbl)
 
         lay.addWidget(sidebar)
@@ -280,6 +295,7 @@ class MainWindow(QMainWindow):
             "stabilized": self.stabilized,
             "maintenance": self.maintenance,
             "material_qty": self.material_qty,
+            "traffic": self.traffic,
             "condition": self.condition,
             "iitpave_status": self.iitpave_status,
             "subgrade": self.subgrade,
@@ -336,6 +352,9 @@ class MainWindow(QMainWindow):
 
     def _on_iitpave_config_updated(self) -> None:
         self.statusBar().showMessage("IITPAVE configuration updated.")
+
+    def _toggle_developer_tools(self) -> None:
+        self.dev_tools_widget.setVisible(self.dev_tools_widget.isHidden())
 
     # ----- navigation -----
 
@@ -426,6 +445,16 @@ class MainWindow(QMainWindow):
             self.engineering_review.set_project(self._current_project_id, work_name)
         elif key == "submission":
             self.submission.set_project(self._current_project_id, work_name)
+        elif key == "traffic":
+            self.traffic.set_project(self._current_project_id, work_name)
+        elif key == "structural":
+            self.structural.set_project(self._current_project_id, work_name)
+        elif key == "stabilized":
+            self.stabilized.set_project(self._current_project_id, work_name)
+        elif key == "material_qty":
+            self.material_qty.set_project(self._current_project_id, work_name)
+        elif key == "project":
+            self.project_form.load_project(self._current_project_id)
 
     # ----- project lifecycle -----
 
@@ -612,6 +641,14 @@ class MainWindow(QMainWindow):
         elif key == "condition":
             self.condition.set_project(self._current_project_id, p.work_name)
             self._show_page("condition")
+
+        elif key == "traffic":
+            self.traffic.set_project(self._current_project_id, p.work_name)
+            self._show_page("traffic")
+
+        elif key == "project":
+            self.project_form.load_project(self._current_project_id)
+            self._show_page("project")
         else:
             QMessageBox.information(
                 self, "Coming soon",
