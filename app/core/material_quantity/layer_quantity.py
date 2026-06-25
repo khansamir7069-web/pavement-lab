@@ -116,6 +116,9 @@ class MaterialQuantityInput:
     project_id: int | None = None
     layers: Tuple[LayerInput, ...] = ()
     notes: str = ""
+    road_length_m: float = 1000.0
+    carriageway_width_m: float = 7.0
+    shoulder_width_m: float = 1.5
 
 
 @dataclass(frozen=True, slots=True)

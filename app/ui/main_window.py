@@ -303,6 +303,7 @@ class MainWindow(QMainWindow):
         self.dashboard.delete_project.connect(self._on_delete_project)
         self.dashboard.export_project.connect(self._on_export_project)
         self.dashboard.import_project.connect(self._on_import_project_export)
+        self.dashboard.load_demo_project_triggered.connect(self._on_load_demo_project)
         self.project_form.saved.connect(self._on_project_saved)
         self.hub.module_selected.connect(self._on_module_selected)
         self.structural.saved.connect(self._on_structural_saved)
@@ -438,6 +439,61 @@ class MainWindow(QMainWindow):
         self.project_form.load_project(project_id)
         self._refresh_hub()
         self._show_page("hub")
+
+    def _on_load_demo_project(self) -> None:
+        from app.db.schema import Project
+        from sqlalchemy import select
+        from datetime import datetime
+        
+        with self.db.session() as s:
+            existing_demo = s.scalars(
+                select(Project).where(Project.work_name == "NH-48 Flexible Pavement Demo")
+            ).first()
+            
+        if existing_demo is not None:
+            msg_box = QMessageBox(self)
+            msg_box.setWindowTitle("Demo Project Exists")
+            msg_box.setText(
+                "The project 'NH-48 Flexible Pavement Demo' already exists.\n\n"
+                "Please choose how you would like to proceed:"
+            )
+            
+            open_btn = msg_box.addButton("Open Existing Demo", QMessageBox.ActionRole)
+            copy_btn = msg_box.addButton("Create Fresh Copy", QMessageBox.ActionRole)
+            cancel_btn = msg_box.addButton("Cancel", QMessageBox.RejectRole)
+            
+            msg_box.setDefaultButton(open_btn)
+            msg_box.exec()
+            
+            clicked = msg_box.clickedButton()
+            if clicked == open_btn:
+                self._on_open_project(existing_demo.id)
+            elif clicked == copy_btn:
+                suffix = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                from app.demo.demo_project_loader import create_demo_project
+                try:
+                    new_id = create_demo_project(self.db, name_suffix=suffix)
+                    QMessageBox.information(
+                        self, "Success",
+                        f"Fresh copy of the demo project created successfully:\n"
+                        f"NH-48 Flexible Pavement Demo (Copy - {suffix})"
+                    )
+                    self._on_open_project(new_id)
+                except Exception as e:
+                    QMessageBox.critical(self, "Error", f"Failed to create fresh copy: {e}")
+            else:
+                return
+        else:
+            from app.demo.demo_project_loader import create_demo_project
+            try:
+                new_id = create_demo_project(self.db)
+                QMessageBox.information(
+                    self, "Success",
+                    "Demo project 'NH-48 Flexible Pavement Demo' loaded successfully."
+                )
+                self._on_open_project(new_id)
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to load demo project: {e}")
 
     def _on_project_saved(self, project_id: int) -> None:
         self._current_project_id = project_id

@@ -742,6 +742,8 @@ def build_layer_summary_excel(file_path: Path, project_id: int, db) -> Path:
     mech = db.latest_mechanistic_validation(project_id)
     rows_mech = []
     if mech and not mech.refused:
+        is_mock = "Demo verification example only" in (mech.notes or "")
+        mode_val = "Decision Support Mode (Demo Run)" if is_mock else "Mechanistic Verified Mode"
         rows_mech = [
             ("Fatigue Life (MSA)", mech.fatigue_life_msa or "N/A"),
             ("Rutting Life (MSA)", mech.rutting_life_msa or "N/A"),
@@ -750,8 +752,10 @@ def build_layer_summary_excel(file_path: Path, project_id: int, db) -> Path:
             ("Rutting Check Verdict", mech.rutting_verdict or "N/A"),
             ("Computed Tensile Strain (Microstrain)", mech.tensile_strain_micro or "—"),
             ("Computed Compressive Strain (Microstrain)", mech.compressive_strain_micro or "—"),
-            ("Verification Mode", "Mechanistic Verified Mode" if not mech.refused else "Decision Support Mode")
+            ("Verification Mode", mode_val)
         ]
+        if is_mock:
+            rows_mech.append(("Note", "Demo verification example only — not actual IITPAVE execution."))
     else:
         rows_mech = [("IITPAVE Verification", "Not performed / Decision Support Mode")]
         

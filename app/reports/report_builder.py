@@ -1041,7 +1041,10 @@ def build_combined_report(
     add_heading(doc, "APPENDIX D: IITPAVE VERIFICATION", level=1, align=WD_ALIGN_PARAGRAPH.CENTER)
     if mech_val and not mech_val.refused:
         add_heading(doc, "Mechanistic Validation Outcomes", level=2)
-        add_p(doc, "The designed pavement layer composition has been validated using the linear elastic analysis program IITPAVE.")
+        if "Demo verification example only" in (mech_val.notes or ""):
+            add_p(doc, "WARNING: Demo verification example only — not actual IITPAVE execution.", bold=True)
+        else:
+            add_p(doc, "The designed pavement layer composition has been validated using the linear elastic analysis program IITPAVE.")
         
         iit_data = [
             ["Fatigue Life (MSA)", f"{mech_val.fatigue_life_msa:.2f}"],
@@ -1055,10 +1058,15 @@ def build_combined_report(
         add_table(doc, ["Verification Metric", "Value / Verdict"], iit_data)
         add_p(doc, "")
         
-        # Traceability
+        subgrade_mr_val = 0.0
+        if structural:
+            subgrade_mr_val = structural.subgrade_mr_mpa
+        elif p.subgrade_mr:
+            subgrade_mr_val = p.subgrade_mr
+            
         iit_inputs = [
             ("Design Traffic", f"{mech_val.design_msa} MSA"),
-            ("Subgrade Mr", f"{mech_val.subgrade_mr_mpa} MPa")
+            ("Subgrade Mr", f"{subgrade_mr_val:.1f} MPa")
         ]
         iit_outputs = [
             ("Fatigue Life", f"{mech_val.fatigue_life_msa:.2f} MSA"),
@@ -1362,7 +1370,10 @@ def write_executive_summary_section(doc, p, structural, stabilized, mech_val, db
         summary_para += "A cement-stabilized design (CTB/CTS) has been analyzed as an alternative to achieve structural thickness optimization. "
     
     if mech_val and not mech_val.refused:
-        summary_para += f"Mechanistic verification has been successfully conducted using IITPAVE under Mechanistic Verified Mode."
+        if "Demo verification example only" in (mech_val.notes or ""):
+            summary_para += f"Mechanistic verification has been successfully conducted (Demo verification example only — not actual IITPAVE execution)."
+        else:
+            summary_para += f"Mechanistic verification has been successfully conducted using IITPAVE under Mechanistic Verified Mode."
     else:
         summary_para += f"The design calculations have been prepared under Decision Support Mode guidelines."
         

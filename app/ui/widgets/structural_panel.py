@@ -314,7 +314,17 @@ class StructuralPanel(QWidget):
         
         # Determine and display active validation mode banner
         mode = r.validation_mode
-        if mode == "Mechanistic Verified Mode":
+        is_mock = False
+        if r.mechanistic_validation and "Demo verification example only" in (r.mechanistic_validation.notes or ""):
+            is_mock = True
+            
+        if is_mock:
+            banner_style = "background-color:#fadbd8; color:#78281f; font-weight:bold; border:1px solid #f5b7b1; border-radius:4px; padding:6px 12px; font-size:10pt;"
+            banner_text = (
+                "⚠️ <b>Verification Mode:</b> Decision Support Mode (Demo Run)<br>"
+                "<b>Demo verification example only — not actual IITPAVE execution.</b>"
+            )
+        elif mode == "Mechanistic Verified Mode":
             banner_style = "background-color:#d4efdf; color:#196f3d; font-weight:bold; border:1px solid #a3e4d7; border-radius:4px; padding:6px 12px; font-size:10pt;"
             banner_text = (
                 f"🛡️ <b>Verification Mode:</b> {mode}<br>"

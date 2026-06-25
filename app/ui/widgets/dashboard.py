@@ -27,6 +27,7 @@ class Dashboard(QWidget):
     delete_project = Signal(int)      # project_id
     export_project = Signal(int)      # project_id
     import_project = Signal()
+    load_demo_project_triggered = Signal()
 
     def __init__(self, db, parent=None):
         super().__init__(parent)
@@ -42,6 +43,15 @@ class Dashboard(QWidget):
         self.btn_new = styled_button("+ New Project")
         self.btn_new.clicked.connect(self.new_project.emit)
         header.add_action(self.btn_new)
+        
+        self.btn_load_demo = styled_button("Load Demo Project", "secondary")
+        self.btn_load_demo.setToolTip(
+            "Load a preset demo project with sample parameters and live verification."
+        )
+        self.btn_load_demo.setStyleSheet("background-color: #27ae60; color: white; font-weight: bold; border-radius: 4px; padding: 6px 12px;")
+        self.btn_load_demo.clicked.connect(self.load_demo_project_triggered.emit)
+        header.add_action(self.btn_load_demo)
+
         self.btn_import_project = styled_button("Import Project Export", "secondary")
         self.btn_import_project.setToolTip(
             "Import a validated SamPave project-export JSON file as a new project."

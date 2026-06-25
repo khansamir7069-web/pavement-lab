@@ -147,6 +147,15 @@ class MechanisticValidationSummary:
     references: Tuple[CodeRef, ...] = REFERENCES
     notes: str = ""
 
+    @property
+    def tensile_strain_micro(self) -> Optional[float]:
+        return self.fatigue.epsilon_t_microstrain
+
+    @property
+    def compressive_strain_micro(self) -> Optional[float]:
+        return self.rutting.epsilon_v_microstrain
+
+
 
 # ---------------------------------------------------------------------------
 # Helpers

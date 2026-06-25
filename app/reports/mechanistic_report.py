@@ -190,7 +190,11 @@ def write_mechanistic_section(
 
     # --- Verification Mode Banner / Info ---
     if validation_mode is None:
-        validation_mode = "Mechanistic Verified Mode" if (not summary.is_placeholder and not summary.refused) else "Decision Support Mode"
+        is_mock = "Demo verification example only" in (summary.notes or "")
+        if is_mock:
+            validation_mode = "Decision Support Mode (Demo Run)"
+        else:
+            validation_mode = "Mechanistic Verified Mode" if (not summary.is_placeholder and not summary.refused) else "Decision Support Mode"
     
     add_heading(doc, "IITPAVE Integration Details", level=2)
     integration_info = [
@@ -209,14 +213,11 @@ def write_mechanistic_section(
     if composition:
         add_heading(doc, "IITPAVE Analysis Layer Composition", level=3)
         comp_rows = []
-        for idx, ly in enumerate(composition):
-            mod_str = f"{ly.modulus_mpa:.0f}" if getattr(ly, "modulus_mpa", None) is not None else "—"
-            poi_val = getattr(ly, "poisson", None)
-            if poi_val is None:
-                poi_val = getattr(ly, "poisson_ratio", 0.25)
-            poi_str = f"{poi_val:.2f}"
+        for ly in composition:
+            mod_str = f"{ly.modulus_mpa:.1f} MPa" if ly.modulus_mpa is not None else "—"
+            poi_str = f"{ly.poisson:.2f}" if ly.poisson is not None else "—"
             comp_rows.append([
-                ly.name,
+                getattr(ly, "name", "—"),
                 getattr(ly, "material", "—"),
                 f"{ly.thickness_mm:.0f} mm",
                 mod_str,
@@ -225,7 +226,10 @@ def write_mechanistic_section(
         add_table(doc, ["Layer", "Material", "Thickness", "Elastic Modulus (MPa)", "Poisson's Ratio"], comp_rows)
 
     # --- Overall refusal banner (Phase 14 safety contract) --------------
-    if summary.refused:
+    is_mock = "Demo verification example only" in (summary.notes or "")
+    if is_mock:
+        add_placeholder_banner(doc, "WARNING: Demo verification example only — not actual IITPAVE execution.")
+    elif summary.refused:
         add_placeholder_banner(doc,
             f"[REFUSED] {summary.refused_reason or 'Final verdict refused.'}"
         )

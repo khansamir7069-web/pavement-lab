@@ -285,6 +285,37 @@ class MechanisticValidation(Base):
 
     project: Mapped[Project] = relationship(back_populates="mechanistic_validations")
 
+    @property
+    def tensile_strain_micro(self) -> Optional[float]:
+        if not self.summary_json:
+            return None
+        try:
+            import json
+            data = self.summary_json
+            if isinstance(data, str):
+                data = json.loads(data)
+            if isinstance(data, dict):
+                return data.get("fatigue", {}).get("epsilon_t_microstrain")
+        except Exception:
+            pass
+        return None
+
+    @property
+    def compressive_strain_micro(self) -> Optional[float]:
+        if not self.summary_json:
+            return None
+        try:
+            import json
+            data = self.summary_json
+            if isinstance(data, str):
+                data = json.loads(data)
+            if isinstance(data, dict):
+                return data.get("rutting", {}).get("epsilon_v_microstrain")
+        except Exception:
+            pass
+        return None
+
+
 
 class IITPaveSchemaDiagnosticsHistory(Base):
     """Phase-33 audit history for guarded IITPAVE schema diagnostics.
