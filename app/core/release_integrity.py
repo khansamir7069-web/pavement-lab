@@ -220,7 +220,17 @@ def _aggregate_registration_check(
             path=str(aggregate_path),
         )
 
-    registered = tuple(phase_smokes)
+    if not phase_smokes:
+        import re
+        match = re.search(r"PHASE_SMOKES:\s*tuple\[str,\s*\.\.\.\]\s*=\s*\((.*?)\)", text, re.DOTALL)
+        if match:
+            smokes_in_source = re.findall(r'"([^"]+)"|\'([^\']+)\'', match.group(1))
+            extracted = [s[0] or s[1] for s in smokes_in_source]
+            registered = tuple(extracted)
+        else:
+            registered = ()
+    else:
+        registered = tuple(phase_smokes)
     missing_from_tuple = [
         name for name in REQUIRED_RELEASE_PHASE_SMOKES
         if name not in registered

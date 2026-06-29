@@ -250,8 +250,8 @@ def test_fail_safe_zip_generation_missing_iitpave(db, tmp_path):
             run_log_content = zf.read("IITPAVE/Run_Log.txt").decode("utf-8")
             verif_content = zf.read("IITPAVE/Verification_Report.txt").decode("utf-8")
             
-            assert "IITPAVE verification file not available." in run_log_content
-            assert "IITPAVE verification file not available." in verif_content
+            assert "Mechanistic verification was not executed because a licensed IITPAVE installation was unavailable." in run_log_content
+            assert "Mechanistic verification was not executed because a licensed IITPAVE installation was unavailable." in verif_content
     finally:
         pa.get_last_run_info = original_get_last_run_info
 

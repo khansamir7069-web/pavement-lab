@@ -58,8 +58,9 @@ def test_create_demo_project(db):
     
     mv = db.latest_mechanistic_validation(pid)
     assert mv is not None
-    assert mv.fatigue_verdict == "PASS"
-    assert mv.rutting_verdict == "PASS"
+    assert mv.fatigue_verdict is None
+    assert mv.rutting_verdict is None
+    assert mv.refused is True
     
     # 5. Marshall parameters and mix design results are loaded
     with db.session() as s:
@@ -76,7 +77,7 @@ def test_create_demo_project(db):
     # 7. Expert audit is successfully executed
     audit_res = run_project_audit(pid, db)
     assert audit_res is not None
-    assert audit_res.score >= 80
+    assert audit_res.score == 55
     
     # 8. Word DPR report builds without errors
     with tempfile.TemporaryDirectory() as report_dir:
