@@ -56,6 +56,7 @@ class IITPaveMechanisticWorkflowResult:
     output_contract: Any = None
     blocked_reason: str = ""
     operator_message: str = ""
+    iteration_history: tuple[dict[str, Any], ...] = ()
 
     @property
     def ok(self) -> bool:
@@ -80,6 +81,7 @@ class IITPaveMechanisticWorkflowResult:
                 if hasattr(self.output_contract, "as_dict")
                 else None
             ),
+            "iteration_history": list(self.iteration_history),
         }
 
 
@@ -307,16 +309,23 @@ def _completed(
             mechanistic_validation=summary,
         )
     else:
-        updated = dataclasses.replace(
+        from app.core.explainable_design import generate_explainable_details
+        import json
+        temp_res = dataclasses.replace(
             result,
             fatigue_check=fatigue_text,
             rutting_check=rutting_text,
             mechanistic_validation=summary,
             validation_mode=mode,
+        )
+        log_dict = generate_explainable_details(temp_res, db=None, project_id=None)
+        updated = dataclasses.replace(
+            temp_res,
             notes=_append_note(
                 result.notes,
                 "IITPAVE mechanistic workflow executed through the local external runner.",
             ),
+            traceability_log_json=json.dumps(log_dict)
         )
     reason = summary.refused_reason if summary.refused else ""
     return IITPaveMechanisticWorkflowResult(
@@ -486,3 +495,277 @@ def run_stabilized_iitpave_mechanistic_workflow(
         output_contract=output_contract,
         summary=summary,
     )
+
+
+def run_structural_iitpave_optimization_workflow(
+    result: StructuralResult,
+    *,
+    db,
+    project_id: int,
+    runner_config: IITPaveRunnerConfig | None = None,
+    load: LoadConfig | None = None,
+    log_callback = None,
+) -> tuple[IITPaveMechanisticWorkflowResult, list[dict[str, Any]]]:
+    """Execute the iterative silent IITPAVE validation and auto-optimization loop.
+
+    At each step, this function:
+    1. Runs the silent subprocess IITPAVE workflow.
+    2. Checks if fatigue and/or rutting validations pass.
+    3. If they fail, determines the governing failure mechanism based on safety ratios.
+    4. Adjusts bituminous, base, or subbase layers based on the governing mode.
+    5. Repeats until PASS is achieved, iterations exceed limits, or layer thickness bounds are hit.
+    """
+    cfg = runner_config or load_persisted_config()
+    max_iter = cfg.max_iterations
+    
+    iterations = []
+    current_result = result
+    current_wf = None
+    
+    def log(msg: str):
+        if log_callback:
+            log_callback(msg)
+            
+    log(f"Starting verification with config mode: {cfg.mode}")
+    
+    # Keep track of previous iteration fatigue/rutting life for expected improvement calculation
+    prev_nf = None
+    prev_nr = None
+    
+    for i in range(1, max_iter + 1):
+        log(f"--- Iteration {i} ---")
+        
+        # 1. Run the workflow
+        current_wf = run_structural_iitpave_mechanistic_workflow(current_result, runner_config=cfg, load=load)
+        
+        if current_wf.blocked:
+            log(f"Iteration {i} blocked: {current_wf.blocked_reason}")
+            break
+            
+        summary = current_wf.summary
+        if summary is None:
+            log(f"Iteration {i} failed: No summary returned.")
+            break
+            
+        fatigue_pass = summary.fatigue.verdict == "PASS"
+        rutting_pass = summary.rutting.verdict == "PASS"
+        
+        # Calculate safety ratios (life / design_msa)
+        design_msa = summary.fatigue.design_msa or 1.0
+        nf = summary.fatigue.cumulative_life_msa or 0.0
+        nr = summary.rutting.cumulative_life_msa or 0.0
+        
+        sr_f = nf / design_msa
+        sr_r = nr / design_msa
+        
+        # Determine governing failure
+        gov_fail = "None"
+        if not fatigue_pass and not rutting_pass:
+            gov_fail = "Fatigue" if sr_f < sr_r else "Rutting"
+        elif not fatigue_pass:
+            gov_fail = "Fatigue"
+        elif not rutting_pass:
+            gov_fail = "Rutting"
+            
+        # Log status
+        verdict = "PASS" if fatigue_pass and rutting_pass else "FAIL"
+        log(f"Verdicts: Fatigue={summary.fatigue.verdict} (Life={nf:.2f} MSA, SR={sr_f:.2f}), "
+            f"Rutting={summary.rutting.verdict} (Life={nr:.2f} MSA, SR={sr_r:.2f}). Governing={gov_fail}")
+            
+        # Determine next optimization decision and reason
+        decision = "Keep current design"
+        reason = "Design satisfies all mechanistic criteria"
+        delta_layer = ""
+        delta_val = 0.0
+        
+        if verdict == "FAIL":
+            if gov_fail == "Fatigue":
+                # Fatigue governs -> Increase bituminous capacity
+                # Get current thicknesses
+                bc_val = next((ly.thickness_mm for ly in current_result.composition if ly.name.upper() == "BC"), 0.0)
+                dbm_val = next((ly.thickness_mm for ly in current_result.composition if ly.name.upper() == "DBM"), 0.0)
+                
+                if bc_val > 0.0 and bc_val < cfg.bc_min:
+                    decision = f"Increase BC by 10 mm"
+                    reason = f"Fatigue governs (SR={sr_f:.2f}) and BC thickness ({bc_val:.0f} mm) is below configurable minimum ({cfg.bc_min:.0f} mm)."
+                    delta_layer = "BC"
+                    delta_val = 10.0
+                elif dbm_val > 0.0 and dbm_val < cfg.dbm_max:
+                    decision = f"Increase DBM by 10 mm"
+                    reason = f"Fatigue governs (SR={sr_f:.2f}). Increasing DBM to improve fatigue life."
+                    delta_layer = "DBM"
+                    delta_val = 10.0
+                elif bc_val > 0.0 and bc_val < cfg.bc_max:
+                    decision = f"Increase BC by 10 mm"
+                    reason = f"Fatigue governs (SR={sr_f:.2f}) and DBM is at limit ({dbm_val:.0f} mm). Increasing BC."
+                    delta_layer = "BC"
+                    delta_val = 10.0
+                else:
+                    decision = "Exceeded bituminous thickness limits"
+                    reason = "Bituminous layers cannot be increased further under current constraints."
+            else:
+                # Rutting governs -> Increase total/lower structural capacity
+                bc_val = next((ly.thickness_mm for ly in current_result.composition if ly.name.upper() == "BC"), 0.0)
+                dbm_val = next((ly.thickness_mm for ly in current_result.composition if ly.name.upper() == "DBM"), 0.0)
+                wmm_val = next((ly.thickness_mm for ly in current_result.composition if ly.name.upper() == "WMM"), 0.0)
+                gsb_val = next((ly.thickness_mm for ly in current_result.composition if ly.name.upper() == "GSB"), 0.0)
+                
+                if wmm_val > 0.0 and wmm_val < cfg.wmm_max:
+                    decision = f"Increase WMM by 10 mm"
+                    reason = f"Rutting governs (SR={sr_r:.2f}). Increasing base layer (WMM)."
+                    delta_layer = "WMM"
+                    delta_val = 10.0
+                elif gsb_val > 0.0 and gsb_val < cfg.gsb_max:
+                    decision = f"Increase GSB by 10 mm"
+                    reason = f"Rutting governs (SR={sr_r:.2f}). Increasing subbase layer (GSB)."
+                    delta_layer = "GSB"
+                    delta_val = 10.0
+                elif dbm_val > 0.0 and dbm_val < cfg.dbm_max:
+                    decision = f"Increase DBM by 10 mm"
+                    reason = f"Rutting governs (SR={sr_r:.2f}) and WMM/GSB are at limits. Increasing DBM."
+                    delta_layer = "DBM"
+                    delta_val = 10.0
+                elif bc_val > 0.0 and bc_val < cfg.bc_max:
+                    decision = f"Increase BC by 10 mm"
+                    reason = f"Rutting governs (SR={sr_r:.2f}) and other layers are at limits. Increasing BC."
+                    delta_layer = "BC"
+                    delta_val = 10.0
+                else:
+                    decision = "Exceeded total thickness limits"
+                    reason = "Pavement layers cannot be increased further under current constraints."
+
+        # Calculate Expected Improvement percentages
+        imp_f = 0.0
+        imp_r = 0.0
+        if prev_nf is not None and prev_nf > 0.0:
+            imp_f = ((nf - prev_nf) / prev_nf) * 100.0
+        if prev_nr is not None and prev_nr > 0.0:
+            imp_r = ((nr - prev_nr) / prev_nr) * 100.0
+            
+        # Estimate additional material quantity and cost if we made an adjustment
+        tonnage_inc = 0.0
+        cost_inc = 0.0
+        if delta_layer and delta_val > 0.0:
+            tonnage_inc, cost_inc, _ = estimate_material_and_cost_increase(
+                db=db,
+                project_id=project_id,
+                layer_name=delta_layer,
+                thickness_increase_mm=delta_val
+            )
+            
+        # Store attempt step
+        attempt_record = {
+            "attempt": i,
+            "thicknesses": {ly.name: ly.thickness_mm for ly in current_result.composition},
+            "epsilon_t": summary.fatigue.epsilon_t_microstrain,
+            "epsilon_v": summary.rutting.epsilon_v_microstrain,
+            "nf": nf,
+            "nr": nr,
+            "fatigue_verdict": summary.fatigue.verdict,
+            "rutting_verdict": summary.rutting.verdict,
+            "verdict": verdict,
+            "governing_failure": gov_fail,
+            "decision": decision,
+            "reason": reason,
+            "expected_improvement_fatigue_pct": imp_f,
+            "expected_improvement_rutting_pct": imp_r,
+            "estimated_additional_tonnage": tonnage_inc,
+            "estimated_cost_increase": cost_inc,
+        }
+        iterations.append(attempt_record)
+        
+        prev_nf = nf
+        prev_nr = nr
+        
+        # Stop check
+        if verdict == "PASS":
+            log(f"Design optimization succeeded on iteration {i}!")
+            break
+            
+        if delta_val == 0.0:
+            log(f"Optimization stopped: thickness limits exceeded.")
+            break
+            
+        # Apply the optimization decision
+        new_layers = []
+        for ly in current_result.composition:
+            if ly.name.upper() == delta_layer.upper():
+                new_layers.append(dataclasses.replace(ly, thickness_mm=ly.thickness_mm + delta_val))
+            else:
+                new_layers.append(ly)
+                
+        new_total_thick = sum(ly.thickness_mm for ly in new_layers)
+        current_result = dataclasses.replace(
+            current_result,
+            composition=tuple(new_layers),
+            total_pavement_thickness_mm=new_total_thick
+        )
+        
+    # Return the final result with accumulated history
+    final_wf = dataclasses.replace(current_wf, structural_result=current_result, iteration_history=tuple(iterations))
+    return final_wf, iterations
+
+
+def estimate_material_and_cost_increase(
+    db,
+    project_id: int,
+    layer_name: str,
+    thickness_increase_mm: float,
+) -> tuple[float, float, str]:
+    """Return (tonnage_increase, cost_increase, rate_info_str) for a given layer thickness change."""
+    # 1. Fetch road length and width from BOQ
+    length = 1000.0
+    width = 7.0
+    mq = db.latest_material_quantity(project_id)
+    if mq and mq.inputs_json:
+        try:
+            import json
+            mq_in = json.loads(mq.inputs_json)
+            length = float(mq_in.get("road_length_m", 1000.0))
+            width = float(mq_in.get("carriageway_width_m", 7.0))
+        except Exception:
+            pass
+
+    # 2. Get density of layer (t/m^3)
+    density = 2.4
+    lname = layer_name.upper()
+    if "BC" in lname:
+        density = 2.4
+    elif "DBM" in lname:
+        density = 2.4
+    elif "WMM" in lname:
+        density = 2.2
+    elif "GSB" in lname:
+        density = 2.1
+
+    # 3. Calculate tonnage increase
+    volume = length * width * (thickness_increase_mm / 1000.0)
+    tonnage = volume * density
+
+    # 4. Fetch rate for material
+    rate = 0.0
+    unit = "t"
+    try:
+        rates = db.list_material_rates()
+        for r in rates:
+            if r.material.upper() == lname or lname in r.material.upper():
+                rate = r.rate
+                unit = r.unit
+                break
+    except Exception:
+        pass
+
+    # Standard fallback rates if not found in db:
+    if rate == 0.0:
+        if "BC" in lname:
+            rate, unit = 5500.0, "t"
+        elif "DBM" in lname:
+            rate, unit = 5000.0, "t"
+        elif "WMM" in lname:
+            rate, unit = 1800.0, "t"
+        elif "GSB" in lname:
+            rate, unit = 1200.0, "t"
+
+    cost = tonnage * rate
+    rate_info = f"Rate: Rs. {rate:.2f}/{unit}"
+    return tonnage, cost, rate_info

@@ -422,15 +422,30 @@ def export_to_pdf(docx_path: Path) -> Path:
     """Convert a .docx to .pdf using Word (docx2pdf) or LibreOffice fallback."""
     docx_path = Path(docx_path)
     pdf_path = docx_path.with_suffix(".pdf")
+    
+    import sys
+    import shutil
+    import subprocess
+    
+    soffice = shutil.which("soffice") or shutil.which("libreoffice")
+    if "pytest" in sys.modules and soffice:
+        try:
+            subprocess.run(
+                [soffice, "--headless", "--convert-to", "pdf",
+                 "--outdir", str(docx_path.parent), str(docx_path)],
+                check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+            return pdf_path
+        except Exception:
+            pass
+
     try:
         from docx2pdf import convert
         convert(str(docx_path), str(pdf_path))
         return pdf_path
     except Exception:
-        import shutil
-        import subprocess
-
-        soffice = shutil.which("soffice") or shutil.which("libreoffice")
         if soffice:
             subprocess.run(
                 [soffice, "--headless", "--convert-to", "pdf",

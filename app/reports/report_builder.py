@@ -876,9 +876,6 @@ def build_combined_report(
     add_heading(doc, "Revision History Table", level=2)
     
     rev_rows = []
-    r0_date = p.created_at.strftime("%Y-%m-%d") if p.created_at else "N/A"
-    r0_eng = p.submitted_by or brand_engineer or "N/A"
-    rev_rows.append(["R0", r0_date, "Initial Design Submission", r0_eng])
     
     revisions_list = []
     if p.revisions_json:
@@ -887,8 +884,22 @@ def build_combined_report(
         except Exception:
             pass
             
+    # Check if R0 is in the list, if not prepend it
+    has_r0 = any(r.get("revision_number") == 0 for r in revisions_list)
+    if not has_r0:
+        r0_date = p.created_at.strftime("%Y-%m-%d") if p.created_at else "N/A"
+        r0_eng = p.submitted_by or brand_engineer or "N/A"
+        r0_val = "Not Audited"
+        if p.validation_results_json and (p.revision_number or 0) == 0:
+            try:
+                res_dict = json.loads(p.validation_results_json)
+                r0_val = f"{res_dict.get('final_recommendation')} (Score: {res_dict.get('score')}/100)"
+            except Exception:
+                pass
+        rev_rows.append(["R0", r0_date, r0_eng, "Initial Design Submission", r0_val, "None"])
+        
     for r in revisions_list:
-        rev_num = r.get("revision_number", 1)
+        rev_num = r.get("revision_number", 0)
         rev_id = f"R{rev_num}"
         dt_str = r.get("created_date") or r.get("date_time") or ""
         if "T" in dt_str:
@@ -912,9 +923,13 @@ def build_combined_report(
             except Exception:
                 pass
                 
-        rev_rows.append([rev_id, date_str, desc, eng])
+        val_status = r.get("validation_status") or "Draft"
+        files = r.get("generated_files", [])
+        files_str = ", ".join(files) if files else "None"
         
-    add_table(doc, ["Rev", "Date", "Description", "Engineer"], rev_rows)
+        rev_rows.append([rev_id, date_str, eng, desc, val_status, files_str])
+        
+    add_table(doc, ["Rev", "Date", "Engineer", "Description of Change", "Validation Status", "Generated Files"], rev_rows)
     doc.add_page_break()
 
     # ---- 3. Contents Page ----
@@ -1143,7 +1158,7 @@ def build_combined_report(
             client=ctx.client, agency=ctx.agency, submitted_by=ctx.submitted_by,
             lab_name=ctx.lab_name, report_date=ctx.report_date,
         )
-        write_material_quantity_section(doc, mq_ctx, material_qty, include_header=False)
+        write_material_quantity_section(doc, mq_ctx, material_qty, include_header=False, db=db)
         
         # Cost Estimate
         boq_res = {}
@@ -1472,37 +1487,80 @@ def write_signature_placeholders(doc) -> None:
 
 def write_expert_design_audit_section(doc, audit_result) -> None:
     try:
-        if not audit_result or not getattr(audit_result, "findings", None):
+        if not audit_result:
             return
         
-        add_heading(doc, "EXPERT DESIGN AUDIT SUMMARY", level=1)
+        add_heading(doc, "ENGINEERING VALIDATION & DESIGN REVIEW SUMMARY", level=1)
         
-        # Add summary info
+        # Summary details
+        rec = getattr(audit_result, "final_recommendation", "NOT READY FOR SUBMISSION")
+        ts = getattr(audit_result, "timestamp", "")
         summary_info = [
             ("Engineering Score", f"{getattr(audit_result, 'score', 0)} / 100"),
             ("Risk Level", str(getattr(audit_result, "risk_level", "UNKNOWN"))),
-            ("Readiness Status", str(getattr(audit_result, "readiness_status", "UNKNOWN")))
+            ("Readiness Status", str(getattr(audit_result, "readiness_status", "UNKNOWN"))),
+            ("Submission Recommendation", str(rec)),
+            ("Validation Timestamp", str(ts) if ts else "N/A")
         ]
         add_kv_table(doc, summary_info)
-        add_p(doc, "")  # blank line
-        
-        # Add findings table
-        findings_rows = []
-        for f in audit_result.findings:
-            findings_rows.append([
-                str(getattr(f, "severity", "")).upper(),
-                str(getattr(f, "module", "")).capitalize(),
-                str(getattr(f, "issue", "")),
-                str(getattr(f, "recommendation", "")),
-                str(getattr(f, "engineering_reason", ""))
-            ])
-            
-        if findings_rows:
+        add_p(doc, "")
+
+        # 1. Engineering Score Cards breakdown
+        if hasattr(audit_result, "completeness_score"):
+            add_heading(doc, "Engineering Score Breakdown", level=2)
+            score_rows = [
+                ["Completeness Score", f"{getattr(audit_result, 'completeness_score', 0)}%", getattr(audit_result, "completeness_explanation", "")],
+                ["Consistency Score", f"{getattr(audit_result, 'consistency_score', 0)}%", getattr(audit_result, "consistency_explanation", "")],
+                ["Mechanistic Score", f"{getattr(audit_result, 'mechanistic_score', 0)}%", getattr(audit_result, "mechanistic_explanation", "")],
+                ["Documentation Score", f"{getattr(audit_result, 'documentation_score', 0)}%", getattr(audit_result, "documentation_explanation", "")],
+                ["Submission Score", f"{getattr(audit_result, 'submission_score', 0)}%", getattr(audit_result, "submission_explanation", "")],
+            ]
+            add_table(doc, ["Score Type", "Rating", "Explanation / Evaluation Details"], score_rows)
+            add_p(doc, "")
+
+        # 2. Module status
+        if hasattr(audit_result, "module_statuses") and audit_result.module_statuses:
+            add_heading(doc, "Module Quality Gate Status", level=2)
+            mod_rows = []
+            for m, st in audit_result.module_statuses.items():
+                mod_rows.append([m.title(), str(st)])
+            add_table(doc, ["Pavement Module", "Status"], mod_rows)
+            add_p(doc, "")
+
+        # 3. Cross-Module consistency
+        if hasattr(audit_result, "consistency_checks") and audit_result.consistency_checks:
+            add_heading(doc, "Cross-Module Parameter Alignment", level=2)
+            cm_rows = []
+            for check in audit_result.consistency_checks:
+                cm_rows.append([
+                    str(check.get("module")),
+                    str(check.get("field")),
+                    str(check.get("source_val")),
+                    str(check.get("target_val")),
+                    str(check.get("status"))
+                ])
+            add_table(doc, ["Module Pairs", "Parameter Field", "Source Value", "Target Value", "Status"], cm_rows)
+            add_p(doc, "")
+
+        # 4. Outstanding Issues
+        findings = getattr(audit_result, "findings", [])
+        if findings:
+            add_heading(doc, "Outstanding Design Validation Issues", level=2)
+            findings_rows = []
+            for f in findings:
+                findings_rows.append([
+                    str(getattr(f, "severity", "")).upper(),
+                    str(getattr(f, "module", "")).capitalize(),
+                    str(getattr(f, "issue", "")),
+                    str(getattr(f, "recommendation", "")),
+                    str(getattr(f, "engineering_reason", ""))
+                ])
             add_table(
                 doc,
-                ["Severity", "Module", "Issue", "Recommendation", "Engineering Reason"],
+                ["Severity", "Module", "Issue Description", "Suggested Action", "Engineering Reason"],
                 findings_rows
             )
+            add_p(doc, "")
             
     except Exception as e:
         import logging

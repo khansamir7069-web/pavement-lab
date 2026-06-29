@@ -6,7 +6,7 @@ branding metadata below carries the SAMPAVE name (Phase 17 / V1
 release).
 """
 
-__version__ = "2.1"
+__version__ = "2.2"
 
 # Product branding (V1 release).
 __product_name__ = "RoadX Professional Suite"

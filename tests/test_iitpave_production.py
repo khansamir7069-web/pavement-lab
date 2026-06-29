@@ -217,3 +217,242 @@ def test_stabilized_workflow_parser_failure_raises_exact_string() -> None:
     assert workflow.blocked is True
     assert workflow.blocked_reason == "IITPAVE execution completed but output verification failed."
     assert workflow.structural_result.validation_mode == "Decision Support Mode"
+
+
+def test_iitpave_executable_path_validation() -> None:
+    # Test discovery path validation
+    tmp = Path(tempfile.mkdtemp(prefix="iitpave_test_val_"))
+    dummy_exe = tmp / "IITPAVE.exe"
+    dummy_exe.write_text("Dummy binary content", encoding="utf-8")
+    
+    validation = validate_iitpave_environment(configured_path=str(dummy_exe))
+    assert validation.selected_path == dummy_exe
+    assert validation.ok is True
+
+
+def test_iitpave_output_parser_cases() -> None:
+    # Test parsing real output table
+    output_text = (
+        "IITPAVE REGION RESULTS\n"
+        " Z      R    SigmaZ   SigmaT   SigmaR   epZ      epT      epR\n"
+        " 100    0    0.45     0.15     0.10     -50      110      90\n"
+        " 250    0    0.15     0.05     0.04     -200     20       10\n"
+    )
+    from app.core.iitpave.parser import parse_iitpave_output
+    from app.core.iitpave.runner import SOURCE_EXTERNAL
+    
+    result = parse_iitpave_output(output_text, source=SOURCE_EXTERNAL)
+    assert len(result.point_results) == 2
+    assert result.point_results[0].z_mm == 100.0
+    assert result.point_results[0].epsilon_t_microstrain == 110.0
+    assert result.point_results[1].epsilon_z_microstrain == -200.0
+
+
+def test_iitpave_optimization_loop_fatigue_governs() -> None:
+    # Test iterative optimization under fatigue failure governs
+    tmp = Path(tempfile.mkdtemp(prefix="iitpave_opt_fatigue_"))
+    
+    # We write a mock executable that checks layer 2 (DBM) thickness.
+    # If DBM < 100mm, fatigue life remains unsafe.
+    # Once DBM >= 100mm, fatigue life passes.
+    python_cmd = (
+        "import sys\n"
+        "lines = [ln.strip() for ln in open('iitp_inp.dat').read().splitlines() if ln.strip() and not ln.strip().startswith('#')]\n"
+        "n_layers = int(lines[0])\n"
+        "dbm_thick = 0.0\n"
+        "for i in range(1, n_layers + 1):\n"
+        "    t = lines[i].split()\n"
+        "    if len(t) >= 3 and i == 2: dbm_thick = float(t[2])\n"
+        "if dbm_thick < 100.0:\n"
+        "    print('IITPAVE OUTPUT')\n"
+        "    print('Z R SigmaZ SigmaT SigmaR TaoRZ DispZ epZ epT epR')\n"
+        "    print('40 0 0.35 0.11 0.09 0 0 -0.000850 0.000850 0.000110')\n"
+        "    print('300 0 0.04 0.01 0.01 0 0 -0.001220 -0.000030 -0.000020')\n"
+        "else:\n"
+        "    print('IITPAVE OUTPUT')\n"
+        "    print('Z R SigmaZ SigmaT SigmaR TaoRZ DispZ epZ epT epR')\n"
+        "    print('40 0 0.35 0.11 0.09 0 0 -0.000050 0.000040 0.000030')\n"
+        "    print('300 0 0.04 0.01 0.01 0 0 -0.000020 -0.000030 -0.000020')\n"
+    )
+    
+    py_file = tmp / "mock_opt.py"
+    py_file.write_text(python_cmd, encoding="utf-8")
+    
+    if os.name == "nt":
+        exe = tmp / "mock_opt.cmd"
+        exe.write_text(f"@echo off\npython \"{py_file}\"\n", encoding="utf-8")
+    else:
+        exe = tmp / "mock_opt"
+        exe.write_text(f"#!/bin/sh\npython \"{py_file}\"\n", encoding="utf-8")
+        exe.chmod(0o755)
+        
+    from app.core import StructuralInput, StructuralResult, PavementLayer
+    from app.db.repository import Database
+    
+    layers = (
+        PavementLayer(name="BC", thickness_mm=40.0, material="BC", modulus_mpa=3000.0, poisson=0.35),
+        PavementLayer(name="DBM", thickness_mm=80.0, material="DBM", modulus_mpa=3000.0, poisson=0.35),
+        PavementLayer(name="WMM", thickness_mm=250.0, material="WMM", modulus_mpa=300.0, poisson=0.4),
+        PavementLayer(name="GSB", thickness_mm=150.0, material="GSB", modulus_mpa=150.0, poisson=0.4)
+    )
+    inputs = StructuralInput(
+        road_category="NH / SH", design_life_years=15, initial_cvpd=2000.0,
+        growth_rate_pct=7.5, vdf=2.5, ldf=0.75, subgrade_cbr_pct=5.0
+    )
+    result = StructuralResult(
+        inputs=inputs, design_msa=10.0, growth_factor=18.0, subgrade_mr_mpa=50.0,
+        composition=layers, total_pavement_thickness_mm=520.0
+    )
+    
+    db_file = tmp / "test_opt.db"
+    db = Database(db_file)
+    
+    cfg = IITPaveRunnerConfig(
+        mode=IITPAVE_RUNNER_EXTERNAL,
+        configured_executable_path=str(exe),
+        bc_min=30.0, bc_max=80.0, dbm_min=50.0, dbm_max=300.0,
+        wmm_max=250.0, gsb_max=400.0, max_iterations=10
+    )
+    
+    from app.core.iitpave.workflow import run_structural_iitpave_optimization_workflow
+    wf_res, iterations = run_structural_iitpave_optimization_workflow(
+        result, db=db, project_id=1, runner_config=cfg
+    )
+    
+    # Strains should pass in step 2 (DBM increased from 80mm to 90mm then 100mm)
+    assert len(iterations) >= 2
+    assert wf_res.ok is True
+    final_dbm = next(ly.thickness_mm for ly in wf_res.structural_result.composition if ly.name.upper() == "DBM")
+    assert final_dbm >= 100.0
+
+
+def test_iitpave_optimization_loop_rutting_governs() -> None:
+    # Test iterative optimization under rutting failure governs
+    tmp = Path(tempfile.mkdtemp(prefix="iitpave_opt_rutting_"))
+    
+    # Mock script: if GSB < 200mm, rutting remains unsafe.
+    python_cmd = (
+        "import sys\n"
+        "lines = [ln.strip() for ln in open('iitp_inp.dat').read().splitlines() if ln.strip() and not ln.strip().startswith('#')]\n"
+        "n_layers = int(lines[0])\n"
+        "gsb_thick = 0.0\n"
+        "for i in range(1, n_layers + 1):\n"
+        "    t = lines[i].split()\n"
+        "    if len(t) >= 3 and i == 4: gsb_thick = float(t[2])\n"
+        "if gsb_thick < 200.0:\n"
+        "    print('IITPAVE OUTPUT')\n"
+        "    print('Z R SigmaZ SigmaT SigmaR TaoRZ DispZ epZ epT epR')\n"
+        "    print('40 0 0.35 0.11 0.09 0 0 -0.000050 0.000040 0.000030')\n"
+        "    print('300 0 0.04 0.01 0.01 0 0 -0.000850 -0.000030 -0.000020')\n"
+        "else:\n"
+        "    print('IITPAVE OUTPUT')\n"
+        "    print('Z R SigmaZ SigmaT SigmaR TaoRZ DispZ epZ epT epR')\n"
+        "    print('40 0 0.35 0.11 0.09 0 0 -0.000050 0.000040 0.000030')\n"
+        "    print('300 0 0.04 0.01 0.01 0 0 -0.000080 -0.000030 -0.000020')\n"
+    )
+    
+    py_file = tmp / "mock_opt_rut.py"
+    py_file.write_text(python_cmd, encoding="utf-8")
+    
+    if os.name == "nt":
+        exe = tmp / "mock_opt_rut.cmd"
+        exe.write_text(f"@echo off\npython \"{py_file}\"\n", encoding="utf-8")
+    else:
+        exe = tmp / "mock_opt_rut"
+        exe.write_text(f"#!/bin/sh\npython \"{py_file}\"\n", encoding="utf-8")
+        exe.chmod(0o755)
+        
+    from app.core import StructuralInput, StructuralResult, PavementLayer
+    from app.db.repository import Database
+    
+    layers = (
+        PavementLayer(name="BC", thickness_mm=40.0, material="BC", modulus_mpa=3000.0, poisson=0.35),
+        PavementLayer(name="DBM", thickness_mm=80.0, material="DBM", modulus_mpa=3000.0, poisson=0.35),
+        # Set WMM to max 250mm so GSB is increased next
+        PavementLayer(name="WMM", thickness_mm=250.0, material="WMM", modulus_mpa=300.0, poisson=0.4),
+        PavementLayer(name="GSB", thickness_mm=150.0, material="GSB", modulus_mpa=150.0, poisson=0.4)
+    )
+    inputs = StructuralInput(
+        road_category="NH / SH", design_life_years=15, initial_cvpd=2000.0,
+        growth_rate_pct=7.5, vdf=2.5, ldf=0.75, subgrade_cbr_pct=5.0
+    )
+    result = StructuralResult(
+        inputs=inputs, design_msa=10.0, growth_factor=18.0, subgrade_mr_mpa=50.0,
+        composition=layers, total_pavement_thickness_mm=520.0
+    )
+    
+    db_file = tmp / "test_opt_rut.db"
+    db = Database(db_file)
+    
+    cfg = IITPaveRunnerConfig(
+        mode=IITPAVE_RUNNER_EXTERNAL,
+        configured_executable_path=str(exe),
+        bc_min=30.0, bc_max=80.0, dbm_min=50.0, dbm_max=300.0,
+        wmm_max=250.0, gsb_max=400.0, max_iterations=10
+    )
+    
+    from app.core.iitpave.workflow import run_structural_iitpave_optimization_workflow
+    wf_res, iterations = run_structural_iitpave_optimization_workflow(
+        result, db=db, project_id=1, runner_config=cfg
+    )
+    
+    # Rutting governs, WMM is at max (250mm), so GSB is adjusted.
+    assert len(iterations) >= 2
+    assert wf_res.ok is True
+    final_gsb = next(ly.thickness_mm for ly in wf_res.structural_result.composition if ly.name.upper() == "GSB")
+    assert final_gsb >= 200.0
+
+
+def test_database_persistence_run_logs() -> None:
+    # Test persistence of executable path, input/output paths, stdout, and iteration details
+    tmp = Path(tempfile.mkdtemp(prefix="iitpave_db_test_"))
+    db_file = tmp / "test_persistence.db"
+    
+    from app.db.repository import Database
+    from app.db.schema import Project
+    from app.core.mechanistic_validation import MechanisticValidationSummary, FatigueCheck, RuttingCheck, FatigueCalibration, RuttingCalibration
+    
+    db = Database(db_file)
+    with db.session() as s:
+        p = Project(work_name="Traceability Project")
+        s.add(p)
+        s.flush()
+        pid = p.id
+        
+    f_cal = FatigueCalibration(label="Test", k1=0.05, k2=0.05, k3=0.05, reliability_pct=80, is_placeholder=False)
+    r_cal = RuttingCalibration(label="Test", k_r=0.05, k_v=0.05, reliability_pct=80, is_placeholder=False)
+    
+    fatigue = FatigueCheck("PASS", 12.0, 10.0, 45.0, False, "", f_cal)
+    rutting = RuttingCheck("PASS", 15.0, 10.0, 120.0, False, "", r_cal)
+    summary = MechanisticValidationSummary(fatigue, rutting, is_placeholder=False, refused=False, refused_reason="")
+    
+    iterations = [
+        {"attempt": 1, "verdict": "FAIL", "decision": "Increase DBM"},
+        {"attempt": 2, "verdict": "PASS", "decision": "Keep"}
+    ]
+    recommended_thick = {"BC": 40, "DBM": 100}
+    
+    row = db.save_mechanistic_validation(
+        project_id=pid,
+        summary=summary,
+        inputs={"dummy": True},
+        exe_path="C:/IITPAVE/IITPAVE.exe",
+        input_filepath="C:/IITPAVE/iitp_inp.dat",
+        output_filepath="C:/IITPAVE/iitp_out.dat",
+        stdout_log="Calculation success console output",
+        stderr_log="No errors logged",
+        iteration_history_json=json.dumps(iterations),
+        recommended_thickness_json=json.dumps(recommended_thick)
+    )
+    
+    # Reload and assert
+    loaded = db.latest_mechanistic_validation(pid)
+    assert loaded is not None
+    assert loaded.exe_path == "C:/IITPAVE/IITPAVE.exe"
+    assert loaded.input_filepath == "C:/IITPAVE/iitp_inp.dat"
+    assert loaded.output_filepath == "C:/IITPAVE/iitp_out.dat"
+    assert loaded.stdout_log == "Calculation success console output"
+    assert loaded.stderr_log == "No errors logged"
+    assert "attempt" in loaded.iteration_history_json
+    assert "BC" in loaded.recommended_thickness_json
+

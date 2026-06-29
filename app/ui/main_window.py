@@ -238,9 +238,36 @@ class MainWindow(QMainWindow):
 
         lay.addWidget(sidebar)
 
+        # Right container
+        right_container = QWidget()
+        right_lay = QVBoxLayout(right_container)
+        right_lay.setContentsMargins(0, 0, 0, 0)
+        right_lay.setSpacing(0)
+
+        # Top Bar
+        self.top_bar = QWidget()
+        self.top_bar.setFixedHeight(45)
+        self.top_bar.setStyleSheet("background-color: #ffffff; border-bottom: 1px solid #e2e8f0;")
+        tb_lay = QHBoxLayout(self.top_bar)
+        tb_lay.setContentsMargins(16, 0, 16, 0)
+
+        self.lbl_top_project = QLabel("No Project Loaded")
+        self.lbl_top_project.setStyleSheet("font-size: 10pt; font-weight: bold; color: #4a5568;")
+        tb_lay.addWidget(self.lbl_top_project)
+        tb_lay.addStretch(1)
+
+        # Status badge container
+        self.status_badge = QLabel("")
+        self.status_badge.setStyleSheet("font-size: 9pt; color: #4a5568;")
+        tb_lay.addWidget(self.status_badge)
+
+        right_lay.addWidget(self.top_bar)
+
         # Stack
         self.stack = QStackedWidget()
-        lay.addWidget(self.stack, stretch=1)
+        right_lay.addWidget(self.stack, stretch=1)
+
+        lay.addWidget(right_container, stretch=1)
 
         self.dashboard = Dashboard(self.db)
         self.project_form = ProjectForm(self.db)
@@ -257,6 +284,7 @@ class MainWindow(QMainWindow):
         self.iitpave_status = IITPaveStatusPanel(self.db)
         self.subgrade = SubgradePanel(self.db)
         self.engineering_review = EngineeringReviewPanel(self.db)
+        self.engineering_review.navigate_to.connect(self._show_page)
         self.submission = SubmissionPanel(self.db)
 
         # Wire Back buttons on every page's header.
@@ -339,9 +367,10 @@ class MainWindow(QMainWindow):
         self.inputs.reset_requested.connect(self._on_reset_inputs)
         self.results.generate_word.connect(self._on_export_word)
         self.results.generate_pdf.connect(self._on_export_pdf)
-        self.subgrade.saved.connect(self._refresh_hub)
+        self.subgrade.saved.connect(self._on_subgrade_saved)
         self.engineering_review.saved.connect(self._refresh_hub)
         self.submission.saved.connect(self._refresh_hub)
+        self.submission.refresh_all_requested.connect(self._on_refresh_all_requested)
         self.submission.project_changed.connect(self._on_open_project)
         self.hub.status_changed.connect(self._on_hub_status_changed)
 
@@ -365,6 +394,10 @@ class MainWindow(QMainWindow):
             it = self.nav.item(i)
             if it.data(Qt.UserRole) == key:
                 self.nav.setCurrentRow(i)
+
+        if self._current_project_id:
+            self.db.log_project_audit(self._current_project_id, key, "Module Opened")
+        self.refresh_project_status_badge()
 
         # Dynamic design lock UI traversal
         widget = self.stack.currentWidget()
@@ -435,7 +468,7 @@ class MainWindow(QMainWindow):
         if key == "dashboard":
             self.dashboard.refresh()
         elif key == "iitpave_status":
-            self.iitpave_status.refresh()
+            self.iitpave_status.set_project(self._current_project_id, work_name)
         elif key == "subgrade":
             self.subgrade.set_project(self._current_project_id, work_name)
         elif key == "inputs":
@@ -467,7 +500,73 @@ class MainWindow(QMainWindow):
         self._current_project_id = project_id
         self.project_form.load_project(project_id)
         self._refresh_hub()
+        self.refresh_project_status_badge()
         self._show_page("hub")
+
+    def refresh_project_status_badge(self) -> None:
+        if self._current_project_id is None:
+            self.lbl_top_project.setText("No Project Loaded")
+            self.status_badge.setText("")
+            return
+        
+        p = self.db.get_project(self._current_project_id)
+        if not p:
+            self.lbl_top_project.setText("No Project Loaded")
+            self.status_badge.setText("")
+            return
+            
+        self.lbl_top_project.setText(f"Project: {p.work_name} (ID: {p.id})")
+        
+        # Get sync statuses
+        statuses = self.db.get_all_sync_statuses(p.id)
+        
+        def get_indicator(status: str) -> str:
+            if status == "Synced":
+                return "🟢"
+            elif status == "Manual Override":
+                return "🟡"
+            else: # Out of Sync
+                return "🔴"
+                
+        traffic_ind = get_indicator(statuses.get("traffic", "Synced"))
+        subgrade_ind = get_indicator(statuses.get("subgrade", "Synced"))
+        struct_ind = get_indicator(statuses.get("structural", "Synced"))
+        boq_ind = get_indicator(statuses.get("material_qty", "Synced"))
+        sub_ind = get_indicator(statuses.get("submission", "Synced"))
+        
+        badge_html = (
+            f"<b>Project Status:</b> "
+            f"Traffic {traffic_ind} | "
+            f"Subgrade {subgrade_ind} | "
+            f"Structural {struct_ind} | "
+            f"BOQ {boq_ind} | "
+            f"Submission {sub_ind}"
+        )
+        self.status_badge.setText(badge_html)
+
+    def _on_refresh_all_requested(self) -> None:
+        pid = self._current_project_id
+        if not pid:
+            return
+            
+        # 1. Refresh Structural Design
+        struct_status = self.db.get_module_sync_status(pid, "structural")
+        if struct_status == "Out of Sync":
+            p = self.db.get_project(pid)
+            self.structural.set_project(pid, p.work_name)
+            self.structural.refresh_from_source(interactive=True)
+            
+        # 2. Refresh BOQ
+        boq_status = self.db.get_module_sync_status(pid, "material_qty")
+        if boq_status == "Out of Sync":
+            p = self.db.get_project(pid)
+            self.material_qty.set_project(pid, p.work_name)
+            self.material_qty.refresh_from_source()
+            
+        # 3. Refresh status
+        self.submission._refresh()
+        self.refresh_project_status_badge()
+        QMessageBox.information(self, "Refresh All", "All modules refreshed successfully.")
 
     def _on_load_demo_project(self) -> None:
         from app.db.schema import Project
@@ -526,8 +625,10 @@ class MainWindow(QMainWindow):
 
     def _on_project_saved(self, project_id: int) -> None:
         self._current_project_id = project_id
+        self.db.log_project_audit(project_id, "project", "Module Saved")
         self.statusBar().showMessage(f"Project #{project_id} saved.")
         self._refresh_hub()
+        self.refresh_project_status_badge()
         self._show_page("hub")
 
     def _refresh_hub(self) -> None:
@@ -623,6 +724,22 @@ class MainWindow(QMainWindow):
             self._show_page("specs_admin")
 
         elif key == "structural":
+            ta = self.db.latest_traffic_analysis(self._current_project_id)
+            has_traffic = ta is not None
+            has_subgrade = p.subgrade_cbr is not None and p.subgrade_mr is not None
+            
+            if not has_traffic or not has_subgrade:
+                if not is_legacy:
+                    QMessageBox.warning(
+                        self, "Sequence Gate",
+                        "Traffic analysis and Subgrade/CBR evaluation must exist before running structural design."
+                    )
+                    return
+                else:
+                    QMessageBox.warning(
+                        self, "Sequence Gate Warning",
+                        "Warning: Traffic analysis or Subgrade/CBR evaluation is missing. Proceeding with warning."
+                    )
             self.structural.set_project(self._current_project_id, p.work_name)
             self._show_page("structural")
 
@@ -635,6 +752,22 @@ class MainWindow(QMainWindow):
             self._show_page("maintenance")
 
         elif key == "material_qty":
+            has_design = (
+                self.db.latest_structural_design(self._current_project_id) is not None
+                or self.db.latest_stabilized_design(self._current_project_id) is not None
+            )
+            if not has_design:
+                if not is_legacy:
+                    QMessageBox.warning(
+                        self, "Sequence Gate",
+                        "Final structural layer design must exist before BOQ estimation."
+                    )
+                    return
+                else:
+                    QMessageBox.warning(
+                        self, "Sequence Gate Warning",
+                        "Warning: Structural layer design is missing. Proceeding with warning."
+                    )
             self.material_qty.set_project(self._current_project_id, p.work_name)
             self._show_page("material_qty")
 
@@ -657,46 +790,66 @@ class MainWindow(QMainWindow):
             )
 
     def _on_structural_saved(self, project_id: int) -> None:
+        self.db.log_project_audit(project_id, "structural", "Module Saved")
         self.statusBar().showMessage(
             f"Structural design saved for project #{project_id}."
         )
         self._refresh_hub()
         self.dashboard.refresh()
+        self.refresh_project_status_badge()
 
     def _on_stabilized_saved(self, project_id: int) -> None:
+        self.db.log_project_audit(project_id, "stabilized", "Module Saved")
         self.statusBar().showMessage(
             f"Stabilized pavement design saved for project #{project_id}."
         )
         self._refresh_hub()
         self.dashboard.refresh()
+        self.refresh_project_status_badge()
 
     def _on_maintenance_saved(self, project_id: int) -> None:
+        self.db.log_project_audit(project_id, "maintenance", "Module Saved")
         self.statusBar().showMessage(
             f"Maintenance design saved for project #{project_id}."
         )
         self._refresh_hub()
         self.dashboard.refresh()
+        self.refresh_project_status_badge()
 
     def _on_traffic_saved(self, project_id: int) -> None:
+        self.db.log_project_audit(project_id, "traffic", "Module Saved")
         self.statusBar().showMessage(
             f"Traffic analysis saved for project #{project_id}."
         )
         self._refresh_hub()
         self.dashboard.refresh()
+        self.refresh_project_status_badge()
 
     def _on_material_qty_saved(self, project_id: int) -> None:
+        self.db.log_project_audit(project_id, "material_qty", "Module Saved")
         self.statusBar().showMessage(
             f"Material-quantity BOQ saved for project #{project_id}."
         )
         self._refresh_hub()
         self.dashboard.refresh()
+        self.refresh_project_status_badge()
 
     def _on_condition_saved(self, project_id: int) -> None:
+        self.db.log_project_audit(project_id, "condition", "Module Saved")
         self.statusBar().showMessage(
             f"Pavement condition survey saved for project #{project_id}."
         )
         self._refresh_hub()
         self.dashboard.refresh()
+        self.refresh_project_status_badge()
+
+    def _on_subgrade_saved(self) -> None:
+        if self._current_project_id:
+            self.db.log_project_audit(self._current_project_id, "subgrade", "Module Saved")
+            self.statusBar().showMessage(f"Subgrade properties saved for project #{self._current_project_id}.")
+        self._refresh_hub()
+        self.dashboard.refresh()
+        self.refresh_project_status_badge()
 
     # ----- Phase 6 export handlers --------------------------------------
 
@@ -878,7 +1031,7 @@ class MainWindow(QMainWindow):
         try:
             meta = self._project_meta_for_report(project_id)
             ctx = MaterialQuantityReportContext(**meta)
-            out = build_material_quantity_docx(Path(path), ctx, result)
+            out = build_material_quantity_docx(Path(path), ctx, result, self.db)
             QMessageBox.information(self, "Report exported", f"Saved to:\n{out}")
             self.statusBar().showMessage(f"Material-quantity Word saved: {out}")
         except Exception as e:

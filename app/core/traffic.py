@@ -104,6 +104,8 @@ class TrafficInput:
     ldf: float | None = None            # None → use _LDF_PRESETS lookup
     road_category: str = "NH / SH"
     notes: str = ""
+    directional_distribution: float = 0.5
+    lane_distribution: float = 1.0
     # ---- Reserved placeholders (no logic — future expansion) ----
     axle_spectrum_kn: Tuple[float, ...] = ()
     wim_records: Tuple[float, ...] = ()

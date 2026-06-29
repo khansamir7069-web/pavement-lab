@@ -113,11 +113,14 @@ def build_boq_excel(file_path: Path, project_id: int, db, meta: dict) -> Path:
         cost_val = opt_d.get("total_cost", 0.0)
         cost_per_km = opt_d.get("cost_per_km", 0.0)
         
+        grand_total_val = opt_d.get("grand_total", cost_val * 1.18)
         detail_rows = [
             ("Selected Option", f"{ref} (Cost Optimized)"),
             ("Thickness Summary", opt_d.get("thickness_summary", "")),
-            ("Total Preliminary Estimate", cost_val),
-            ("Est. Cost per Kilometre", cost_per_km),
+            ("Pavement Subtotal Estimate", cost_val),
+            ("GST (18% Tax)", opt_d.get("gst", cost_val * 0.18)),
+            ("Grand Total Estimate", grand_total_val),
+            ("Est. Cost per Kilometre (Subtotal)", cost_per_km),
         ]
         for label, val in detail_rows:
             c1 = ws_summary.cell(row=r_idx, column=2, value=label)
@@ -138,18 +141,19 @@ def build_boq_excel(file_path: Path, project_id: int, db, meta: dict) -> Path:
         c2.font = FONT_DATA; c2.border = BORDER_THIN
         r_idx += 1
         
-    autofit_columns(ws_summary)
-
-    # ----------------------------------------------------
+    autofit_columns(ws_summary)    # ----------------------------------------------------
     # Sheet 2: Quantity Abstract (Active project BOQ)
     # ----------------------------------------------------
     ws_qty = wb.create_sheet(title="Quantity Abstract")
     ws_qty.views.sheetView[0].showGridLines = True
     
     ws_qty.cell(row=2, column=2, value="BILL OF QUANTITIES (ACTIVE DESIGN)").font = FONT_SECTION
-    ws_qty.cell(row=3, column=2, value="Preliminary Engineer Estimate based on active rates").font = FONT_SUBTITLE
+    ws_qty.cell(row=3, column=2, value="Preliminary Engineering Estimate based on active rates").font = FONT_SUBTITLE
     
-    headers = ["Sl.", "Layer Type", "Thickness (mm)", "Volume (m³)", "Density (t/m³)", "Quantity", "Unit", "Rate (₹)", "Amount (₹)"]
+    headers = [
+        "Sl.", "Layer Type", "Thickness (mm)", "Compacted Vol (m³)", "Loose Vol (m³)", 
+        "Density (t/m³)", "Quantity", "Unit", "Rate Source", "Rate (₹)", "Amount (₹)"
+    ]
     for col_idx, h in enumerate(headers, start=2):
         cell = ws_qty.cell(row=5, column=col_idx, value=h)
         cell.font = FONT_HEADER
@@ -164,6 +168,13 @@ def build_boq_excel(file_path: Path, project_id: int, db, meta: dict) -> Path:
     row_num = 1
     cur_row = 6
     total_boq_amount = 0.0
+    
+    total_compacted = 0.0
+    total_loose = 0.0
+    total_bitumen = 0.0
+    total_cement = 0.0
+    total_filler = 0.0
+    total_aggregate = 0.0
 
     if active_qty:
         for lr in active_qty.layers:
@@ -174,38 +185,55 @@ def build_boq_excel(file_path: Path, project_id: int, db, meta: dict) -> Path:
             density = lr.inputs.density_t_m3 if lr.inputs.density_t_m3 is not None else DEFAULT_DENSITY.get(layer_type, 2.20)
             
             material_key = get_material_key(layer_type)
-            vol = area * (thick / 1000.0) if category != "sprayed_coat" else 0.0
+            vol = lr.compacted_volume_m3
+            loose_vol = lr.loose_volume_m3
+            
+            total_compacted += vol
+            total_loose += loose_vol
+            total_bitumen += lr.binder_tonnage_t
+            total_cement += lr.cement_tonnage_t
+            total_filler += lr.filler_tonnage_t
+            total_aggregate += lr.aggregate_tonnage_t
 
             # Calculate Quantity and Rate
+            rate_source = "Preliminary Estimate"
             if category == "sprayed_coat":
                 qty = lr.binder_tonnage_t
                 unit = "Tonne"
                 r_info = rates_map.get("Bitumen")
                 rate = r_info.rate if r_info else DEFAULT_RATES["Bitumen"]["rate"]
-                vol_str, dens_str, thick_str = "—", "—", "—"
+                if r_info:
+                    rate_source = "Project rate"
+                vol_str, loose_vol_str, dens_str, thick_str = "—", "—", "—", "—"
+                amount_val = qty * rate
             elif layer_type.upper() in ("CTB", "CTS") or material_key == "STABILIZED":
                 qty = lr.layer_tonnage_t
                 unit = "Tonne"
-                # Stabilized constituent rates
                 cement_pct = 4.5 if layer_type.upper() == "CTB" else 3.0
+                if lr.inputs.binder_pct is not None and lr.inputs.binder_pct > 0.0:
+                    cement_pct = lr.inputs.binder_pct
                 cement_t = qty * cement_pct / 100.0
                 agg_t = qty - cement_t
                 
                 c_rate = rates_map.get("Cement").rate if rates_map.get("Cement") else DEFAULT_RATES["Cement"]["rate"]
                 a_rate = rates_map.get("Aggregate").rate if rates_map.get("Aggregate") else DEFAULT_RATES["Aggregate"]["rate"]
+                if rates_map.get("Cement") and rates_map.get("Aggregate"):
+                    rate_source = "Project rate"
                 amount_val = (cement_t * c_rate) + (agg_t * a_rate)
                 rate = amount_val / qty if qty > 0 else a_rate
-                vol_str, dens_str, thick_str = vol, density, thick
+                vol_str, loose_vol_str, dens_str, thick_str = vol, loose_vol, density, thick
             else:
                 qty = lr.layer_tonnage_t
                 r_info = rates_map.get(material_key)
                 unit = r_info.unit if r_info else DEFAULT_RATES.get(material_key, {}).get("unit", "Tonne")
                 rate = r_info.rate if r_info else DEFAULT_RATES.get(material_key, {}).get("rate", 0.0)
+                if r_info:
+                    rate_source = "Project rate"
                 if unit.lower() in ("cum", "m3"):
                     qty = vol
-                vol_str, dens_str, thick_str = vol, density, thick
+                vol_str, loose_vol_str, dens_str, thick_str = vol, loose_vol, density, thick
+                amount_val = qty * rate
 
-            amount_val = qty * rate if not (layer_type.upper() in ("CTB", "CTS") or material_key == "STABILIZED") else amount_val
             total_boq_amount += amount_val
 
             # Write row cells
@@ -214,11 +242,13 @@ def build_boq_excel(file_path: Path, project_id: int, db, meta: dict) -> Path:
                 ws_qty.cell(row=cur_row, column=3, value=layer_type),
                 ws_qty.cell(row=cur_row, column=4, value=thick_str),
                 ws_qty.cell(row=cur_row, column=5, value=vol_str),
-                ws_qty.cell(row=cur_row, column=6, value=dens_str),
-                ws_qty.cell(row=cur_row, column=7, value=qty),
-                ws_qty.cell(row=cur_row, column=8, value=unit),
-                ws_qty.cell(row=cur_row, column=9, value=rate),
-                ws_qty.cell(row=cur_row, column=10, value=amount_val)
+                ws_qty.cell(row=cur_row, column=6, value=loose_vol_str),
+                ws_qty.cell(row=cur_row, column=7, value=dens_str),
+                ws_qty.cell(row=cur_row, column=8, value=qty),
+                ws_qty.cell(row=cur_row, column=9, value=unit),
+                ws_qty.cell(row=cur_row, column=10, value=rate_source),
+                ws_qty.cell(row=cur_row, column=11, value=rate),
+                ws_qty.cell(row=cur_row, column=12, value=amount_val)
             ]
 
             for idx, c in enumerate(cells):
@@ -226,15 +256,15 @@ def build_boq_excel(file_path: Path, project_id: int, db, meta: dict) -> Path:
                 c.border = BORDER_THIN
                 if cur_row % 2 == 1:
                     c.fill = FILL_ZEBRA
-                if idx in (0, 7): # Sl. No, Unit
+                if idx in (0, 7, 8): # Sl. No, Unit, Rate Source
                     c.alignment = ALIGN_CENTER
-                elif idx in (2, 3, 4, 5, 8): # Numbers & Cost
+                elif idx in (2, 3, 4, 5, 6, 9, 10): # Numbers & Cost
                     c.alignment = ALIGN_RIGHT
-                    if idx in (2, 3, 5):
+                    if idx in (2, 3, 4, 6):
                         c.number_format = FORMAT_NUMBER
-                    elif idx == 4:
+                    elif idx == 5:
                         c.number_format = FORMAT_QTY
-                    elif idx == 8:
+                    elif idx in (9, 10):
                         c.number_format = FORMAT_CURRENCY
                 else:
                     c.alignment = ALIGN_LEFT
@@ -242,19 +272,76 @@ def build_boq_excel(file_path: Path, project_id: int, db, meta: dict) -> Path:
             row_num += 1
             cur_row += 1
             
-        # Total row
+        # Subtotal row
         ws_qty.cell(row=cur_row, column=2, value="").border = BORDER_TOTAL
-        ws_qty.cell(row=cur_row, column=3, value="Total Preliminary Estimate").font = FONT_BOLD
+        ws_qty.cell(row=cur_row, column=3, value="Subtotal Preliminary Estimate").font = FONT_BOLD
         ws_qty.cell(row=cur_row, column=3).border = BORDER_TOTAL
-        
-        for c_idx in range(4, 10):
+        for c_idx in range(4, 13):
             ws_qty.cell(row=cur_row, column=c_idx, value="").border = BORDER_TOTAL
-
-        tot_cell = ws_qty.cell(row=cur_row, column=10, value=total_boq_amount)
+        tot_cell = ws_qty.cell(row=cur_row, column=12, value=total_boq_amount)
         tot_cell.font = FONT_BOLD
         tot_cell.border = BORDER_TOTAL
         tot_cell.number_format = FORMAT_CURRENCY
         tot_cell.alignment = ALIGN_RIGHT
+        cur_row += 1
+
+        # GST row
+        ws_qty.cell(row=cur_row, column=2, value="").border = BORDER_TOTAL
+        ws_qty.cell(row=cur_row, column=3, value="GST (18% Tax)").font = FONT_BOLD
+        ws_qty.cell(row=cur_row, column=3).border = BORDER_TOTAL
+        for c_idx in range(4, 13):
+            ws_qty.cell(row=cur_row, column=c_idx, value="").border = BORDER_TOTAL
+        gst_cell = ws_qty.cell(row=cur_row, column=12, value=total_boq_amount * 0.18)
+        gst_cell.font = FONT_BOLD
+        gst_cell.border = BORDER_TOTAL
+        gst_cell.number_format = FORMAT_CURRENCY
+        gst_cell.alignment = ALIGN_RIGHT
+        cur_row += 1
+
+        # Grand Total row
+        ws_qty.cell(row=cur_row, column=2, value="").border = BORDER_TOTAL
+        ws_qty.cell(row=cur_row, column=3, value="Grand Total Estimated Cost").font = FONT_BOLD
+        ws_qty.cell(row=cur_row, column=3).border = BORDER_TOTAL
+        for c_idx in range(4, 13):
+            ws_qty.cell(row=cur_row, column=c_idx, value="").border = BORDER_TOTAL
+        grand_cell = ws_qty.cell(row=cur_row, column=12, value=total_boq_amount * 1.18)
+        grand_cell.font = FONT_BOLD
+        grand_cell.border = BORDER_TOTAL
+        grand_cell.number_format = FORMAT_CURRENCY
+        grand_cell.alignment = ALIGN_RIGHT
+        
+        # Material Tonnage Splits Sub-table
+        cur_row += 3
+        ws_qty.cell(row=cur_row, column=2, value="MATERIAL CONSUMPTION SUMMARY").font = FONT_SECTION
+        cur_row += 1
+        
+        splits_headers = ["Material Component", "Total Tonnage (Tonne)"]
+        for col_idx, h in enumerate(splits_headers, start=2):
+            cell = ws_qty.cell(row=cur_row, column=col_idx, value=h)
+            cell.font = FONT_HEADER
+            cell.fill = FILL_HEADER
+            cell.alignment = ALIGN_CENTER
+            cell.border = BORDER_THIN
+            
+        cur_row += 1
+        splits_data = [
+            ("Stone Aggregates", total_aggregate),
+            ("Bitumen Binder", total_bitumen),
+            ("Cement Binder", total_cement),
+            ("Mineral Filler", total_filler),
+        ]
+        for name, val in splits_data:
+            c1 = ws_qty.cell(row=cur_row, column=2, value=name)
+            c2 = ws_qty.cell(row=cur_row, column=3, value=val)
+            c1.font = FONT_DATA
+            c1.border = BORDER_THIN
+            c1.alignment = ALIGN_LEFT
+            c2.font = FONT_DATA
+            c2.border = BORDER_THIN
+            c2.alignment = ALIGN_RIGHT
+            c2.number_format = FORMAT_QTY
+            cur_row += 1
+            
     else:
         # Empty placeholder
         ws_qty.cell(row=cur_row, column=2, value="No active BOQ layers calculated or saved yet.").font = FONT_BOLD

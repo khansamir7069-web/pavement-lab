@@ -114,6 +114,8 @@ class TrafficPanel(QWidget):
         self.vdf.setSpecialValueText(" (auto from IRC:37 Table 1)")
         self.ldf   = _spin(0.0, 0, 1, 0.05, 2)
         self.ldf.setSpecialValueText(" (auto from IRC:37 cl. 4.4)")
+        self.dir_dist = _spin(0.5, 0.0, 1.0, 0.05, 2)
+        self.lane_dist = _spin(1.0, 0.0, 1.0, 0.05, 2)
 
         form.addRow("Road Category", self.road_cat)
         form.addRow("Terrain", self.terrain)
@@ -121,6 +123,8 @@ class TrafficPanel(QWidget):
         form.addRow("Initial Commercial Traffic (A)", self.cvpd)
         form.addRow("Growth Rate (r)", self.growth)
         form.addRow("Design Life (n)", self.life)
+        form.addRow("Directional Distribution Factor", self.dir_dist)
+        form.addRow("Lane Distribution Factor", self.lane_dist)
         form.addRow("VDF (F) — override", self.vdf)
         form.addRow("LDF (D) — override", self.ldf)
         bl.addWidget(in_card)
@@ -193,6 +197,8 @@ class TrafficPanel(QWidget):
                 self.life.setValue(int(d.get("design_life_years", 15)))
                 self.vdf.setValue(float(d.get("vdf") or 0))
                 self.ldf.setValue(float(d.get("ldf") or 0))
+                self.dir_dist.setValue(float(d.get("directional_distribution", 0.5)))
+                self.lane_dist.setValue(float(d.get("lane_distribution", 1.0)))
             except Exception:
                 pass
 
@@ -206,6 +212,8 @@ class TrafficPanel(QWidget):
             vdf=(self.vdf.value() if self.vdf.value() > 0 else None),
             ldf=(self.ldf.value() if self.ldf.value() > 0 else None),
             road_category=self.road_cat.currentText(),
+            directional_distribution=self.dir_dist.value(),
+            lane_distribution=self.lane_dist.value(),
         )
 
     def _on_compute(self) -> None:

@@ -57,6 +57,7 @@ class StructuralInput:
     subgrade_cbr_pct: float = 5.0          # 4-day soaked CBR (%)
     resilient_modulus_mpa: float | None = None   # optional measured Mr
     notes: str = ""
+    overrides: dict = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if self.initial_cvpd < 0:
@@ -109,6 +110,7 @@ class StructuralResult:
     mechanistic_validation: "Optional[MechanisticValidationSummary]" = None
     intelligence: "Optional[IntelligenceResult]" = None
     validation_mode: str = "Decision Support Mode"
+    traceability_log_json: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
@@ -172,7 +174,7 @@ def compute_structural_design(inp: StructuralInput) -> StructuralResult:
     from .intelligence_checker import check_pavement_intelligence
     intel = check_pavement_intelligence(comp, mr)
 
-    return StructuralResult(
+    res = StructuralResult(
         inputs=inp,
         design_msa=msa,
         growth_factor=gf,
@@ -184,5 +186,10 @@ def compute_structural_design(inp: StructuralInput) -> StructuralResult:
         notes=notes,
         intelligence=intel,
     )
+    import dataclasses
+    import json
+    from app.core.explainable_design import generate_explainable_details
+    log_dict = generate_explainable_details(res, db=None, project_id=None)
+    return dataclasses.replace(res, traceability_log_json=json.dumps(log_dict))
 
 

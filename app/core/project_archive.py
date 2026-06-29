@@ -93,19 +93,15 @@ def compile_revision_history_text(project_id: int, db) -> str:
     if not p:
         return "Project not found."
     lines = [
-        "========================================================================",
-        "                           REVISION HISTORY",
-        "========================================================================",
+        "==========================================================================",
+        "                             REVISION HISTORY",
+        "==========================================================================",
         f"Project Name: {p.work_name}",
         "",
-        f"{'Rev':<6} {'Date':<12} {'Engineer':<20} {'Description':<30} {'Reason':<25}",
-        "-" * 100
+        f"{'Rev':<6} {'Date':<12} {'Engineer':<20} {'Description':<35} {'Validation Status':<35} {'Files':<35}",
+        "-" * 150
     ]
-    # R0
-    r0_date = p.created_at.strftime("%Y-%m-%d") if p.created_at else "N/A"
-    r0_eng = p.submitted_by or "N/A"
-    lines.append(f"{'R0':<6} {r0_date:<12} {r0_eng:<20} {'Initial Design':<30} {'Initial Creation':<25}")
-
+    
     # Revisions from revisions_json
     revisions_list = []
     if p.revisions_json:
@@ -114,8 +110,21 @@ def compile_revision_history_text(project_id: int, db) -> str:
         except Exception:
             pass
 
+    has_r0 = any(r.get("revision_number") == 0 for r in revisions_list)
+    if not has_r0:
+        r0_date = p.created_at.strftime("%Y-%m-%d") if p.created_at else "N/A"
+        r0_eng = p.submitted_by or "N/A"
+        r0_val = "Not Audited"
+        if p.validation_results_json and (p.revision_number or 0) == 0:
+            try:
+                res_dict = json.loads(p.validation_results_json)
+                r0_val = f"{res_dict.get('final_recommendation')} (Score: {res_dict.get('score')}/100)"
+            except Exception:
+                pass
+        lines.append(f"{'R0':<6} {r0_date:<12} {r0_eng:<20} {'Initial Design Submission':<35} {r0_val:<35} {'None':<35}")
+
     for r in revisions_list:
-        rev_num = r.get("revision_number", 1)
+        rev_num = r.get("revision_number", 0)
         rev_id = f"R{rev_num}"
         dt_str = r.get("created_date") or r.get("date_time") or ""
         if "T" in dt_str:
@@ -129,22 +138,26 @@ def compile_revision_history_text(project_id: int, db) -> str:
 
         eng = r.get("engineer") or r.get("engineer_name") or "N/A"
         desc = r.get("description") or r.get("engineer_note") or "N/A"
-        reason = r.get("reason") or "N/A"
-
+        
         # If engineer_note is a JSON string, extract details
         if isinstance(desc, str) and desc.strip().startswith("{"):
             try:
                 note_data = json.loads(desc)
                 desc = note_data.get("description") or desc
                 eng = note_data.get("engineer") or eng
-                reason = note_data.get("reason") or reason
             except Exception:
                 pass
 
-        # Trim description/reason to fit layout
-        desc_trimmed = desc[:28] + ".." if len(desc) > 30 else desc
-        reason_trimmed = reason[:23] + ".." if len(reason) > 25 else reason
-        lines.append(f"{rev_id:<6} {date_str:<12} {eng:<20} {desc_trimmed:<30} {reason_trimmed:<25}")
+        val_status = r.get("validation_status") or "Draft"
+        files = r.get("generated_files", [])
+        files_str = ", ".join(files) if files else "None"
+
+        # Trim text to fit layout
+        desc_trimmed = desc[:33] + ".." if len(desc) > 35 else desc
+        val_trimmed = val_status[:33] + ".." if len(val_status) > 35 else val_status
+        files_trimmed = files_str[:33] + ".." if len(files_str) > 35 else files_str
+        
+        lines.append(f"{rev_id:<6} {date_str:<12} {eng:<20} {desc_trimmed:<35} {val_trimmed:<35} {files_trimmed:<35}")
 
     return "\n".join(lines)
 
@@ -339,6 +352,17 @@ def generate_project_archive(
                 if fpath.is_file():
                     run_dir_files.append((fpath, fname))
 
+        # Generate PDF report if docx is available (fail-safe)
+        pdf_path = None
+        report_path_obj = Path(report_path)
+        if report_path_obj.is_file():
+            try:
+                from app.reports.word_report import export_to_pdf
+                pdf_path = export_to_pdf(report_path_obj)
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning(f"Fail-safe: PDF compilation skipped or failed: {e}")
+
         # Write final structured ZIP package
         with zipfile.ZipFile(archive_out_path, "w", zipfile.ZIP_DEFLATED) as zip_file:
             # ---- Legacy files for backward compatibility ----
@@ -347,15 +371,19 @@ def generate_project_archive(
             zip_file.writestr("CalculationSummary.txt", summary_text)
             zip_file.writestr("ApprovalSheet.txt", approval_text)
             zip_file.writestr("RevisionHistoryLog.json", revisions_json_str)
-            if report_path.is_file():
-                zip_file.write(report_path, report_path.name)
+            if report_path_obj.is_file():
+                zip_file.write(report_path_obj, report_path_obj.name)
+            if pdf_path and pdf_path.is_file():
+                zip_file.write(pdf_path, pdf_path.name)
             for fpath, name in run_dir_files:
                 zip_file.write(fpath, f"iitpave_files/{name}")
 
             # ---- New Phase 5 structured package folders ----
             # /Reports
-            if report_path.is_file():
-                zip_file.write(report_path, "Reports/Professional_DPR.docx")
+            if report_path_obj.is_file():
+                zip_file.write(report_path_obj, "Reports/Professional_DPR.docx")
+            if pdf_path and pdf_path.is_file():
+                zip_file.write(pdf_path, "Reports/Professional_DPR.pdf")
             if boq_excel_path.is_file():
                 zip_file.write(boq_excel_path, "Reports/BOQ_Estimate.xlsx")
             zip_file.writestr("Reports/Audit_Report.txt", audit_report_text)
@@ -372,5 +400,15 @@ def generate_project_archive(
 
             # /Archive
             zip_file.writestr("Archive/Revision_History.txt", revision_history_text)
+
+        # Record generated files in database revision history (append-only)
+        try:
+            db.record_generated_file(project_id, Path(archive_out_path).name)
+            if report_path_obj.is_file():
+                db.record_generated_file(project_id, report_path_obj.name)
+            if pdf_path and pdf_path.is_file():
+                db.record_generated_file(project_id, pdf_path.name)
+        except Exception:
+            pass
 
     return archive_out_path

@@ -46,6 +46,16 @@ def test_ui_card_navigation_and_popups(temp_db):
     temp_db.set_module_status(pid.id, "structural", "complete")
     temp_db.set_module_status(pid.id, "stabilized", "complete")
     
+    # Save a mock traffic analysis and structural design to satisfy routing sequence gates
+    from app.core import TrafficInput, compute_traffic_analysis
+    from app.db.schema import StructuralDesign
+    ta_in = TrafficInput(initial_cvpd=2000.0)
+    temp_db.save_traffic_analysis(project_id=pid.id, result=compute_traffic_analysis(ta_in))
+    with temp_db.session() as s:
+        sd = StructuralDesign(project_id=pid.id, inputs_json="{}")
+        s.add(sd)
+        s.flush()
+    
     main = MainWindow()
     main._on_open_project(pid.id)
     
@@ -86,4 +96,4 @@ def test_iitpave_status_indicator(temp_db):
     # Without real executable, status indicator should show "Decision Support Mode — IITPAVE executable not connected"
     main.iitpave_status.refresh()
     status_text = main.iitpave_status.lbl_engine_status.text()
-    assert "Decision Support Mode — IITPAVE executable not connected" in status_text
+    assert "IITPAVE NOT CONNECTED" in status_text

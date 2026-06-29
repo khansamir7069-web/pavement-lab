@@ -77,6 +77,7 @@ class SubmissionPanel(QWidget):
 
     saved = Signal(int)             # Emits project_id
     project_changed = Signal(int)   # Emits project_id when revision created
+    refresh_all_requested = Signal() # Emits when refresh all is clicked
 
     def __init__(self, db: Any, parent: QWidget | None = None):
         super().__init__(parent)
@@ -93,6 +94,9 @@ class SubmissionPanel(QWidget):
         self.header = PageHeader(
             "Submission & Delivery", "Project locking, revisions, and final delivery package"
         )
+        self.btn_refresh_all = styled_button("Refresh All Modules", "secondary")
+        self.btn_refresh_all.clicked.connect(self.refresh_all_requested.emit)
+        self.header.add_action(self.btn_refresh_all)
         lay.addWidget(self.header)
 
         scroll = QScrollArea()
@@ -320,97 +324,269 @@ class SubmissionPanel(QWidget):
 
     def _check_readiness(self, project: Any) -> None:
         status = self.db.get_module_status(project.id) or {}
+        sync_statuses = self.db.get_all_sync_statuses(project.id)
         
-        # Calculate completion %
-        completed_count = 0
-        total_modules = 5
+        # Modules list to check
+        check_modules = [
+            ("project", "Project Setup"),
+            ("traffic", "Traffic"),
+            ("subgrade", "Subgrade"),
+            ("structural", "Structural"),
+            ("mix_design", "Mix"),
+            ("material_qty", "BOQ"),
+            ("engineering_review", "Engineering Review"),
+            ("submission", "Submission")
+        ]
         
-        has_traffic = status.get("traffic") == "complete"
-        if has_traffic:
-            completed_count += 1
+        def get_sync_badge(m_key: str, val: str) -> str:
+            if val == "empty":
+                return "<span style='color:#718096;'>⚫ Not Started</span>"
+            elif val == "in_progress":
+                return "<span style='color:#3182ce;'>🔵 Pending</span>"
             
-        has_subgrade = project.subgrade_cbr is not None and project.subgrade_cbr > 0.0
-        if has_subgrade:
-            completed_count += 1
-            
-        has_structural = status.get("structural") == "complete"
-        if has_structural:
-            completed_count += 1
-            
-        mech_val = self.db.latest_mechanistic_validation(project.id)
-        has_iitpave = mech_val is not None and not mech_val.refused
-        if has_iitpave:
-            completed_count += 1
-            
-        mq_row = self.db.latest_material_quantity(project.id)
-        has_boq = mq_row is not None
-        if has_boq:
-            completed_count += 1
-            
-        progress_pct = int((completed_count / total_modules) * 100)
+            sync_s = sync_statuses.get(m_key, "Synced")
+            if sync_s == "Synced":
+                return "<span style='color:#1d7a3a;'>🟢 Synced</span>"
+            elif sync_s == "Manual Override":
+                return "<span style='color:#b7791f;'>🟡 Manual Override</span>"
+            else: # Out of Sync
+                return "<span style='color:#e53e3e;'>🔴 Out of Sync</span>"
 
-        # Audit Status
-        audit_status = "Not Run"
-        audit_color = "#6a7180"
-        try:
-            from app.engineering.design_audit import run_project_audit
-            audit = run_project_audit(project.id, self.db)
-            audit_status = f"{audit.readiness_status} (Score: {audit.score}/100, Risk: {audit.risk_level})"
-            if audit.risk_level == "GREEN":
-                audit_color = "#1d7a3a"
-            elif audit.risk_level == "YELLOW":
-                audit_color = "#b28a00"
+        completed_count = 0
+        status_rows = []
+        for key, name in check_modules:
+            val = status.get(key, "empty")
+            if val == "complete":
+                completed_count += 1
+                status_lbl = "<span style='color:#1d7a3a; font-weight:bold;'>✓ Completed</span>"
+            elif val == "needs_review":
+                status_lbl = "<span style='color:#d9381e; font-weight:bold;'>⚠ Needs Review</span>"
+            elif val == "in_progress":
+                status_lbl = "<span style='color:#a06d00; font-weight:bold;'>● In progress</span>"
+            elif val == "locked":
+                status_lbl = "<span style='color:#4a5568; font-weight:bold;'>🔒 Locked</span>"
+                completed_count += 1
             else:
-                audit_color = "#b22222"
-        except Exception:
-            pass
+                status_lbl = "<span style='color:#6a7180;'>Not started</span>"
+                
+            sync_lbl = get_sync_badge(key, val)
+            status_rows.append(f"<tr><td>{name}</td><td>{status_lbl}</td><td>{sync_lbl}</td></tr>")
             
-        boq_status = "Complete" if has_boq else "Incomplete"
-        boq_color = "#1d7a3a" if has_boq else "#b22222"
+        progress_pct = int((completed_count / len(check_modules)) * 100)
         
-        dpr_status = "Ready for Export" if (has_traffic and has_structural) else "Incomplete (Traffic and Structural design required)"
-        dpr_color = "#1d7a3a" if (has_traffic and has_structural) else "#b22222"
+        # Fetch actual data
+        import json
         
+        # 1. Project Metadata
+        p_name = project.work_name or "Not defined"
+        p_client = project.client.name if project.client else "Not defined"
+        p_standard = project.design_standard or "Not defined"
+        
+        # 2. Traffic Analysis
+        ta = self.db.latest_traffic_analysis(project.id)
+        ta_summary = "No saved data"
+        if ta:
+            try:
+                ta_in = json.loads(ta.inputs_json) if isinstance(ta.inputs_json, str) else ta.inputs_json
+                cvpd_val = ta_in.get('initial_cvpd')
+                cvpd_str = f"{cvpd_val:.0f}" if cvpd_val is not None else "0"
+                growth_val = ta_in.get('growth_rate_pct')
+                growth_str = f"{growth_val:.1f}%" if growth_val is not None else "0.0%"
+                msa_val = ta.design_msa
+                msa_str = f"{msa_val:.2f} MSA" if msa_val is not None else "0.00 MSA"
+                ta_summary = f"CVPD: {cvpd_str} · growth: {growth_str} · design: {msa_str}"
+            except Exception:
+                msa_val = ta.design_msa
+                msa_str = f"{msa_val:.2f} MSA" if msa_val is not None else "0.00 MSA"
+                ta_summary = f"design: {msa_str}"
+                
+        # 3. Subgrade
+        subgrade_summary = "No saved data"
+        if project.subgrade_cbr is not None:
+            cbr_str = f"{project.subgrade_cbr:.1f}%"
+            mr_val = project.subgrade_mr
+            mr_str = f"{mr_val:.1f} MPa" if mr_val is not None else "0.0 MPa"
+            subgrade_summary = f"CBR: {cbr_str} · Mr: {mr_str}"
+            
+        # 4. Structural Design
+        sd = self.db.latest_structural_design(project.id)
+        sd_summary = "No saved data"
+        if sd:
+            try:
+                sd_comp = json.loads(sd.composition_json) if isinstance(sd.composition_json, str) else sd.composition_json
+                layers_desc_list = []
+                for ly in sd_comp:
+                    ly_thick = ly.get('thickness_mm')
+                    thick_str = f"{float(ly_thick):.0f}mm" if ly_thick is not None else "0mm"
+                    layers_desc_list.append(f"{ly.get('name') or ly.get('material') or 'Layer'}: {thick_str}")
+                layers_desc = ", ".join(layers_desc_list)
+                
+                thick_val = sd.total_pavement_thickness_mm
+                thick_str = f"{thick_val:.0f}mm" if thick_val is not None else "0mm"
+                if layers_desc:
+                    sd_summary = f"thickness: {thick_str} ({layers_desc})"
+                else:
+                    sd_summary = f"thickness: {thick_str}"
+            except Exception:
+                thick_val = sd.total_pavement_thickness_mm
+                thick_str = f"{thick_val:.0f}mm" if thick_val is not None else "0mm"
+                sd_summary = f"thickness: {thick_str}"
+                
+        # 5. Mix Design
+        mix = self.db.latest_mix_design(project.id)
+        mix_summary = "No saved data"
+        if mix:
+            mix_type = project.mix_type or "Not selected"
+            obc_val = mix.obc_pct
+            obc_str = f"{obc_val:.2f}%" if obc_val is not None else "0.00%"
+            av_val = mix.air_voids_at_obc_pct
+            av_str = f"{av_val:.2f}%" if av_val is not None else "0.00%"
+            mix_summary = f"type: {mix_type} · OBC: {obc_str} · Air Voids: {av_str}"
+            
+        # 6. BOQ
+        mq = self.db.latest_material_quantity(project.id)
+        mq_summary = "No saved data"
+        if mq:
+            t_val = mq.total_layer_tonnage_t
+            t_str = f"{t_val:.2f} t" if t_val is not None else "0.00 t"
+            b_val = mq.total_binder_tonnage_t
+            b_str = f"{b_val:.2f} t" if b_val is not None else "0.00 t"
+            mq_summary = f"layers: {t_str} · binder: {b_str}"
+            
+        # 7. Engineering Review
+        rev_status = project.review_status or "Draft"
+        
+        # Parse override history
+        override_html = ""
+        try:
+            history = json.loads(project.override_history_json) if project.override_history_json else []
+        except Exception:
+            history = []
+            
+        if history:
+            override_rows = []
+            for h in history:
+                f_name = h.get("field_name", "")
+                orig_val = h.get("original_val", "")
+                prev_val = h.get("previous_val", "")
+                new_val = h.get("new_val", "")
+                reason = h.get("reason", "")
+                ts = h.get("timestamp", "")
+                try:
+                    dt = datetime.fromisoformat(ts)
+                    ts_formatted = dt.strftime("%Y-%m-%d %H:%M:%S UTC")
+                except Exception:
+                    ts_formatted = ts
+                user = h.get("user", "Engineer")
+                machine = h.get("machine_id", "Local")
+                
+                if len(reason) > 50:
+                    reason = reason[:47] + "..."
+                    
+                override_rows.append(
+                    f"<tr style='border-bottom: 1px solid #eee;'>"
+                    f"<td>{h.get('module', 'Structural')}</td>"
+                    f"<td>{f_name}</td>"
+                    f"<td>{orig_val}</td>"
+                    f"<td>{prev_val}</td>"
+                    f"<td>{new_val}</td>"
+                    f"<td>{reason}</td>"
+                    f"<td>{ts_formatted}</td>"
+                    f"<td>{user} ({machine})</td>"
+                    f"</tr>"
+                )
+                
+            override_html = f"""
+            <h3>Manual Override Audit History</h3>
+            <table width="100%" cellpadding="6" style="font-size:9pt; border-collapse: collapse; border: 1px solid #ddd; margin-bottom: 16px;">
+                <tr style="background-color: #f8f9fa; border-bottom: 1px solid #ddd;">
+                    <th align="left">Module</th>
+                    <th align="left">Field</th>
+                    <th align="left">Original</th>
+                    <th align="left">Previous</th>
+                    <th align="left">New</th>
+                    <th align="left">Reason</th>
+                    <th align="left">Timestamp</th>
+                    <th align="left">User (Machine)</th>
+                </tr>
+                {"".join(override_rows)}
+            </table>
+            """
+
+        # Build readiness UI HTML
         html = f"""
-        <table width="100%" cellpadding="4" style="font-size:10pt; border-collapse: collapse;">
+        <h3>Workflow Completion Status Breakdown</h3>
+        <table width="100%" cellpadding="6" style="font-size:10pt; border-collapse: collapse; border: 1px solid #ddd; margin-bottom: 16px;">
+            <tr style="background-color: #f2f2f2; border-bottom: 1px solid #ddd;">
+                <th align="left" width="40%">Module</th>
+                <th align="left" width="30%">Completion</th>
+                <th align="left" width="30%">Sync Status</th>
+            </tr>
+            {"".join(status_rows)}
+        </table>
+        
+        <div style="margin-bottom: 16px;">
+            <b>Overall Project Progress:</b>
+            <div style="background-color: #e0e0e0; border-radius: 4px; width: 100%; height: 18px; margin-top: 4px;">
+                <div style="background-color: #1d7a3a; border-radius: 4px; width: {progress_pct}%; height: 18px; text-align: center; color: white; font-weight: bold; font-size: 9pt; line-height: 18px;">
+                    {progress_pct}%
+                </div>
+            </div>
+        </div>
+
+        <h3>Database Module Summary</h3>
+        <table width="100%" cellpadding="6" style="font-size:10pt; border-collapse: collapse; border: 1px solid #ddd; margin-bottom: 16px;">
             <tr style="border-bottom: 1px solid #eee;">
-                <td width="35%"><b>Workflow Completion:</b></td>
-                <td>
-                    <div style="background-color: #e0e0e0; border-radius: 4px; width: 100%; height: 16px;">
-                        <div style="background-color: #2980b9; border-radius: 4px; width: {progress_pct}%; height: 16px; text-align: center; color: white; font-weight: bold; font-size: 8pt; line-height: 16px;">
-                            {progress_pct}%
-                        </div>
-                    </div>
-                </td>
+                <td width="30%"><b>Project Name:</b></td>
+                <td>{p_name}</td>
             </tr>
             <tr style="border-bottom: 1px solid #eee;">
-                <td><b>Design Audit Status:</b></td>
-                <td style="color: {audit_color}; font-weight: bold;">{audit_status}</td>
+                <td><b>Client:</b></td>
+                <td>{p_client}</td>
             </tr>
             <tr style="border-bottom: 1px solid #eee;">
-                <td><b>BOQ / Costing Status:</b></td>
-                <td style="color: {boq_color}; font-weight: bold;">{boq_status}</td>
+                <td><b>Design Standard:</b></td>
+                <td>{p_standard}</td>
             </tr>
-            <tr>
-                <td><b>DPR Report Status:</b></td>
-                <td style="color: {dpr_color}; font-weight: bold;">{dpr_status}</td>
+            <tr style="border-bottom: 1px solid #eee;">
+                <td><b>Traffic Survey:</b></td>
+                <td>{ta_summary}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #eee;">
+                <td><b>Subgrade properties:</b></td>
+                <td>{subgrade_summary}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #eee;">
+                <td><b>Pavement Composition:</b></td>
+                <td>{sd_summary}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #eee;">
+                <td><b>Marshall Mix:</b></td>
+                <td>{mix_summary}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #eee;">
+                <td><b>BOQ Estimate:</b></td>
+                <td>{mq_summary}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #eee;">
+                <td><b>Engineering Review:</b></td>
+                <td><b>{rev_status}</b></td>
             </tr>
         </table>
+        {override_html}
         """
         
         missing = []
         if not project.work_name or not project.client_id or not project.consultant or not project.report_id:
             missing.append("• Project metadata is incomplete (check Client, Consultant, and Report ID).")
-        if not has_traffic:
+        if status.get("traffic") != "complete":
             missing.append("• Traffic / MSA analysis has not been completed.")
-        if not has_subgrade:
+        if project.subgrade_cbr is None or project.subgrade_mr is None:
             missing.append("• Subgrade CBR and Resilient Modulus (Mr) have not been set.")
-        if not has_structural:
+        if status.get("structural") != "complete":
             missing.append("• Structural design has not been saved.")
-        if not has_boq:
+        if not mq:
             missing.append("• Material Quantity / BOQ estimation has not been run.")
-        if not has_iitpave:
-            missing.append("• IITPAVE mechanistic check has not been run.")
             
         if missing:
             html += "<p style='color:#b22222; margin-top:10px; font-weight:bold;'>Review Checklist Warnings:<br>" + "<br>".join(missing) + "</p>"
@@ -443,6 +619,18 @@ class SubmissionPanel(QWidget):
                     self.db.set_module_status(self._project_id, "submission", "empty")
                     QMessageBox.information(self, "Unlocked", "Design unlocked successfully.")
             else:
+                # ENFORCE VALIDATION GATE
+                from app.engineering.design_audit import check_validation_gate
+                ok, gate_errors = check_validation_gate(self._project_id, self.db)
+                if not ok:
+                    err_txt = "\n".join(gate_errors)
+                    QMessageBox.critical(
+                        self,
+                        "Validation Gate Blocked",
+                        f"Project cannot be locked. The following validation gate criteria failed:\n\n{err_txt}"
+                    )
+                    return
+
                 self.db.lock_project(self._project_id)
                 self.db.set_module_status(self._project_id, "submission", "complete")
                 QMessageBox.information(
@@ -538,6 +726,10 @@ class SubmissionPanel(QWidget):
                 self._project_id,
                 ctx,
             )
+            try:
+                self.db.record_generated_file(self._project_id, Path(path).name)
+            except Exception:
+                pass
             QMessageBox.information(
                 self,
                 "Success",
@@ -556,6 +748,14 @@ class SubmissionPanel(QWidget):
             return
         p = self.db.get_project(self._project_id)
         if not p:
+            return
+
+        if not p.locked:
+            QMessageBox.warning(
+                self,
+                "Lock Required",
+                "Project must be locked first to freeze parameters and establish the lock snapshot audit trail before final submission packaging."
+            )
             return
 
         # 1. Compile final Word report to temporary folder

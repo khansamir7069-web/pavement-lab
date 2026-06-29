@@ -23,14 +23,18 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QPushButton,
     QFileDialog,
+    QGridLayout,
+    QFrame,
 )
 
 from .common import Card, PageHeader, styled_button
+from app.engineering.design_audit import run_project_audit, AuditResult, AuditFinding
 
 class EngineeringReviewPanel(QWidget):
     """Stage 9 Engineering Review panel."""
 
     saved = Signal(int)
+    navigate_to = Signal(str)
 
     def __init__(self, db, parent=None):
         super().__init__(parent)
@@ -107,49 +111,97 @@ class EngineeringReviewPanel(QWidget):
 
         bl.addWidget(form_card)
 
-        # Expert Audit Card
+        # Final Recommendation Banner
+        self.rec_banner = QLabel("VALIDATION PENDING")
+        self.rec_banner.setAlignment(Qt.AlignCenter)
+        self.rec_banner.setStyleSheet(
+            "background: #7f8c8d; color: white; font-weight: bold; font-size: 13pt; "
+            "padding: 12px; border-radius: 4px; border: 1px solid #7f8c8d;"
+        )
+        bl.addWidget(self.rec_banner)
+
+        # Score Cards Card
+        score_card = Card()
+        score_layout = QVBoxLayout(score_card)
+        score_layout.setContentsMargins(20, 16, 20, 16)
+        score_layout.setSpacing(10)
+        
+        score_title = QLabel("<b>Engineering Sub-Score Breakdown</b>")
+        score_title.setStyleSheet("font-size: 11pt; color: #1f3a68;")
+        score_layout.addWidget(score_title)
+        
+        self.score_grid = QGridLayout()
+        self.score_grid.setSpacing(10)
+        
+        # We will dynamically create the 6 score cards in _update_scores
+        score_layout.addLayout(self.score_grid)
+        bl.addWidget(score_card)
+
+        # Module Status Grid Card
+        mod_card = Card()
+        mod_layout = QVBoxLayout(mod_card)
+        mod_layout.setContentsMargins(20, 16, 20, 16)
+        mod_layout.setSpacing(10)
+        
+        mod_title = QLabel("<b>Module Quality Gate Status</b>")
+        mod_title.setStyleSheet("font-size: 11pt; color: #1f3a68;")
+        mod_layout.addWidget(mod_title)
+        
+        self.mod_statuses_layout = QHBoxLayout()
+        self.mod_statuses_layout.setSpacing(12)
+        mod_layout.addLayout(self.mod_statuses_layout)
+        bl.addWidget(mod_card)
+
+        # Cross-Module Consistency Table Card
+        cm_card = Card()
+        cm_layout = QVBoxLayout(cm_card)
+        cm_layout.setContentsMargins(20, 16, 20, 16)
+        cm_layout.setSpacing(10)
+        
+        cm_title = QLabel("<b>Cross-Module Parameter Alignment</b>")
+        cm_title.setStyleSheet("font-size: 11pt; color: #1f3a68;")
+        cm_layout.addWidget(cm_title)
+        
+        self.cm_table = QTableWidget()
+        self.cm_table.setColumnCount(5)
+        self.cm_table.setHorizontalHeaderLabels([
+            "Module Comparison", "Parameter Field", "Source Module Value", "Target Module Value", "Status"
+        ])
+        self.cm_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.cm_table.setMinimumHeight(150)
+        cm_layout.addWidget(self.cm_table)
+        bl.addWidget(cm_card)
+
+        # Expert Audit Card (Issue List)
         self.audit_card = Card()
         audit_layout = QVBoxLayout(self.audit_card)
         audit_layout.setContentsMargins(20, 16, 20, 16)
         audit_layout.setSpacing(12)
 
         audit_header = QHBoxLayout()
-        audit_title = QLabel("<b>Expert Design Audit Summary</b>")
+        audit_title = QLabel("<b>Outstanding Design Validation Issues</b>")
         audit_title.setStyleSheet("font-size: 11pt; color: #1f3a68;")
         audit_header.addWidget(audit_title)
         
-        self.btn_run_audit = QPushButton("Run Audit")
+        self.btn_run_audit = QPushButton("Run Validation Check")
         self.btn_run_audit.setProperty("class", "Secondary")
         self.btn_run_audit.clicked.connect(self._run_audit)
         audit_header.addWidget(self.btn_run_audit)
         
-        self.btn_export_audit = QPushButton("Export Audit Summary")
+        self.btn_export_audit = QPushButton("Export Summary Report")
         self.btn_export_audit.setProperty("class", "Secondary")
         self.btn_export_audit.clicked.connect(self._export_audit)
         audit_header.addWidget(self.btn_export_audit)
         
         audit_layout.addLayout(audit_header)
 
-        # Status row
-        status_layout = QHBoxLayout()
-        self.lbl_audit_score = QLabel("Engineering Score: N/A")
-        self.lbl_audit_score.setStyleSheet("font-size: 10pt; font-weight: bold;")
-        self.lbl_risk_level = QLabel("Risk Level: N/A")
-        self.lbl_risk_level.setStyleSheet("font-size: 10pt; font-weight: bold;")
-        self.lbl_readiness_status = QLabel("Readiness Status: N/A")
-        self.lbl_readiness_status.setStyleSheet("font-size: 10pt; font-weight: bold;")
-        
-        status_layout.addWidget(self.lbl_audit_score)
-        status_layout.addWidget(self.lbl_risk_level)
-        status_layout.addWidget(self.lbl_readiness_status)
-        audit_layout.addLayout(status_layout)
-
         # Findings table
         self.findings_table = QTableWidget()
-        self.findings_table.setColumnCount(4)
-        self.findings_table.setHorizontalHeaderLabels(["Severity", "Module", "Issue", "Recommendation & Reason"])
+        self.findings_table.setColumnCount(5)
+        self.findings_table.setHorizontalHeaderLabels(["Severity", "Module", "Issue Description", "Suggested Action", "Navigation"])
+        self.findings_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
         self.findings_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Stretch)
-        self.findings_table.setMinimumHeight(200)
+        self.findings_table.setMinimumHeight(220)
         audit_layout.addWidget(self.findings_table)
 
         bl.addWidget(self.audit_card)
@@ -222,36 +274,161 @@ class EngineeringReviewPanel(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "Save Failed", str(e))
 
+    def _go_to_module(self, key: str) -> None:
+        mapping = {
+            "Traffic": "traffic",
+            "Subgrade": "subgrade",
+            "Structural Design": "structural",
+            "IITPAVE Status": "iitpave_status",
+            "Mix Design": "inputs",
+            "BOQ": "material_qty",
+            "Submission Center": "submission",
+        }
+        target = mapping.get(key)
+        if target:
+            self.navigate_to.emit(target)
+        else:
+            QMessageBox.warning(self, "Navigation Error", "Module navigation unavailable.")
+
+    def _clear_grid_layout(self, layout) -> None:
+        while layout.count():
+            item = layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
+
+    def _clear_layout(self, layout) -> None:
+        while layout.count():
+            item = layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
+
     def _run_audit(self) -> None:
         if self._project_id is None:
-            # Clear UI elements
-            self.lbl_audit_score.setText("Engineering Score: N/A")
-            self.lbl_risk_level.setText("Risk Level: N/A")
-            self.lbl_readiness_status.setText("Readiness Status: N/A")
+            self.rec_banner.setText("VALIDATION PENDING")
+            self.rec_banner.setStyleSheet("background: #7f8c8d; color: white; padding: 12px; border-radius: 4px;")
+            self._clear_grid_layout(self.score_grid)
             self.findings_table.setRowCount(0)
+            self.cm_table.setRowCount(0)
             return
         
-        from app.engineering.design_audit import run_project_audit
+        # Run audit calculation
         res = run_project_audit(self._project_id, self.db)
         
-        self.lbl_audit_score.setText(f"Engineering Score: {res.score}/100")
-        
-        color_map = {
-            "GREEN": "#1d7a3a",
-            "YELLOW": "#b56900",
-            "RED": "#c22d2d"
+        # Persist validation results
+        try:
+            self.db.save_project_validation_results(self._project_id, res.to_dict())
+        except Exception:
+            pass
+
+        # 1. Update Recommendation Banner
+        rec_colors = {
+            "READY FOR CONSULTANCY SUBMISSION": "background: #27ae60; border: 1px solid #219653; color: white;",
+            "READY AFTER MINOR CORRECTIONS": "background: #f39c12; border: 1px solid #d35400; color: white;",
+            "NOT READY FOR SUBMISSION": "background: #c0392b; border: 1px solid #962d22; color: white;"
         }
-        color = color_map.get(res.risk_level, "#333333")
-        self.lbl_risk_level.setText(f"Risk Level: <span style='color:{color}; font-weight:bold;'>{res.risk_level}</span>")
-        self.lbl_readiness_status.setText(f"Readiness Status: {res.readiness_status}")
-        
+        self.rec_banner.setText(f"{res.final_recommendation}\n(Checked: {res.timestamp})")
+        self.rec_banner.setStyleSheet(
+            f"font-weight: bold; font-size: 12pt; padding: 12px; border-radius: 4px; "
+            f"{rec_colors.get(res.final_recommendation, 'background:#7f8c8d; color:white;')}"
+        )
+
+        # 2. Update Engineering Score Cards
+        self._clear_grid_layout(self.score_grid)
+        scores = [
+            ("Completeness", res.completeness_score, res.completeness_explanation),
+            ("Consistency", res.consistency_score, res.consistency_explanation),
+            ("Mechanistic Validation", res.mechanistic_score, res.mechanistic_explanation),
+            ("Documentation", res.documentation_score, res.documentation_explanation),
+            ("Submission", res.submission_score, res.submission_explanation),
+            ("Overall Status", res.score, f"Overall project health evaluated at {res.score}/100.")
+        ]
+        for idx, (label, val, desc) in enumerate(scores):
+            row = idx // 3
+            col = idx % 3
+            
+            card = QFrame()
+            card.setFrameShape(QFrame.StyledPanel)
+            card.setStyleSheet(
+                "background: #f8f9fa; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px;"
+            )
+            vlay = QVBoxLayout(card)
+            vlay.setSpacing(4)
+            vlay.setContentsMargins(6, 6, 6, 6)
+            
+            lbl_title = QLabel(f"<b>{label}</b>")
+            lbl_title.setStyleSheet("font-size: 9pt; color: #4a5568;")
+            vlay.addWidget(lbl_title)
+            
+            score_color = "#27ae60" if val >= 90 else ("#f39c12" if val >= 70 else "#c0392b")
+            lbl_val = QLabel(f"<span style='font-size: 16pt; font-weight: bold; color: {score_color};'>{val}%</span>")
+            vlay.addWidget(lbl_val)
+            
+            lbl_desc = QLabel(desc)
+            lbl_desc.setWordWrap(True)
+            lbl_desc.setStyleSheet("font-size: 8pt; color: #718096;")
+            vlay.addWidget(lbl_desc)
+            
+            self.score_grid.addWidget(card, row, col)
+
+        # 3. Update Module Quality Gate Grid
+        self._clear_layout(self.mod_statuses_layout)
+        for mod, status in (res.module_statuses or {}).items():
+            btn = QPushButton(f"{mod.title()}: {status}")
+            btn.setEnabled(False)
+            if status == "PASS":
+                btn.setStyleSheet(
+                    "background: #d4edda; color: #155724; border: 1px solid #c3e6cb; "
+                    "font-weight: bold; padding: 6px 12px; border-radius: 4px;"
+                )
+            elif status == "FAIL":
+                btn.setStyleSheet(
+                    "background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; "
+                    "font-weight: bold; padding: 6px 12px; border-radius: 4px;"
+                )
+            else:
+                btn.setStyleSheet(
+                    "background: #fff3cd; color: #856404; border: 1px solid #ffeeba; "
+                    "font-weight: bold; padding: 6px 12px; border-radius: 4px;"
+                )
+            self.mod_statuses_layout.addWidget(btn)
+
+        # 4. Cross-Module Consistency Table
+        checks = res.consistency_checks or []
+        self.cm_table.setRowCount(len(checks))
+        for idx, check in enumerate(checks):
+            item_mod = QTableWidgetItem(check["module"])
+            item_mod.setTextAlignment(Qt.AlignCenter)
+            self.cm_table.setItem(idx, 0, item_mod)
+            
+            item_fld = QTableWidgetItem(check["field"])
+            item_fld.setTextAlignment(Qt.AlignCenter)
+            self.cm_table.setItem(idx, 1, item_fld)
+            
+            item_src = QTableWidgetItem(check["source_val"])
+            item_src.setTextAlignment(Qt.AlignCenter)
+            self.cm_table.setItem(idx, 2, item_src)
+            
+            item_tgt = QTableWidgetItem(check["target_val"])
+            item_tgt.setTextAlignment(Qt.AlignCenter)
+            self.cm_table.setItem(idx, 3, item_tgt)
+            
+            item_st = QTableWidgetItem(check["status"])
+            item_st.setTextAlignment(Qt.AlignCenter)
+            st_color = "#27ae60" if check["status"] == "PASS" else "#c0392b"
+            item_st.setForeground(QColor(st_color))
+            self.cm_table.setItem(idx, 4, item_st)
+
+        # 5. Outstanding Issues Table
         self.findings_table.setRowCount(len(res.findings))
         for i, f in enumerate(res.findings):
             item_sev = QTableWidgetItem(f.severity.upper())
             sev_colors = {
-                "critical": "#c22d2d",
-                "warning": "#b56900",
-                "info": "#1d7a3a"
+                "critical": "#c0392b",
+                "major": "#e67e22",
+                "warning": "#f39c12",
+                "info": "#27ae60"
             }
             item_sev.setForeground(QColor(sev_colors.get(f.severity, "#333333")))
             item_sev.setTextAlignment(Qt.AlignCenter)
@@ -261,11 +438,18 @@ class EngineeringReviewPanel(QWidget):
             item_mod.setTextAlignment(Qt.AlignCenter)
             self.findings_table.setItem(i, 1, item_mod)
             
-            self.findings_table.setItem(i, 2, QTableWidgetItem(f.issue))
+            item_issue = QTableWidgetItem(f.issue)
+            self.findings_table.setItem(i, 2, item_issue)
             
             rec_text = f"Recommendation: {f.recommendation}\nReason: {f.engineering_reason}"
             item_rec = QTableWidgetItem(rec_text)
             self.findings_table.setItem(i, 3, item_rec)
+            
+            # Go To Button
+            btn_goto = QPushButton("Go To")
+            btn_goto.setProperty("class", "Secondary")
+            btn_goto.clicked.connect(lambda *_, k=f.navigation_key: self._go_to_module(k))
+            self.findings_table.setCellWidget(i, 4, btn_goto)
 
     def _export_audit(self) -> None:
         if self._project_id is None:
@@ -273,32 +457,52 @@ class EngineeringReviewPanel(QWidget):
         from app.engineering.design_audit import run_project_audit
         res = run_project_audit(self._project_id, self.db)
         
-        default = f"Audit_Summary_Project_{self._project_id}.txt"
+        default = f"Validation_Report_Project_{self._project_id}.txt"
         path, _ = QFileDialog.getSaveFileName(self, "Export Audit Summary", default, "Text Files (*.txt)")
         if not path:
             return
             
         try:
             lines = [
-                f"SAMPAVE DESIGN AUDIT SUMMARY REPORT",
-                f"Project ID: {self._project_id}",
-                f"Engineering Score: {res.score}/100",
-                f"Risk Level: {res.risk_level}",
-                f"Readiness Status: {res.readiness_status}",
                 "==================================================",
-                f"Total Findings: {len(res.findings)}",
-                ""
+                "   ROADX DESIGN VALIDATION SUMMARY REPORT",
+                "==================================================",
+                f"Project ID: {self._project_id}",
+                f"Validation Timestamp: {res.timestamp}",
+                f"Final Recommendation: {res.final_recommendation}",
+                f"Overall Engineering Score: {res.score}/100",
+                f"Readiness Status: {res.readiness_status}",
+                f"Risk Evaluation: {res.risk_level}",
+                "--------------------------------------------------",
+                "Score Card Breakdown:",
+                f" - Completeness: {res.completeness_score}%",
+                f" - Consistency: {res.consistency_score}%",
+                f" - Mechanistic: {res.mechanistic_score}%",
+                f" - Documentation: {res.documentation_score}%",
+                f" - Submission: {res.submission_score}%",
+                "--------------------------------------------------",
+                "Module Status Grid:",
             ]
+            for m, st in (res.module_statuses or {}).items():
+                lines.append(f" - {m.title()}: {st}")
+            lines.append("--------------------------------------------------")
+            lines.append("Cross-Module Consistency Analysis:")
+            for check in (res.consistency_checks or []):
+                lines.append(f" - {check['module']} ({check['field']}): {check['source_val']} vs {check['target_val']} -> {check['status']}")
+            lines.append("--------------------------------------------------")
+            lines.append(f"Total Finding Warnings/Issues: {len(res.findings)}")
+            lines.append("")
+            
             for idx, f in enumerate(res.findings, 1):
-                lines.append(f"{idx}. [{f.severity.upper()}] in Module: {f.module.upper()}")
+                lines.append(f"{idx}. [{f.severity.upper()}] {f.module.upper()}")
                 lines.append(f"   Issue: {f.issue}")
-                lines.append(f"   Recommendation: {f.recommendation}")
-                lines.append(f"   Engineering Reason: {f.engineering_reason}")
+                lines.append(f"   Action: {f.recommendation}")
+                lines.append(f"   Reason: {f.engineering_reason}")
                 lines.append("")
                 
             with open(path, "w", encoding="utf-8") as file:
                 file.write("\n".join(lines))
                 
-            QMessageBox.information(self, "Export Successful", f"Audit summary exported to:\n{path}")
+            QMessageBox.information(self, "Export Successful", f"Audit report exported to:\n{path}")
         except Exception as e:
             QMessageBox.critical(self, "Export Failed", str(e))

@@ -86,6 +86,11 @@ class Project(Base):
     subgrade_cbr: Mapped[Optional[float]] = mapped_column(Float, default=None)
     subgrade_mr: Mapped[Optional[float]] = mapped_column(Float, default=None)
     selected_design_option: Mapped[Optional[str]] = mapped_column(Text, default=None)
+    override_history_json: Mapped[Optional[str]] = mapped_column(JSON, default=None)
+    sync_version: Mapped[Optional[int]] = mapped_column(Integer, default=1)
+    sync_state: Mapped[Optional[str]] = mapped_column(JSON, default=None)
+    audit_history_json: Mapped[Optional[str]] = mapped_column(JSON, default=None)
+    validation_results_json: Mapped[Optional[str]] = mapped_column(JSON, default=None)
 
 
 
@@ -174,6 +179,7 @@ class StructuralDesign(Base):
     project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False)
 
     inputs_json: Mapped[Optional[str]] = mapped_column(JSON)
+    traceability_log_json: Mapped[Optional[str]] = mapped_column(JSON)
     design_msa: Mapped[Optional[float]] = mapped_column(Float)
     growth_factor: Mapped[Optional[float]] = mapped_column(Float)
     subgrade_mr_mpa: Mapped[Optional[float]] = mapped_column(Float)
@@ -281,6 +287,13 @@ class MechanisticValidation(Base):
     design_msa: Mapped[Optional[float]] = mapped_column(Float)
     refused_reason: Mapped[Optional[str]] = mapped_column(Text)
     notes: Mapped[Optional[str]] = mapped_column(Text)
+    exe_path: Mapped[Optional[str]] = mapped_column(Text)
+    input_filepath: Mapped[Optional[str]] = mapped_column(Text)
+    output_filepath: Mapped[Optional[str]] = mapped_column(Text)
+    stdout_log: Mapped[Optional[str]] = mapped_column(Text)
+    stderr_log: Mapped[Optional[str]] = mapped_column(Text)
+    iteration_history_json: Mapped[Optional[str]] = mapped_column(JSON)
+    recommended_thickness_json: Mapped[Optional[str]] = mapped_column(JSON)
     computed_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
     project: Mapped[Project] = relationship(back_populates="mechanistic_validations")

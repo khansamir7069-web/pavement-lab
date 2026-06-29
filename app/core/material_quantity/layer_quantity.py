@@ -109,6 +109,12 @@ class LayerResult:
     layer_tonnage_t: float             # mix or aggregate tonnage (0 for sprayed)
     binder_tonnage_t: float            # 0 for granular
     code_refs: Tuple[CodeRef, ...] = ()
+    compacted_volume_m3: float = 0.0
+    loose_volume_m3: float = 0.0
+    bitumen_tonnage_t: float = 0.0
+    cement_tonnage_t: float = 0.0
+    filler_tonnage_t: float = 0.0
+    aggregate_tonnage_t: float = 0.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -130,6 +136,11 @@ class MaterialQuantityResult:
     total_area_m2: float
     references: Tuple[CodeRef, ...] = REFERENCES
     notes: str = ""
+    total_compacted_volume_m3: float = 0.0
+    total_loose_volume_m3: float = 0.0
+    total_cement_tonnage_t: float = 0.0
+    total_filler_tonnage_t: float = 0.0
+    total_aggregate_tonnage_t: float = 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -159,34 +170,77 @@ def compute_layer(inp: LayerInput) -> LayerResult:
     a = max(0.0, inp.length_m) * max(0.0, inp.width_m)
     waste = max(0.0, inp.waste_pct) / 100.0
 
+    compacted_vol = 0.0
+    loose_vol = 0.0
+    bitumen_t = 0.0
+    cement_t = 0.0
+    filler_t = 0.0
+    aggregate_t = 0.0
+    t_layer = 0.0
+
     if category == "sprayed_coat":
         rate = (inp.spray_rate_kgm2
                 if inp.spray_rate_kgm2 is not None
                 else DEFAULT_SPRAY_RATE_KGM2.get(layer, 0.0))
-        binder_t = a * rate / 1000.0
+        bitumen_t = a * rate / 1000.0
         return LayerResult(
             inputs=inp, category=category, area_m2=a,
-            layer_tonnage_t=0.0, binder_tonnage_t=binder_t,
+            layer_tonnage_t=0.0, binder_tonnage_t=bitumen_t,
             code_refs=_refs_for(layer),
+            compacted_volume_m3=0.0, loose_volume_m3=0.0,
+            bitumen_tonnage_t=bitumen_t, cement_tonnage_t=0.0,
+            filler_tonnage_t=0.0, aggregate_tonnage_t=0.0
         )
 
     rho = (inp.density_t_m3
            if inp.density_t_m3 is not None
            else DEFAULT_DENSITY.get(layer, 2.30))
-    t_layer = a * (max(0.0, inp.thickness_mm) / 1000.0) * rho * (1.0 + waste)
+    compacted_vol = a * (max(0.0, inp.thickness_mm) / 1000.0)
+    t_layer = compacted_vol * rho * (1.0 + waste)
 
-    if category == "granular":
-        binder_t = 0.0
-    else:  # bituminous_mix
+    # Loose volume factor mapping
+    loose_factor = 1.20
+    if layer in ("BC", "DBM", "BM"):
+        loose_factor = 1.15
+    elif layer == "GSB":
+        loose_factor = 1.25
+    
+    loose_vol = compacted_vol * loose_factor
+
+    # Constituent splits
+    if layer in ("CTB", "CTS"):
+        pc = 4.5 if layer == "CTB" else 3.0
+        if inp.binder_pct is not None and inp.binder_pct > 0.0:
+            pc = inp.binder_pct
+        cement_t = t_layer * pc / 100.0
+        aggregate_t = t_layer - cement_t
+    elif category == "granular":
+        aggregate_t = t_layer
+    elif layer == "BC":
         pb = (inp.binder_pct
               if inp.binder_pct is not None
-              else DEFAULT_BINDER_PCT.get(layer, 5.0))
-        binder_t = t_layer * pb / 100.0
+              else DEFAULT_BINDER_PCT.get(layer, 5.5))
+        pf = 2.0  # mineral filler default 2.0%
+        bitumen_t = t_layer * pb / 100.0
+        filler_t = t_layer * pf / 100.0
+        aggregate_t = t_layer - bitumen_t - filler_t
+    elif layer in ("DBM", "BM"):
+        pb = (inp.binder_pct
+              if inp.binder_pct is not None
+              else DEFAULT_BINDER_PCT.get(layer, 4.5))
+        bitumen_t = t_layer * pb / 100.0
+        aggregate_t = t_layer - bitumen_t
 
     return LayerResult(
         inputs=inp, category=category, area_m2=a,
-        layer_tonnage_t=t_layer, binder_tonnage_t=binder_t,
+        layer_tonnage_t=t_layer, binder_tonnage_t=bitumen_t,
         code_refs=_refs_for(layer),
+        compacted_volume_m3=compacted_vol,
+        loose_volume_m3=loose_vol,
+        bitumen_tonnage_t=bitumen_t,
+        cement_tonnage_t=cement_t,
+        filler_tonnage_t=filler_t,
+        aggregate_tonnage_t=aggregate_t
     )
 
 
@@ -200,6 +254,11 @@ def compute_material_quantity(
         total_layer_tonnage_t=sum(r.layer_tonnage_t for r in results),
         total_binder_tonnage_t=sum(r.binder_tonnage_t for r in results),
         total_area_m2=sum(r.area_m2 for r in results) if results else 0.0,
+        total_compacted_volume_m3=sum(r.compacted_volume_m3 for r in results),
+        total_loose_volume_m3=sum(r.loose_volume_m3 for r in results),
+        total_cement_tonnage_t=sum(r.cement_tonnage_t for r in results),
+        total_filler_tonnage_t=sum(r.filler_tonnage_t for r in results),
+        total_aggregate_tonnage_t=sum(r.aggregate_tonnage_t for r in results),
         notes=("Quantities are estimates per IRC/MoRTH typical defaults. "
                "Finalise densities / spray rates per the approved Job Mix "
                "Formula and site-specific lab tests."),

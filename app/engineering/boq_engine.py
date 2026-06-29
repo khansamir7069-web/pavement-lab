@@ -70,14 +70,25 @@ def calculate_layer_boq(
     else:
         density = 2.20
 
+    # Loose volume factor
+    loose_factor = 1.20
+    if material_key in ("BC", "DBM"):
+        loose_factor = 1.15
+    elif material_key == "GSB":
+        loose_factor = 1.25
+        
+    loose_volume_m3 = volume_m3 * loose_factor
+
     waste_pct = 2.0
     weight_t = volume_m3 * density * (1.0 + waste_pct / 100.0)
 
     # Binder/Cement splits
     binder_pct = 0.0
     cement_pct = 0.0
+    filler_pct = 0.0
     if material_key == "BC":
         binder_pct = 5.5
+        filler_pct = 2.0
     elif material_key == "DBM":
         binder_pct = 4.5
     elif name.upper() == "CTB":
@@ -87,9 +98,12 @@ def calculate_layer_boq(
 
     bitumen_t = 0.0
     cement_t = 0.0
+    filler_t = 0.0
     if binder_pct > 0:
         bitumen_t = weight_t * binder_pct / 100.0
-        aggregate_t = weight_t - bitumen_t
+        if filler_pct > 0:
+            filler_t = weight_t * filler_pct / 100.0
+        aggregate_t = weight_t - bitumen_t - filler_t
     elif cement_pct > 0:
         cement_t = weight_t * cement_pct / 100.0
         aggregate_t = weight_t - cement_t
@@ -100,37 +114,64 @@ def calculate_layer_boq(
     cost = 0.0
     rate_used = 0.0
     unit_used = ""
+    rate_source = "Preliminary Estimate"
 
     if material_key == "STABILIZED":
-        # Calculate from constituents: cement + aggregate
-        cement_rate = rates.get("Cement", {}).get("rate", DEFAULT_RATES["Cement"]["rate"])
-        agg_rate = rates.get("Aggregate", {}).get("rate", DEFAULT_RATES["Aggregate"]["rate"])
+        cement_rate_info = rates.get("Cement", {})
+        cement_rate = cement_rate_info.get("rate", DEFAULT_RATES["Cement"]["rate"])
+        
+        agg_rate_info = rates.get("Aggregate", {})
+        agg_rate = agg_rate_info.get("rate", DEFAULT_RATES["Aggregate"]["rate"])
+        
         cost = (cement_t * cement_rate) + (aggregate_t * agg_rate)
         rate_used = agg_rate
         unit_used = "Tonne (Constituent)"
+        if "Cement" in rates and "Aggregate" in rates:
+            rate_source = "Project rate"
     else:
         r_info = rates.get(material_key, DEFAULT_RATES.get(material_key, {}))
         rate_used = r_info.get("rate", 0.0)
         unit_used = r_info.get("unit", "Tonne")
+        if material_key in rates:
+            rate_source = "Project rate"
+            
         if unit_used.lower() in ("cum", "m3"):
             cost = volume_m3 * rate_used
         else:
             cost = weight_t * rate_used
+
+    gst = cost * 0.18
+    grand_total = cost + gst
+    
+    # Detailed Traceability Log step
+    if name in ("Prime Coat", "Tack Coat"):
+        traceability = f"{name} Tonnage ({bitumen_t:.2f} t) = Area ({area_m2:.1f} m²) × Spray Rate ({thickness_mm:.2f} kg/m² / 1000)"
+    else:
+        traceability = f"{name} Tonnage ({weight_t:.2f} t) = Area ({area_m2:.1f} m²) × Thickness ({thickness_mm:.1f} mm / 1000) × Density ({density:.2f} t/m³) × Waste Factor (1.{waste_pct:.0f})"
 
     return {
         "layer_name": name,
         "thickness_mm": thickness_mm,
         "length_m": length_m,
         "width_m": width_m,
+        "area_m2": area_m2,
         "volume_m3": volume_m3,
+        "loose_volume_m3": loose_volume_m3,
         "weight_t": weight_t,
         "bitumen_t": bitumen_t,
         "cement_t": cement_t,
+        "filler_t": filler_t,
         "aggregate_t": aggregate_t,
         "rate": rate_used,
         "unit": unit_used,
+        "rate_source": rate_source,
         "cost": cost,
-        "formatted_cost": format_indian_currency(cost)
+        "formatted_cost": format_indian_currency(cost),
+        "gst": gst,
+        "formatted_gst": format_indian_currency(gst),
+        "grand_total": grand_total,
+        "formatted_grand_total": format_indian_currency(grand_total),
+        "traceability": traceability
     }
 
 def generate_boq(project_id: int, db) -> Dict[str, Any]:
@@ -387,7 +428,31 @@ def generate_boq(project_id: int, db) -> Dict[str, Any]:
     else:
         options_data["Option D"] = {"available": False}
 
-    return {
+    # GST, Grand Total, and loose volume calculations for each option
+    for opt_name in ("Option A", "Option B", "Option C", "Option D"):
+        opt = options_data.get(opt_name, {})
+        if opt.get("available"):
+            subtotal = opt.get("total_cost", 0.0)
+            gst = subtotal * 0.18
+            grand_total = subtotal + gst
+            
+            tot_loose = 0.0
+            tot_compacted = 0.0
+            tot_filler = 0.0
+            for l_boq in opt.get("layers", []):
+                tot_loose += l_boq.get("loose_volume_m3", 0.0)
+                tot_compacted += l_boq.get("volume_m3", 0.0)
+                tot_filler += l_boq.get("filler_t", 0.0)
+                
+            opt["gst"] = gst
+            opt["formatted_gst"] = format_indian_currency(gst)
+            opt["grand_total"] = grand_total
+            opt["formatted_grand_total"] = format_indian_currency(grand_total)
+            opt["total_loose_volume_m3"] = tot_loose
+            opt["total_compacted_volume_m3"] = tot_compacted
+            opt["filler_t"] = tot_filler
+
+    res_dict = {
         "available": has_layers,
         "show_rupees": show_rupees,
         "road_length_m": road_length,
@@ -395,4 +460,93 @@ def generate_boq(project_id: int, db) -> Dict[str, Any]:
         "shoulder_width_m": shoulder_width,
         "options": options_data,
         "rates": rates
+    }
+
+    # Run BOQ validation
+    res_dict["validation"] = validate_boq_data(project_id, db, res_dict)
+    return res_dict
+
+
+def validate_boq_data(project_id: int, db, boq_res: dict) -> dict:
+    """Performs validation checks on generated BOQ data."""
+    errors = []
+    warnings = []
+    
+    sd = db.latest_structural_design(project_id)
+    if not sd:
+        errors.append("No approved structural design found.")
+        return {"status": "FAIL", "errors": errors, "warnings": warnings}
+        
+    try:
+        comp = json.loads(sd.composition_json) if isinstance(sd.composition_json, str) else sd.composition_json
+    except Exception:
+        comp = []
+        
+    if not comp:
+        errors.append("Approved structural design composition is empty.")
+        return {"status": "FAIL", "errors": errors, "warnings": warnings}
+        
+    opt_d = boq_res.get("options", {}).get("Option D", {})
+    if not opt_d.get("available"):
+        errors.append("No valid pavement option is available for calculation.")
+        return {"status": "FAIL", "errors": errors, "warnings": warnings}
+        
+    opt_layers = opt_d.get("layers", [])
+    opt_layer_names = {l["layer_name"].upper() for l in opt_layers}
+    
+    # Map helper for layer names
+    def map_layer_name(cname: str) -> str:
+        cname_upper = cname.upper()
+        if "BC" in cname_upper or "CONCRETE" in cname_upper or "WEARING" in cname_upper:
+            return "BC"
+        if "DBM" in cname_upper or "BINDER" in cname_upper or "BM" in cname_upper or "BITUMINOUS" in cname_upper:
+            return "DBM"
+        if "WMM" in cname_upper or "WET MIX" in cname_upper:
+            return "WMM"
+        if "GSB" in cname_upper or "SUB-BASE" in cname_upper or "SUBBASE" in cname_upper or "GRANULAR" in cname_upper:
+            return "GSB"
+        if "CTB" in cname_upper:
+            return "CTB"
+        if "CTS" in cname_upper:
+            return "CTS"
+        return "DBM"
+    
+    # 1. Missing layers
+    for sl in comp:
+        sl_mapped = map_layer_name(sl.get("name", "Unknown"))
+        matched = False
+        for ol in opt_layers:
+            ol_mapped = map_layer_name(ol["layer_name"])
+            if ol_mapped == sl_mapped:
+                matched = True
+                break
+        if not matched:
+            errors.append(f"Missing structural layer in BOQ calculation: {sl.get('name')}")
+            
+    # 2. Thickness mismatch
+    for sl in comp:
+        sl_mapped = map_layer_name(sl.get("name", "Unknown"))
+        sl_thick = float(sl.get("thickness_mm", 0.0))
+        for ol in opt_layers:
+            ol_mapped = map_layer_name(ol["layer_name"])
+            if ol_mapped == sl_mapped:
+                ol_thick = float(ol["thickness_mm"])
+                if abs(ol_thick - sl_thick) > 0.1:
+                    warnings.append(
+                        f"Thickness mismatch for {ol['layer_name']}: "
+                        f"BOQ = {ol_thick:.0f} mm, Structural Design = {sl_thick:.0f} mm."
+                    )
+                    
+    # 3. Geometry mismatch / Negative values
+    for ol in opt_layers:
+        if ol["length_m"] < 0 or ol["width_m"] < 0 or ol["thickness_mm"] < 0:
+            errors.append(f"Negative values detected in layer {ol['layer_name']}.")
+        if ol["length_m"] != boq_res.get("road_length_m", 1000.0):
+            warnings.append(f"Layer length mismatch for {ol['layer_name']}: Layer length ({ol['length_m']} m) differs from project geometry length ({boq_res.get('road_length_m')} m).")
+            
+    status = "PASS" if not errors else "FAIL"
+    return {
+        "status": status,
+        "errors": errors,
+        "warnings": warnings
     }

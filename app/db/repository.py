@@ -216,7 +216,228 @@ class Database:
                 conn.execute(text("UPDATE projects SET is_legacy = 1"))
             if "selected_design_option" not in cols:
                 conn.execute(text("ALTER TABLE projects ADD COLUMN selected_design_option TEXT"))
+            if "override_history_json" not in cols:
+                conn.execute(text("ALTER TABLE projects ADD COLUMN override_history_json TEXT"))
+            if "sync_version" not in cols:
+                conn.execute(text("ALTER TABLE projects ADD COLUMN sync_version INTEGER DEFAULT 1"))
+            if "sync_state" not in cols:
+                conn.execute(text("ALTER TABLE projects ADD COLUMN sync_state TEXT"))
+            if "audit_history_json" not in cols:
+                conn.execute(text("ALTER TABLE projects ADD COLUMN audit_history_json TEXT"))
 
+            # Idempotently add columns for mechanistic_validations table
+            cols_mv = {r[1] for r in conn.execute(text("PRAGMA table_info(mechanistic_validations)"))}
+            for col_name in [
+                "exe_path",
+                "input_filepath",
+                "output_filepath",
+                "stdout_log",
+                "stderr_log",
+                "iteration_history_json",
+                "recommended_thickness_json"
+            ]:
+                if col_name not in cols_mv:
+                    conn.execute(text(f"ALTER TABLE mechanistic_validations ADD COLUMN {col_name} TEXT"))
+
+            cols_sd = {r[1] for r in conn.execute(text("PRAGMA table_info(structural_designs)"))}
+            if "traceability_log_json" not in cols_sd:
+                conn.execute(text("ALTER TABLE structural_designs ADD COLUMN traceability_log_json TEXT"))
+
+            cols_proj = {r[1] for r in conn.execute(text("PRAGMA table_info(projects)"))}
+            if "validation_results_json" not in cols_proj:
+                conn.execute(text("ALTER TABLE projects ADD COLUMN validation_results_json TEXT"))
+
+
+    def _get_sync_state_from_project(self, p: Project) -> dict:
+        if not p.sync_state:
+            return {
+                "versions": {"traffic": 1, "subgrade": 1, "structural": 1, "material_qty": 1},
+                "synced_with": {
+                    "structural": {"traffic": 1, "subgrade": 1},
+                    "material_qty": {"structural": 1}
+                }
+            }
+        try:
+            return json.loads(p.sync_state)
+        except Exception:
+            return {
+                "versions": {"traffic": 1, "subgrade": 1, "structural": 1, "material_qty": 1},
+                "synced_with": {
+                    "structural": {"traffic": 1, "subgrade": 1},
+                    "material_qty": {"structural": 1}
+                }
+            }
+
+    def _increment_module_version_in_session(self, session: Session, project_id: int, module_name: str) -> None:
+        p = session.get(Project, project_id)
+        if p:
+            state = self._get_sync_state_from_project(p)
+            state["versions"][module_name] = state["versions"].get(module_name, 1) + 1
+            p.sync_state = json.dumps(state)
+
+    def _increment_and_sync_module_in_session(self, session: Session, project_id: int, module_name: str, sources: list[str]) -> None:
+        p = session.get(Project, project_id)
+        if p:
+            state = self._get_sync_state_from_project(p)
+            state["versions"][module_name] = state["versions"].get(module_name, 1) + 1
+            if "synced_with" not in state:
+                state["synced_with"] = {}
+            if module_name not in state["synced_with"]:
+                state["synced_with"][module_name] = {}
+            for src in sources:
+                state["synced_with"][module_name][src] = state["versions"].get(src, 1)
+            p.sync_state = json.dumps(state)
+
+    def get_module_sync_status(self, project_id: int, module_name: str) -> str:
+        """Return status string: 'Synced', 'Manual Override', or 'Out of Sync'."""
+        with self.session() as s:
+            p = s.get(Project, project_id)
+            if not p:
+                return "Synced"
+            state = self._get_sync_state_from_project(p)
+            
+            # Check Out of Sync
+            synced_info = state.get("synced_with", {}).get(module_name, {})
+            versions = state.get("versions", {})
+            for src, synced_ver in synced_info.items():
+                curr_ver = versions.get(src, 1)
+                if synced_ver < curr_ver:
+                    return "Out of Sync"
+            
+            # Check Manual Override
+            if module_name == "structural":
+                sd = self.latest_structural_design(project_id)
+                if sd and sd.inputs_json:
+                    try:
+                        d = json.loads(sd.inputs_json)
+                        if d.get("overrides", {}).get("active"):
+                            return "Manual Override"
+                    except Exception:
+                        pass
+            
+            return "Synced"
+
+    def get_all_sync_statuses(self, project_id: int) -> dict[str, str]:
+        struct_status = self.get_module_sync_status(project_id, "structural")
+        boq_status = self.get_module_sync_status(project_id, "material_qty")
+        
+        sub_status = "Synced"
+        if struct_status == "Out of Sync" or boq_status == "Out of Sync":
+            sub_status = "Out of Sync"
+        elif struct_status == "Manual Override" or boq_status == "Manual Override":
+            sub_status = "Manual Override"
+            
+        return {
+            "project": "Synced",
+            "traffic": "Synced",
+            "subgrade": "Synced",
+            "structural": struct_status,
+            "material_qty": boq_status,
+            "submission": sub_status
+        }
+
+    def mark_module_synced(self, project_id: int, module_name: str, sources: list[str]) -> None:
+        with self.session() as s:
+            p = s.get(Project, project_id)
+            if p:
+                state = self._get_sync_state_from_project(p)
+                if "synced_with" not in state:
+                    state["synced_with"] = {}
+                if module_name not in state["synced_with"]:
+                    state["synced_with"][module_name] = {}
+                for src in sources:
+                    state["synced_with"][module_name][src] = state["versions"].get(src, 1)
+                p.sync_state = json.dumps(state)
+                s.flush()
+
+    def append_override_history(
+        self,
+        project_id: int,
+        field_name: str,
+        original_val: Any,
+        previous_val: Any,
+        new_val: Any,
+        reason: str,
+        module_name: str,
+        user: str = "Engineer",
+    ) -> None:
+        import socket
+        import os
+        try:
+            machine_id = socket.gethostname()
+        except Exception:
+            machine_id = "Unknown Machine"
+            
+        try:
+            env_user = os.getlogin()
+        except Exception:
+            env_user = os.environ.get("USERNAME") or os.environ.get("USER") or "Engineer"
+
+        with self.session() as s:
+            p = s.get(Project, project_id)
+            if not p:
+                return
+            try:
+                history = json.loads(p.override_history_json) if p.override_history_json else []
+            except Exception:
+                history = []
+            
+            entry = {
+                "module": module_name,
+                "field_name": field_name,
+                "original_val": original_val,
+                "previous_val": previous_val,
+                "new_val": new_val,
+                "reason": reason,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "active": True,
+                "user": user or env_user,
+                "machine_id": machine_id
+            }
+            history.append(entry)
+            p.override_history_json = json.dumps(history)
+            s.flush()
+
+    def log_project_audit(self, project_id: int, module: str, action: str, detail: str | None = None) -> None:
+        import os
+        try:
+            env_user = os.getlogin()
+        except Exception:
+            env_user = os.environ.get("USERNAME") or os.environ.get("USER") or "Engineer"
+
+        with self.session() as s:
+            p = s.get(Project, project_id)
+            if not p:
+                return
+            
+            # 1. Project-level JSON audit history
+            try:
+                audit = json.loads(p.audit_history_json) if p.audit_history_json else []
+            except Exception:
+                audit = []
+            
+            timestamp_str = datetime.now(timezone.utc).isoformat()
+            entry = {
+                "timestamp": timestamp_str,
+                "module": module,
+                "action": action,
+                "detail": detail or "",
+                "user": env_user
+            }
+            audit.append(entry)
+            p.audit_history_json = json.dumps(audit)
+            
+            # 2. Main AuditLog table record
+            log_row = AuditLog(
+                user_id=None,
+                action=action,
+                object_type=module,
+                object_id=project_id,
+                detail=detail or "",
+                timestamp=datetime.now(timezone.utc)
+            )
+            s.add(log_row)
+            s.flush()
 
     def initialize_workflow_statuses(self, project_id: int) -> dict:
         with self.session() as s:
@@ -356,6 +577,11 @@ class Database:
                     raise ValueError("Cannot modify a locked project.")
             for k, v in kwargs.items():
                 setattr(p, k, v)
+            
+            subgrade_keys = {"subgrade_cbr", "subgrade_mr"}
+            if subgrade_keys.intersection(kwargs.keys()):
+                self._increment_module_version_in_session(s, project_id, "subgrade")
+                
             s.flush()
             return p
 
@@ -550,11 +776,20 @@ class Database:
         """Persist a Phase-4 StructuralResult.  ``result`` is core.StructuralResult."""
         inputs_dict = _to_json_safe(result.inputs)
         comp_dict = _to_json_safe(result.composition)
+        
+        trace_str = None
+        if hasattr(result, "traceability_log_json") and result.traceability_log_json:
+            if isinstance(result.traceability_log_json, dict):
+                trace_str = json.dumps(result.traceability_log_json)
+            else:
+                trace_str = result.traceability_log_json
+
         with self.session() as s:
             _check_not_locked(s, project_id)
             sd = StructuralDesign(
                 project_id=project_id,
                 inputs_json=json.dumps(inputs_dict),
+                traceability_log_json=trace_str,
                 design_msa=result.design_msa,
                 growth_factor=result.growth_factor,
                 subgrade_mr_mpa=result.subgrade_mr_mpa,
@@ -563,6 +798,7 @@ class Database:
                 notes=result.notes,
             )
             s.add(sd); s.flush()
+            self._increment_and_sync_module_in_session(s, project_id, "structural", ["traffic", "subgrade"])
             return sd
 
     def latest_structural_design(self, project_id: int) -> StructuralDesign | None:
@@ -671,6 +907,7 @@ class Database:
                 notes=getattr(result, "notes", "") or "",
             )
             s.add(row); s.flush()
+            self._increment_and_sync_module_in_session(s, project_id, "material_qty", ["structural"])
             return row
 
     def latest_material_quantity(
@@ -705,6 +942,7 @@ class Database:
                 notes=getattr(result, "notes", "") or "",
             )
             s.add(row); s.flush()
+            self._increment_module_version_in_session(s, project_id, "traffic")
             return row
 
     def latest_traffic_analysis(self, project_id: int) -> TrafficAnalysis | None:
@@ -751,6 +989,9 @@ class Database:
     # ---- Mechanistic validation (Phase 15 P4) --------------------------
     def save_mechanistic_validation(
         self, *, project_id: int, summary, inputs=None,
+        exe_path=None, input_filepath=None, output_filepath=None,
+        stdout_log=None, stderr_log=None, iteration_history_json=None,
+        recommended_thickness_json=None
     ) -> MechanisticValidation:
         """Persist a Phase-14 ``MechanisticValidationSummary``.
 
@@ -776,6 +1017,13 @@ class Database:
                 design_msa=float(getattr(summary.fatigue, "design_msa", 0.0)),
                 refused_reason=getattr(summary, "refused_reason", "") or "",
                 notes=getattr(summary, "notes", "") or "",
+                exe_path=exe_path,
+                input_filepath=input_filepath,
+                output_filepath=output_filepath,
+                stdout_log=stdout_log,
+                stderr_log=stderr_log,
+                iteration_history_json=iteration_history_json,
+                recommended_thickness_json=recommended_thickness_json,
             )
             s.add(row); s.flush()
             return row
@@ -1079,10 +1327,27 @@ class Database:
                 revisions = []
                 
             next_rev_num = int(parent.revision_number or 0) + 1
+            
+            eng_name = parent.submitted_by or "N/A"
+            desc_val = "Design Revision"
+            reason_val = "Update"
+            try:
+                note_dict = json.loads(engineer_note)
+                eng_name = note_dict.get("engineer") or eng_name
+                desc_val = note_dict.get("description") or desc_val
+                reason_val = note_dict.get("reason") or reason_val
+            except Exception:
+                pass
+
             rev_entry = {
                 "revision_number": next_rev_num,
                 "date_time": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
                 "engineer_note": engineer_note,
+                "engineer": eng_name,
+                "description": desc_val,
+                "reason": reason_val,
+                "validation_status": "Draft / Unlocked",
+                "generated_files": [],
                 "changed_parameters": []
             }
             revisions.append(rev_entry)
@@ -1211,20 +1476,37 @@ class Database:
             p.locked_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
             p.lock_snapshot_json = json.dumps(snapshot)
             
+            # Record current validation status at lock time
+            val_status = "Not Audited"
+            if p.validation_results_json:
+                try:
+                    res_dict = json.loads(p.validation_results_json)
+                    val_status = f"{res_dict.get('final_recommendation')} (Score: {res_dict.get('score')}/100)"
+                except Exception:
+                    pass
+
+            # Update revisions list
+            try:
+                revisions = json.loads(p.revisions_json) if p.revisions_json else []
+            except Exception:
+                revisions = []
+
+            curr_rev = p.revision_number or 0
+            for r in revisions:
+                if r.get("revision_number") == curr_rev:
+                    r["validation_status"] = val_status
+                    break
+            
             if p.parent_project_id:
                 parent = s.get(Project, p.parent_project_id)
                 if parent:
                     diff = compute_project_diff(parent, p)
-                    try:
-                        revisions = json.loads(p.revisions_json) if p.revisions_json else []
-                        if revisions:
-                            for rev in revisions:
-                                if rev.get("revision_number") == p.revision_number:
-                                    rev["changed_parameters"] = diff
-                                    break
-                            p.revisions_json = json.dumps(revisions)
-                    except Exception:
-                        pass
+                    for r in revisions:
+                        if r.get("revision_number") == p.revision_number:
+                            r["changed_parameters"] = diff
+                            break
+            
+            p.revisions_json = json.dumps(revisions)
             s.flush()
 
     def unlock_project(self, project_id: int) -> None:
@@ -1237,6 +1519,42 @@ class Database:
             p.lock_snapshot_json = None
             s.flush()
 
+    def record_generated_file(self, project_id: int, filename: str) -> None:
+        with self.session() as s:
+            p = s.get(Project, project_id)
+            if not p:
+                return
+            try:
+                revisions = json.loads(p.revisions_json) if p.revisions_json else []
+            except Exception:
+                revisions = []
+            
+            curr_rev = p.revision_number or 0
+            found = False
+            for r in revisions:
+                if r.get("revision_number") == curr_rev:
+                    files = r.get("generated_files", [])
+                    if filename not in files:
+                        files.append(filename)
+                    r["generated_files"] = files
+                    found = True
+                    break
+            if not found:
+                r_entry = {
+                    "revision_number": curr_rev,
+                    "date_time": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+                    "engineer": p.submitted_by or "N/A",
+                    "description": "Initial Design Submission" if curr_rev == 0 else "Design Revision",
+                    "reason": "Initial Creation" if curr_rev == 0 else "Update",
+                    "validation_status": "Draft / Unlocked",
+                    "generated_files": [filename],
+                    "changed_parameters": []
+                }
+                revisions.append(r_entry)
+            
+            p.revisions_json = json.dumps(revisions)
+            s.flush()
+
     def save_project_checklist(self, project_id: int, review_status: str, checklist: dict) -> None:
         with self.session() as s:
             p = s.get(Project, project_id)
@@ -1244,6 +1562,14 @@ class Database:
                 raise ValueError("Project not found")
             p.review_status = review_status
             p.checklist_json = json.dumps(checklist)
+            s.flush()
+
+    def save_project_validation_results(self, project_id: int, results: dict) -> None:
+        with self.session() as s:
+            p = s.get(Project, project_id)
+            if not p:
+                raise ValueError("Project not found")
+            p.validation_results_json = json.dumps(results) if results else None
             s.flush()
 
 

@@ -54,6 +54,15 @@ class IITPaveRunnerConfig:
     use_stdin_stdout: bool = True
     input_filename: str = "iitp_inp.dat"
     output_filename: str = "iitp_out.dat"
+    bc_min: float = 30.0
+    bc_max: float = 80.0
+    dbm_min: float = 50.0
+    dbm_max: float = 300.0
+    wmm_min: float = 75.0
+    wmm_max: float = 250.0
+    gsb_min: float = 100.0
+    gsb_max: float = 400.0
+    max_iterations: int = 15
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -65,6 +74,15 @@ class IITPaveRunnerConfig:
             "use_stdin_stdout": self.use_stdin_stdout,
             "input_filename": self.input_filename,
             "output_filename": self.output_filename,
+            "bc_min": self.bc_min,
+            "bc_max": self.bc_max,
+            "dbm_min": self.dbm_min,
+            "dbm_max": self.dbm_max,
+            "wmm_min": self.wmm_min,
+            "wmm_max": self.wmm_max,
+            "gsb_min": self.gsb_min,
+            "gsb_max": self.gsb_max,
+            "max_iterations": self.max_iterations,
         }
 
 
@@ -122,6 +140,15 @@ def iitpave_runner_config_from_mapping(
         use_stdin_stdout=bool(payload.get("use_stdin_stdout", True)),
         input_filename=str(payload.get("input_filename") or "iitp_inp.dat").strip(),
         output_filename=str(payload.get("output_filename") or "iitp_out.dat").strip(),
+        bc_min=float(payload.get("bc_min", 30.0)),
+        bc_max=float(payload.get("bc_max", 80.0)),
+        dbm_min=float(payload.get("dbm_min", 50.0)),
+        dbm_max=float(payload.get("dbm_max", 300.0)),
+        wmm_min=float(payload.get("wmm_min", 75.0)),
+        wmm_max=float(payload.get("wmm_max", 250.0)),
+        gsb_min=float(payload.get("gsb_min", 100.0)),
+        gsb_max=float(payload.get("gsb_max", 400.0)),
+        max_iterations=int(payload.get("max_iterations", 15)),
     )
 
 

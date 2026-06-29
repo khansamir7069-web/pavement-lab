@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
     QFormLayout,
+    QTabWidget,
 )
 
 from app.core import (
@@ -59,6 +60,73 @@ def _make_layer_combo(default: str = "DBM") -> QComboBox:
         cb.addItem(t)
     cb.setCurrentText(default)
     return cb
+
+
+def get_final_pavement_layers(db, project_id: int) -> list[dict]:
+    p = db.get_project(project_id)
+    if not p:
+        return []
+    
+    selected_opt = p.selected_design_option
+    sd = db.latest_structural_design(project_id)
+    stab = db.latest_stabilized_design(project_id)
+    
+    comp = []
+    if selected_opt:
+        if "Option B" in selected_opt:
+            if stab:
+                try:
+                    res_data = json.loads(stab.results_json) if isinstance(stab.results_json, str) else stab.results_json
+                    comp = res_data.get("stabilized_composition", [])
+                except Exception:
+                    pass
+        elif "Option C" in selected_opt:
+            if stab:
+                try:
+                    res_data = json.loads(stab.results_json) if isinstance(stab.results_json, str) else stab.results_json
+                    comp = res_data.get("stabilized_composition", [])
+                except Exception:
+                    pass
+            if not comp and sd:
+                try:
+                    comp = json.loads(sd.composition_json) if isinstance(sd.composition_json, str) else sd.composition_json
+                except Exception:
+                    pass
+        elif "Option D" in selected_opt:
+            try:
+                from app.engineering.boq_engine import generate_boq
+                boq_data = generate_boq(project_id, db)
+                best_opt_key = boq_data.get("options", {}).get("Option D", {}).get("selected_reference")
+                if best_opt_key == "Option B" and stab:
+                    res_data = json.loads(stab.results_json) if isinstance(stab.results_json, str) else stab.results_json
+                    comp = res_data.get("stabilized_composition", [])
+                elif sd:
+                    comp = json.loads(sd.composition_json) if isinstance(sd.composition_json, str) else sd.composition_json
+            except Exception:
+                pass
+        else: # Option A
+            if sd:
+                try:
+                    comp = json.loads(sd.composition_json) if isinstance(sd.composition_json, str) else sd.composition_json
+                except Exception:
+                    pass
+    else:
+        if sd:
+            try:
+                comp = json.loads(sd.composition_json) if isinstance(sd.composition_json, str) else sd.composition_json
+                if not comp and stab:
+                    res_data = json.loads(stab.results_json) if isinstance(stab.results_json, str) else stab.results_json
+                    comp = res_data.get("stabilized_composition", [])
+            except Exception:
+                pass
+        elif stab:
+            try:
+                res_data = json.loads(stab.results_json) if isinstance(stab.results_json, str) else stab.results_json
+                comp = res_data.get("stabilized_composition", [])
+            except Exception:
+                pass
+                
+    return comp
 
 
 class MaterialQuantityPanel(QWidget):
@@ -105,8 +173,11 @@ class MaterialQuantityPanel(QWidget):
 
         self.btn_toggle_rates = styled_button("Manage Rates", "secondary")
         self.btn_toggle_rates.clicked.connect(self._toggle_rates_visible)
+        
+        self.btn_refresh = styled_button("Refresh Structural Design", "secondary")
+        self.btn_refresh.clicked.connect(self._on_refresh_source)
 
-        for b in (self.btn_toggle_rates, self.btn_export_excel, self.btn_export,
+        for b in (self.btn_toggle_rates, self.btn_refresh, self.btn_export_excel, self.btn_export,
                   self.btn_save, self.btn_compute, self.btn_remove, self.btn_add):
             self.header.add_action(b)
         lay.addWidget(self.header)
@@ -211,26 +282,77 @@ class MaterialQuantityPanel(QWidget):
         # Results
         self.res_card = Card()
         rl = QVBoxLayout(self.res_card)
-        rl.setContentsMargins(16, 12, 16, 12); rl.setSpacing(6)
-        rl.addWidget(QLabel("<b>Computed BOQ</b>"))
+        rl.setContentsMargins(16, 12, 16, 12); rl.setSpacing(8)
+        rl.addWidget(QLabel("<b>Computed Results — Preliminary Engineering Estimate</b>"))
+        
+        self.res_tabs = QTabWidget()
+        rl.addWidget(self.res_tabs)
+
+        # Tab 1: Quantity & Cost Abstract
+        self.tab_abstract = QWidget()
+        tl1 = QVBoxLayout(self.tab_abstract)
+        tl1.setContentsMargins(10, 10, 10, 10); tl1.setSpacing(10)
+        
         self.lbl_totals = QLabel("Total: —")
-        self.lbl_totals.setStyleSheet(
-            "font-size:11pt; font-weight:bold; color:#1d7a3a;")
-        rl.addWidget(self.lbl_totals)
-        self.res_tbl = QTableWidget(0, 8)
+        self.lbl_totals.setStyleSheet("font-size:11pt; font-weight:bold; color:#1d7a3a;")
+        tl1.addWidget(self.lbl_totals)
+        
+        self.res_tbl = QTableWidget(0, 9)
         self.res_tbl.setHorizontalHeaderLabels([
-            "Layer", "Thickness (mm)", "Volume (m³)", "Density (t/m³)", 
-            "Quantity", "Unit", "Rate", "Amount"
+            "Layer", "Thickness (mm)", "Compacted (m³)", "Loose (m³)", 
+            "Quantity", "Unit", "Rate Source", "Rate (₹)", "Amount (₹)"
         ])
         self.res_tbl.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.res_tbl.verticalHeader().setVisible(False)
-        rl.addWidget(self.res_tbl)
+        tl1.addWidget(self.res_tbl)
+        
         self.lbl_notes = QLabel("")
         self.lbl_notes.setWordWrap(True)
         self.lbl_notes.setStyleSheet(
             "background:#fbf2d3; color:#6e520a; padding:8px 12px; "
             "border:1px solid #e8d68f; border-radius:4px; font-size:10pt;")
-        rl.addWidget(self.lbl_notes)
+        tl1.addWidget(self.lbl_notes)
+        self.res_tabs.addTab(self.tab_abstract, "Quantity & Cost Abstract")
+
+        # Tab 2: Material Consumption Splits
+        self.tab_splits = QWidget()
+        tl2 = QVBoxLayout(self.tab_splits)
+        tl2.setContentsMargins(10, 10, 10, 10); tl2.setSpacing(10)
+        
+        tl2.addWidget(QLabel("<b>Cumulative Material Tonnage Consumption</b>"))
+        self.lbl_splits_summary = QLabel("—")
+        self.lbl_splits_summary.setStyleSheet(
+            "background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 4px; "
+            "padding: 12px; color: #1e3a8a; font-size: 10.5pt; line-height: 1.5;"
+        )
+        tl2.addWidget(self.lbl_splits_summary)
+        tl2.addStretch(1)
+        self.res_tabs.addTab(self.tab_splits, "Material Consumption Splits")
+
+        # Tab 3: BOQ Validation & Traceability
+        self.tab_val_trace = QWidget()
+        tl3 = QVBoxLayout(self.tab_val_trace)
+        tl3.setContentsMargins(10, 10, 10, 10); tl3.setSpacing(10)
+        
+        tl3.addWidget(QLabel("<b>BOQ Validation Checks</b>"))
+        self.lbl_validation_status = QLabel("—")
+        self.lbl_validation_status.setWordWrap(True)
+        self.lbl_validation_status.setStyleSheet(
+            "background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 4px; "
+            "padding: 10px; color: #374151; font-size: 9.5pt;"
+        )
+        tl3.addWidget(self.lbl_validation_status)
+        
+        tl3.addWidget(QLabel("<b>Pavement Quantity Traceability Log</b>"))
+        self.lbl_traceability = QLabel("—")
+        self.lbl_traceability.setWordWrap(True)
+        self.lbl_traceability.setStyleSheet(
+            "font-family: 'Courier New', Courier, monospace; background-color: #fafaf9; "
+            "border: 1px solid #e7e5e4; border-radius: 4px; padding: 10px; font-size: 9.5pt; color: #44403c;"
+        )
+        tl3.addWidget(self.lbl_traceability)
+        self.res_tabs.addTab(self.tab_val_trace, "Validation & Traceability")
+
         self.res_card.setVisible(False)
         bl.addWidget(self.res_card)
 
@@ -320,11 +442,126 @@ class MaterialQuantityPanel(QWidget):
             self.btn_export_excel.setEnabled(False)
             return
         self.proj_banner.setText(f"<b>Project #{pid}:</b> {name or '(unnamed)'}")
+        
+        # Check if structural design exists (Option A, B, C, or D)
+        comp = get_final_pavement_layers(self.db, pid)
         row = self.db.latest_material_quantity(pid)
         self.btn_export.setEnabled(row is not None)
         self.btn_export_excel.setEnabled(row is not None)
-        if row and row.inputs_json:
-            self._prefill(row.inputs_json)
+        
+        if comp:
+            saved_dict = {}
+            if row and row.inputs_json:
+                try:
+                    saved_dict = json.loads(row.inputs_json) if isinstance(row.inputs_json, str) else row.inputs_json
+                except Exception:
+                    pass
+            
+            # Geometry defaults
+            road_length = float(saved_dict.get("road_length_m", 1000.0))
+            carriageway_width = float(saved_dict.get("carriageway_width_m", 7.0))
+            shoulder_width = float(saved_dict.get("shoulder_width_m", 1.5))
+            
+            self.sp_road_length.setValue(road_length)
+            self.sp_carriageway_width.setValue(carriageway_width)
+            self.sp_shoulder_width.setValue(shoulder_width)
+            
+            # Map saved layers
+            saved_layers = {L.get("layer_type"): L for L in saved_dict.get("layers", [])}
+            
+            self.tbl.setRowCount(0)
+            
+            def map_layer_name(cname: str) -> str:
+                cname_upper = cname.upper()
+                if "BC" in cname_upper or "CONCRETE" in cname_upper or "WEARING" in cname_upper:
+                    return "BC"
+                if "DBM" in cname_upper or "BINDER" in cname_upper or "BM" in cname_upper or "BITUMINOUS" in cname_upper:
+                    return "DBM"
+                if "WMM" in cname_upper or "WET MIX" in cname_upper:
+                    return "WMM"
+                if "GSB" in cname_upper or "SUB-BASE" in cname_upper or "SUBBASE" in cname_upper or "GRANULAR" in cname_upper:
+                    return "GSB"
+                if "CTB" in cname_upper:
+                    return "CTB"
+                if "CTS" in cname_upper:
+                    return "CTS"
+                return "DBM"
+            
+            # Add structural layers in order
+            for ly in comp:
+                ly_name = ly.get("name", "")
+                ly_thick = float(ly.get("thickness_mm", 40.0))
+                mapped_type = map_layer_name(ly_name)
+                
+                saved_ly = saved_layers.get(mapped_type, {})
+                self._add_row(mapped_type)
+                r = self.tbl.rowCount() - 1
+                
+                # Thickness is strictly from structural design suggestion
+                self.tbl.cellWidget(r, 3).setValue(ly_thick)
+                
+                L_val = float(saved_ly.get("length_m") if saved_ly.get("length_m") is not None else road_length)
+                self.tbl.cellWidget(r, 1).setValue(L_val)
+                
+                if mapped_type in ("WMM", "GSB", "CTB", "CTS"):
+                    default_W = carriageway_width + 2 * shoulder_width
+                else:
+                    default_W = carriageway_width
+                W_val = float(saved_ly.get("width_m") if saved_ly.get("width_m") is not None else default_W)
+                self.tbl.cellWidget(r, 2).setValue(W_val)
+                
+                self.tbl.cellWidget(r, 4).setValue(float(saved_ly.get("density_t_m3") or 0.0))
+                self.tbl.cellWidget(r, 5).setValue(float(saved_ly.get("binder_pct") or 0.0))
+                self.tbl.cellWidget(r, 6).setValue(float(saved_ly.get("spray_rate_kgm2") or 0.0))
+                self.tbl.cellWidget(r, 7).setValue(float(saved_ly.get("waste_pct") if saved_ly.get("waste_pct") is not None else 2.0))
+                
+            # Add sprayed coats if they exist in saved or default
+            for coat in ("Prime Coat", "Tack Coat"):
+                saved_ly = saved_layers.get(coat)
+                if saved_ly or not saved_layers:
+                    self._add_row(coat)
+                    r = self.tbl.rowCount() - 1
+                    saved_ly = saved_ly or {}
+                    
+                    self.tbl.cellWidget(r, 1).setValue(float(saved_ly.get("length_m") if saved_ly.get("length_m") is not None else road_length))
+                    self.tbl.cellWidget(r, 2).setValue(float(saved_ly.get("width_m") if saved_ly.get("width_m") is not None else carriageway_width))
+                    self.tbl.cellWidget(r, 3).setValue(float(saved_ly.get("thickness_mm") if saved_ly.get("thickness_mm") is not None else 0.0))
+                    self.tbl.cellWidget(r, 4).setValue(float(saved_ly.get("density_t_m3") or 0.0))
+                    self.tbl.cellWidget(r, 5).setValue(float(saved_ly.get("binder_pct") or 0.0))
+                    self.tbl.cellWidget(r, 6).setValue(float(saved_ly.get("spray_rate_kgm2") or 0.0))
+                    self.tbl.cellWidget(r, 7).setValue(float(saved_ly.get("waste_pct") if saved_ly.get("waste_pct") is not None else 2.0))
+        else:
+            if row and row.inputs_json:
+                self._prefill(row.inputs_json)
+            else:
+                self.sp_road_length.setValue(1000.0)
+                self.sp_carriageway_width.setValue(7.0)
+                self.sp_shoulder_width.setValue(1.5)
+                self.tbl.setRowCount(0)
+                self._seed_default_rows()
+
+    def _on_refresh_source(self) -> None:
+        self.refresh_from_source()
+
+    def refresh_from_source(self) -> None:
+        if self._project_id is None:
+            return
+            
+        self.db.log_project_audit(self._project_id, "material_qty", "Refresh", "Refreshed layer thicknesses from structural design.")
+        self.set_project(self._project_id, self.proj_banner.text())
+        self.db.mark_module_synced(self._project_id, "material_qty", ["structural"])
+        self._on_compute()
+        self._on_save()
+        
+        # Refresh parent status badge
+        parent = self.parent()
+        while parent is not None:
+            if hasattr(parent, "refresh_project_status_badge"):
+                parent.refresh_project_status_badge()
+                break
+            parent = parent.parent()
+            
+        QMessageBox.information(self, "Refreshed", "Structural design layers refreshed and BOQ recalculated successfully.")
 
     def _prefill(self, inputs_json: str) -> None:
         try:
@@ -410,6 +647,15 @@ class MaterialQuantityPanel(QWidget):
         self.res_tbl.setRowCount(len(r.layers))
         total_boq_amount = 0.0
         
+        total_compacted = 0.0
+        total_loose = 0.0
+        total_bitumen = 0.0
+        total_cement = 0.0
+        total_filler = 0.0
+        total_aggregate = 0.0
+        
+        traceability_steps = []
+        
         for i, lr in enumerate(r.layers):
             layer_type = lr.inputs.layer_type
             thick = lr.inputs.thickness_mm
@@ -418,28 +664,45 @@ class MaterialQuantityPanel(QWidget):
             density = lr.inputs.density_t_m3 if lr.inputs.density_t_m3 is not None else DEFAULT_DENSITY.get(layer_type, 2.20)
             
             material_key = get_material_key(layer_type)
-            vol = area * (thick / 1000.0) if category != "sprayed_coat" else 0.0
+            vol = lr.compacted_volume_m3
+            loose_vol = lr.loose_volume_m3
+            
+            # Sum totals
+            total_compacted += vol
+            total_loose += loose_vol
+            total_bitumen += lr.binder_tonnage_t
+            total_cement += lr.cement_tonnage_t
+            total_filler += lr.filler_tonnage_t
+            total_aggregate += lr.aggregate_tonnage_t
 
             # Calculate Quantity and Rate
+            rate_source = "Preliminary Estimate"
             if category == "sprayed_coat":
                 qty = lr.binder_tonnage_t
                 unit = "Tonne"
                 r_info = rates.get("Bitumen", DEFAULT_RATES["Bitumen"])
                 rate = r_info.get("rate", 0.0)
+                if "Bitumen" in rates:
+                    rate_source = "Project rate"
                 amount = qty * rate
-                vol_str, dens_str, thick_str = "—", "—", "—"
+                vol_str, loose_vol_str, dens_str, thick_str = "—", "—", "—", "—"
             elif layer_type.upper() in ("CTB", "CTS") or material_key == "STABILIZED":
                 qty = lr.layer_tonnage_t
                 unit = "Tonne"
                 cement_pct = 4.5 if layer_type.upper() == "CTB" else 3.0
+                if lr.inputs.binder_pct is not None and lr.inputs.binder_pct > 0.0:
+                    cement_pct = lr.inputs.binder_pct
                 cement_t = qty * cement_pct / 100.0
                 agg_t = qty - cement_t
                 c_rate = rates.get("Cement", {}).get("rate", DEFAULT_RATES["Cement"]["rate"])
                 agg_rate = rates.get("Aggregate", {}).get("rate", DEFAULT_RATES["Aggregate"]["rate"])
+                if "Cement" in rates and "Aggregate" in rates:
+                    rate_source = "Project rate"
                 amount = (cement_t * c_rate) + (agg_t * agg_rate)
                 rate = amount / qty if qty > 0 else agg_rate
                 unit = "Tonne"
                 vol_str = f"{vol:.1f}"
+                loose_vol_str = f"{loose_vol:.1f}"
                 dens_str = f"{density:.2f}"
                 thick_str = f"{thick:.0f}"
             else:
@@ -447,38 +710,135 @@ class MaterialQuantityPanel(QWidget):
                 r_info = rates.get(material_key, DEFAULT_RATES.get(material_key, {}))
                 unit = r_info.get("unit", "Tonne")
                 rate = r_info.get("rate", 0.0)
+                if material_key in rates:
+                    rate_source = "Project rate"
                 if unit.lower() in ("cum", "m3"):
                     qty = vol
                 amount = qty * rate
                 vol_str = f"{vol:.1f}"
+                loose_vol_str = f"{loose_vol:.1f}"
                 dens_str = f"{density:.2f}"
                 thick_str = f"{thick:.0f}"
 
             total_boq_amount += amount
+            
+            # Traceability step text
+            waste_pct = lr.inputs.waste_pct
+            if category == "sprayed_coat":
+                tr = f"• {layer_type}: Bitumen Tonnage ({qty:.2f} t) = Area ({area:.1f} m²) × Spray Rate ({lr.inputs.spray_rate_kgm2 or DEFAULT_SPRAY_RATE_KGM2.get(layer_type, 0.25):.2f} kg/m² / 1000)"
+            else:
+                tr = f"• {layer_type}: Compacted Vol ({vol:.1f} m³) = L ({lr.inputs.length_m:.1f} m) × W ({lr.inputs.width_m:.1f} m) × Thickness ({thick:.0f} mm / 1000)\n" \
+                     f"  Compacted Tonnage ({lr.layer_tonnage_t:.2f} t) = Vol ({vol:.1f} m³) × Density ({density:.2f} t/m³) × Waste ({1 + waste_pct/100:.2f})\n" \
+                     f"  Loose Vol ({loose_vol:.1f} m³) = Compacted Vol × bulking factor"
+            traceability_steps.append(tr)
 
             cells = [
                 layer_type,
                 thick_str,
                 vol_str,
-                dens_str,
+                loose_vol_str,
                 f"{qty:.2f}",
                 unit,
+                rate_source,
                 f"₹{rate:,.2f}",
                 f"₹{amount:,.2f}"
             ]
             for c, txt in enumerate(cells):
                 it = QTableWidgetItem(txt)
                 if c > 0:
-                    it.setTextAlignment(Qt.AlignCenter if c in (1, 3, 5) else Qt.AlignRight)
+                    it.setTextAlignment(Qt.AlignCenter if c in (1, 2, 3, 5) else Qt.AlignRight)
                 self.res_tbl.setItem(i, c, it)
 
+        # GST and Grand Total calculations
+        gst = total_boq_amount * 0.18
+        grand_total = total_boq_amount + gst
+
         self.lbl_totals.setText(
-            f"Preliminary Engineer Estimate / Consultant BOQ Estimate: {format_indian_currency(total_boq_amount)}\n"
-            f"Σ Layer = {r.total_layer_tonnage_t:.2f} t   ·   "
-            f"Σ Binder = {r.total_binder_tonnage_t:.2f} t   ·   "
-            f"Area = {r.total_area_m2:.0f} m²"
+            f"Preliminary Engineering Estimate:\n"
+            f"  Subtotal Amount  = ₹{total_boq_amount:,.2f}\n"
+            f"  GST (18% tax)    = ₹{gst:,.2f}\n"
+            f"  Grand Total Cost = ₹{grand_total:,.2f}"
         )
-        self.lbl_notes.setText(r.notes)
+        self.lbl_notes.setText(
+            f"Σ Compacted = {total_compacted:.1f} m³   ·   "
+            f"Σ Loose = {total_loose:.1f} m³   ·   "
+            f"Total Area = {r.total_area_m2:.0f} m²\n\n"
+            f"{r.notes}"
+        )
+        
+        # Populate splits on Tab 2
+        splits_html = (
+            f"<b>Aggregate (Stone/Granular):</b> {total_aggregate:,.2f} Tonnes<br>"
+            f"<b>Bitumen (Binder):</b> {total_bitumen:,.2f} Tonnes<br>"
+            f"<b>Cement Binder:</b> {total_cement:,.2f} Tonnes<br>"
+            f"<b>Mineral Filler (Dust):</b> {total_filler:,.2f} Tonnes<br><br>"
+            f"<i>Constituent calculations are derived from compacted dry density, mix design percentages, and waste tolerances.</i>"
+        )
+        self.lbl_splits_summary.setText(splits_html)
+
+        # BOQ Validation Checks
+        errors = []
+        warnings = []
+        
+        # Missing/negative value checks
+        for lr in r.layers:
+            if lr.inputs.length_m <= 0 or lr.inputs.width_m <= 0:
+                errors.append(f"Negative or zero geometry detected for layer '{lr.inputs.layer_type}'.")
+                
+        # Load structural design to verify thickness consistency
+        sd = self.db.latest_structural_design(self._project_id) if self._project_id else None
+        if sd:
+            try:
+                comp = json.loads(sd.composition_json) if isinstance(sd.composition_json, str) else sd.composition_json
+            except Exception:
+                comp = []
+                
+            struct_thicknesses = {}
+            for s_ly in comp:
+                s_name = s_ly.get("name", "").upper()
+                struct_thicknesses[s_name] = float(s_ly.get("thickness_mm", 0.0))
+                
+            # Verify if each layer exists
+            for lr in r.layers:
+                layer_type = lr.inputs.layer_type
+                if layer_type in ("Prime Coat", "Tack Coat"):
+                    continue
+                matched_s_name = None
+                for s_name in struct_thicknesses:
+                    if layer_type.upper() in s_name or s_name in layer_type.upper():
+                        matched_s_name = s_name
+                        break
+                if matched_s_name:
+                    s_thick = struct_thicknesses[matched_s_name]
+                    if abs(lr.inputs.thickness_mm - s_thick) > 0.1:
+                        warnings.append(
+                            f"Thickness mismatch for '{layer_type}': "
+                            f"BOQ = {lr.inputs.thickness_mm:.0f} mm, Structural Design = {s_thick:.0f} mm."
+                        )
+                else:
+                    warnings.append(f"Layer '{layer_type}' in BOQ does not match any layer in the approved structural design.")
+        else:
+            errors.append("No approved structural design found to validate thicknesses.")
+
+        val_status = "PASS" if not errors else "FAIL"
+        color = "#166534" if val_status == "PASS" else "#9b1c1c"
+        bg_color = "#f0fdf4" if val_status == "PASS" else "#fff5f5"
+        border_color = "#bbf7d0" if val_status == "PASS" else "#fed7d7"
+        
+        err_msg = "<br>".join(f"❌ {e}" for e in errors) if errors else "<i>No critical quantity errors found.</i>"
+        warn_msg = "<br>".join(f"⚠️ {w}" for w in warnings) if warnings else "<i>No quantity warnings found.</i>"
+        
+        self.lbl_validation_status.setStyleSheet(
+            f"background-color: {bg_color}; border: 1px solid {border_color}; border-radius: 4px; "
+            f"padding: 10px; color: {color}; font-size: 10pt;"
+        )
+        self.lbl_validation_status.setText(
+            f"<b>Validation Status: {val_status}</b><br><br>"
+            f"<b>Critical Errors:</b><br>{err_msg}<br><br>"
+            f"<b>Warnings / Mismatches:</b><br>{warn_msg}"
+        )
+        
+        self.lbl_traceability.setText("\n\n".join(traceability_steps))
 
     def _on_save(self) -> None:
         if self._project_id is None or self._last_result is None:

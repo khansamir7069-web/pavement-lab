@@ -196,6 +196,9 @@ def write_structural_section(
         add_heading(doc, "7. Designer Notes", level=2)
         add_p(doc, result.notes, size=10)
 
+    # Engineering Explainability & Traceability Log
+    write_explainability_sections(doc, result)
+
     # Engineering Intelligence Checker
     if hasattr(result, "intelligence") and result.intelligence:
         from .intelligence_report import write_intelligence_section
@@ -205,6 +208,103 @@ def write_structural_section(
         "References: IRC:37-2018 'Guidelines for the Design of Flexible "
         "Pavements' (Indian Roads Congress, 4th Revision)."
     )
+
+
+def write_explainability_sections(doc: Document, result: StructuralResult) -> None:
+    """Writes detailed P3 explainable engineering decisions and IRC traceability to report."""
+    add_heading(doc, "8. Engineering Explainability & Decision Support", level=2)
+    
+    import json
+    log_dict = None
+    if hasattr(result, "traceability_log_json") and result.traceability_log_json:
+        try:
+            log_dict = json.loads(result.traceability_log_json)
+        except Exception:
+            pass
+            
+    if not log_dict:
+        add_p(doc, "Traceability log not available for this legacy record.", italic=True)
+        return
+        
+    # 1. Decision Chain
+    add_heading(doc, "8.1 Engineering Decision Chain", level=3)
+    chain_parts = [
+        log_dict.get("traffic_category", "—"),
+        log_dict.get("cbr_category", "—"),
+        log_dict.get("final_selection", {}).get("reference_plate", "—"),
+        log_dict.get("mechanistic_verification", "—"),
+        log_dict.get("client_summary", {}).get("estimated_cost", "—")
+    ]
+    add_p(doc, " → ".join(chain_parts), bold=True)
+    
+    add_p(doc, "ASCII Design Decision Tree Flow:", italic=True)
+    add_p(doc, log_dict.get("decision_tree_ascii", "—"), size=9)
+    
+    # 2. IRC Reference Card
+    add_heading(doc, "8.2 IRC Reference Citation Card", level=3)
+    irc = log_dict.get("irc_ref_card", {})
+    add_table(doc, ["Reference Parameter", "IRC Value / Citation"], [
+        ["IRC Standard Citation", irc.get("standard", "—")],
+        ["Edition / Version", irc.get("edition", "—")],
+        ["Governing Catalogue Table", irc.get("table_number", "—")],
+        ["Governing Catalogue Figure", irc.get("figure_number", "—")],
+        ["Selected Design Plate", irc.get("plate_number", "—")],
+        ["CBR Range Specification", irc.get("cbr_range", "—")],
+        ["Design Traffic Limit", irc.get("traffic_range", "—")],
+        ["Standard Clauses", irc.get("governing_clause", "—")]
+    ])
+    
+    # 3. Candidate Option Comparison
+    add_heading(doc, "8.3 Candidate Design Comparison", level=3)
+    candidates_list = log_dict.get("candidates", [])
+    cand_rows = []
+    for cand in candidates_list:
+        cand_rows.append([
+            cand.get("name", "—"),
+            f"{cand.get('total_thickness_mm', 0):.0f} mm",
+            f"Rs. {cand.get('estimated_cost', 0):,.2f}",
+            f"{cand.get('expected_life_years', 0):g} years",
+            cand.get("construction_complexity", "—"),
+            cand.get("maintainability", "—"),
+            cand.get("mechanistic_status", "—")
+        ])
+    add_table(doc, ["Plate Option", "Total Thickness", "Estimated Cost", "Life (Years)", "Complexity", "Maintainability", "Safety Status"], cand_rows)
+    
+    rejections = log_dict.get("rejected_options", [])
+    if rejections:
+        add_p(doc, "Why Not Rejection Reasonings for Alternative Plates:", bold=True)
+        for rej in rejections:
+            add_p(doc, f"• {rej['name']}: {rej['reason']}", size=9.5)
+            
+    # 4. Consultancy Remarks & Client Summary
+    add_heading(doc, "8.4 Consultancy Engineering Remarks", level=3)
+    add_p(doc, log_dict.get("engineering_remarks", "—"), italic=True)
+    
+    add_heading(doc, "8.5 Client Non-Technical Summary", level=3)
+    cli = log_dict.get("client_summary", {})
+    add_table(doc, ["Key Metric", "Client Summary Value"], [
+        ["Recommended Pavement", cli.get("recommended_pavement", "—")],
+        ["Expected Design Life", cli.get("expected_design_life", "—")],
+        ["Mechanistic Verification", cli.get("mechanistic_verified", "—")],
+        ["IRC Compliance", cli.get("irc_compliant", "—")],
+        ["Construction Readiness", cli.get("construction_ready", "—")],
+        ["Estimated Cost (per km lane)", cli.get("estimated_cost", "—")],
+        ["Maintenance Expectation", cli.get("maintenance_expectation", "—")]
+    ])
+    
+    # Layer Justifications
+    add_heading(doc, "8.6 Layer-by-Layer Engineering Justification", level=3)
+    justs = log_dict.get("layer_justifications", [])
+    for j in justs:
+        add_p(doc, f"• {j['name']} ({j['thickness']}): {j['reason']}")
+        
+    # Confidence Score
+    add_heading(doc, "8.7 Overall Engineering Confidence Score", level=3)
+    conf_score = log_dict.get("confidence_score", 100.0)
+    add_p(doc, f"Overall Engineering Confidence: {conf_score}%", bold=True)
+    breakdown = log_dict.get("confidence_breakdown", {})
+    for k, v in breakdown.items():
+        add_p(doc, f"  - {k}: {v:.0f}%")
 
 
 # ---------------------------------------------------------------------------
