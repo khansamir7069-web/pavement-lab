@@ -1,4 +1,4 @@
-# SAMPAVE
+# ROADX
 
 A commercial-grade desktop application for **flexible-pavement engineering** —
 Marshall Mix Design (DBM, BC, SDAC, BM), structural design (IRC:37-2018),
@@ -10,7 +10,7 @@ matches the source workbook to 1 × 10⁻⁹.
 
 ![Status: Excel parity 16/16](https://img.shields.io/badge/Excel%20parity-16%2F16%20passing-2c8a3e)
 ![Tests: 36/36](https://img.shields.io/badge/regression-36%2F36%20passing-2c8a3e)
-![Build](https://img.shields.io/badge/Windows%20build-SamPave.exe-1f3a68)
+![Build](https://img.shields.io/badge/Windows%20build-RoadX.exe-1f3a68)
 
 ---
 
@@ -21,20 +21,20 @@ Nothing else needs installing.
 
 ### Option A — Double-click on this machine
 
-1. Open `dist\SamPave\` and double-click **`SamPave.exe`**,
+1. Open `dist\RoadX\` and double-click **`RoadX.exe`**,
 2. Or double-click **`Launch.bat`** in the project root,
-3. Or open the **SAMPAVE** shortcut that was placed on your Desktop.
+3. Or open the **ROADX** shortcut that was placed on your Desktop.
 
 ### Option B — Hand the build to another Windows PC
 
 The V1 redistributable archive is generated at the repo root as:
 
 ```
-SAMPAVE_V1_Windows.zip
+RoadX_Professional_v2.2_Setup.exe
 ```
 
-Copy that zip to the target PC, unzip it anywhere, open the `SamPave\` folder,
-and double-click **`SamPave.exe`**. The bundle embeds Python and every
+Copy that zip to the target PC, unzip it anywhere, open the `RoadX\` folder,
+and double-click **`RoadX.exe`**. The bundle embeds Python and every
 library; the target machine does **not** need Python installed.
 
 ---
@@ -99,8 +99,8 @@ pavement_lab/
 │   ├── build_exe.ps1            ← Windows build script
 │   └── installer.iss            ← Inno Setup installer script
 └── dist/
-    └── SamPave/
-        ├── SamPave.exe          ← THE STANDALONE APP
+    └── RoadX/
+        ├── RoadX.exe          ← THE STANDALONE APP
         └── _internal/           ← embedded Python + libraries
 ```
 
@@ -132,13 +132,13 @@ Sample run (current workbook):
 
 ## Building a real installer (.msi-style single-file installer)
 
-The `dist\SamPave\` folder works as-is. If you want a single setup wizard
-(`SAMPAVE-Setup.exe`):
+The `dist\RoadX\` folder works as-is. If you want a single setup wizard
+(`ROADX-Setup.exe`):
 
-1. Run `Setup.bat` or `Build.bat` to produce `dist\SamPave\`.
+1. Run `Setup.bat` or `Build.bat` to produce `dist\RoadX\`.
 2. Install **Inno Setup** from https://jrsoftware.org/isinfo.php (free).
 3. Open `build\installer.iss` in Inno Setup and click **Compile**.
-4. `SAMPAVE-Setup.exe` appears in `build\` — distribute that single file.
+4. `ROADX-Setup.exe` appears in `build\` — distribute that single file.
 
 ---
 
@@ -164,7 +164,7 @@ The code is organised so each piece is replaceable without rewiring the rest.
 - **New calculation panel** — add a `QTableWidget`-based tab to
   `app/ui/widgets/inputs_panel.py`, add a `collect()` method that returns an
   engine dataclass, and reference it from `MainWindow._on_compute`.
-- **After any change**, run `Build.bat` to rebuild `SamPave.exe`.
+- **After any change**, run `Build.bat` to rebuild `RoadX.exe`.
 
 ---
 

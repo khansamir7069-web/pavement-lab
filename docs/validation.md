@@ -1,4 +1,4 @@
-# PavementLab Validation Framework (Phase 16)
+# RoadX Validation Framework (Phase 16)
 
 This document describes the canonical sample-project corpus, the
 validation harness that exercises it, and the discipline that keeps

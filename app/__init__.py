@@ -1,9 +1,8 @@
-"""SAMPAVE — Transportation Engineering Laboratory Automation Platform.
+"""RoadX Professional Suite — Transportation Engineering Laboratory Automation Platform.
 
 The Python import namespace stays ``app.*`` for compatibility with all
 existing modules / smokes / sample projects; only the product-facing
-branding metadata below carries the SAMPAVE name (Phase 17 / V1
-release).
+branding metadata below carries the RoadX Professional Suite name.
 """
 
 __version__ = "2.2"
