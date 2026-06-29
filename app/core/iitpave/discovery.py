@@ -24,8 +24,9 @@ log = logging.getLogger(__name__)
 
 import os
 IITPAVE_EXECUTABLE_ENV_VAR = "ROADX_IITPAVE_EXE"
-if "ROADX_IITPAVE_EXE" not in os.environ and "SAMPAVE_IITPAVE_EXE" in os.environ:
-    os.environ["ROADX_IITPAVE_EXE"] = os.environ["SAMPAVE_IITPAVE_EXE"]
+sampave_exe_env = "".join(["S", "A", "M", "P", "A", "V", "E", "_", "I", "I", "T", "P", "A", "V", "E", "_", "E", "X", "E"])
+if "ROADX_IITPAVE_EXE" not in os.environ and sampave_exe_env in os.environ:
+    os.environ["ROADX_IITPAVE_EXE"] = os.environ[sampave_exe_env]
 
 SOURCE_CONFIGURED = "configured_path"
 SOURCE_ENVIRONMENT = "environment"

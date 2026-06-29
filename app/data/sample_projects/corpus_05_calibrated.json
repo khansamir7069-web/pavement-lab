@@ -4,7 +4,7 @@
   "engineering_intent": "Demonstrates that swapping placeholder calibration constants visibly changes downstream engineering decisions; corpus_02 with default calibration produces micro-surfacing + crack sealing, while this corpus with a tighter pci_fair_min (65) reroutes the survey into the overlay band, and a 10x stiffer fatigue k1 flips the fatigue verdict from PASS to FAIL.",
   "condition": {
     "work_name": "Calibration override (sample 05)",
-    "surveyed_by": "PavementLab QA",
+    "surveyed_by": "RoadX QA",
     "survey_date": "2026-04-20",
     "lane_id": "Lane 1",
     "chainage_from_km": 0.0,

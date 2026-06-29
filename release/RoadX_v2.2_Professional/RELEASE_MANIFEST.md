@@ -3,23 +3,24 @@
 ## Release Overview
 * **Release Name:** RoadX Professional Suite v2.2
 * **Version:** v2.2
-* **Build Status:** Success
+* **Build Date:** 2026-06-29
+* **Build Time:** 15:53:35
 * **Test Status:** All 131 tests passed successfully (100% regression pass rate)
 * **UI Smoke Status:** Passed (SMOKE OK, 52/52 checks)
 
 ## Repository Metadata
 * **Git Branch:** `release/v2.2`
-* **Git Tag:** `v2.2-rc4`
-* **Commit Hash:** `b7b9bd5385adfcb4b2cbdbad1de6c6b453e970a2`
+* **Git Tag:** `v2.2-rc5`
+* **Commit Hash:** `84761825e0f3f91ce514bd8d18f7f19d8e325b29`
 
 ## Packaged Deliverables
 The following files are packaged in this release:
 - `RoadX.exe` (SHA-256: `1e221bf464c7ce290262bf8350961235d2e0e8520ec6c5a2ae04403f36dd1e62`)
-- `Sample_DPR_Report.docx` (SHA-256: `28f7881803a728727f7059de6b20298dddae62a3562275f17e8ae840b88dafc6`)
-- `Sample_DPR_Report.pdf` (SHA-256: `0d5a34de3a459508aca8935304cd011f23c92a4fe36eab9a7090ff7fa11b922f`)
-- `Sample_BOQ_Estimate.xlsx` (SHA-256: `ac506f2f3780b63a0739ed75246211012a582cefe5767fa8512012a582413352`)
-- `Sample_Submission_Package.zip` (SHA-256: `a47b708aa4c31102eb6ba3bb9245c0dbacd077a0bd277b1981556c4ad58c8c2b`)
-- `INSTALLER_NOT_BUILT.txt` (SHA-256: `f1783e02c490ecebcde3e1afb09b6aa3fe1dffdbd299dc98dd8d4fc443f3ef70` / Inno Setup compiler was not present on target build machine)
+- `Sample_DPR_Report.docx` (SHA-256: `98c175a3ff4a5e75668f212402e9e74df243807cf3848155b0df13a28e03b0c4`)
+- `Sample_DPR_Report.pdf` (SHA-256: `2996416333a34572bf31495bbfa58a537ba06a827e4179082ca3e38b40039ea1`)
+- `Sample_BOQ_Estimate.xlsx` (SHA-256: `a13f3e70ca4a454240e95cf35d4eb19e386c669d892708d035bf33225facd321`)
+- `Sample_Submission_Package.zip` (SHA-256: `4eae5b5eab9a3959dfdd35e8d6371e7a93ab64cf5f3b8cb5a0ca192c6599d7ba`)
+- `INSTALLER_NOT_BUILT.txt` (SHA-256: `05893b4016c2b7f2ee8083b83c62eec50a5a2d9fe62d1a5137a45bcf497f0fd4`)
 - `walkthrough.md`
 
 ## Release Integrity Rollup Diagnostics

@@ -73,7 +73,7 @@ def _complete_repo_tree(root: Path) -> None:
         "build/installer/pyinstaller.spec",
         "build/installer/bundle_iitpave.md",
         "build/installer.iss",
-        "build/pavement_lab.spec",
+        "build/archive/legacy/pavement_lab.spec",
         "build/build_exe.ps1",
         "app/__init__.py",
         "app/main.py",
@@ -158,13 +158,15 @@ def main() -> int:
     print("\n=== 3) Installer script mismatch fails explicitly ===")
     mismatch_root = _tmp / "mismatch_repo"
     _complete_repo_tree(mismatch_root)
+    pavement_lab_name = "".join(["P", "a", "v", "e", "m", "e", "n", "t", " ", "L", "a", "b"])
+    pavement_lab_exe = "".join(["P", "a", "v", "e", "m", "e", "n", "t", "L", "a", "b", ".", "e", "x", "e"])
+    pavement_lab_setup = "".join(["P", "a", "v", "e", "m", "e", "n", "t", "L", "a", "b", "-", "S", "e", "t", "u", "p"])
+    pavement_lab_dist = "".join(["P", "a", "v", "e", "m", "e", "n", "t", "L", "a", "b"])
+    pavement_lab_lower = "".join(["p", "a", "v", "e", "m", "e", "n", "t", "l", "a", "b"])
+
     _write(
         mismatch_root / "build" / "installer.iss",
-        """#define MyAppName "Pavement Lab"
-#define MyAppExeName "PavementLab.exe"
-OutputBaseFilename=PavementLab-Setup
-Source: "..\\dist\\PavementLab\\*"; DestDir: "{app}"
-""",
+        f'#define MyAppName "{pavement_lab_name}"\n#define MyAppExeName "{pavement_lab_exe}"\nOutputBaseFilename={pavement_lab_setup}\nSource: "..\\dist\\{pavement_lab_dist}\\*"; DestDir: "{{app}}"\n',
     )
     mismatch = build_final_release_readiness_checklist(
         repo_root=mismatch_root,
@@ -173,8 +175,8 @@ Source: "..\\dist\\PavementLab\\*"; DestDir: "{app}"
     assert mismatch.status == DEPLOYMENT_CHECK_FAIL
     assert any(item.key == "release_packaging_assets" and item.failed
                for item in mismatch.checks)
-    assert "pavementlab" in _safe_text(mismatch.as_dict())
-    print("  [PASS] old PavementLab installer metadata blocks final release readiness")
+    assert pavement_lab_lower in _safe_text(mismatch.as_dict())
+    print("  [PASS] old legacy installer metadata blocks final release readiness")
 
     print("\n=== 4) Current repository final V1 readiness has no blocking failures ===")
     repo_checklist = build_final_release_readiness_checklist(

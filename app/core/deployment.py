@@ -635,7 +635,7 @@ def _installer_asset_specs() -> tuple[tuple[str, str, str, str, bool], ...]:
             "directory",
             True,
         ),
-        ("legacy_pyinstaller_spec", "Legacy PyInstaller spec", "build/pavement_lab.spec", "file", False),
+        ("legacy_pyinstaller_spec", "Legacy PyInstaller spec", "build/archive/legacy/pavement_lab.spec", "file", False),
         ("inno_setup_script", "Local installer script", "build/installer.iss", "file", False),
         ("build_powershell", "PowerShell build script", "build/build_exe.ps1", "file", False),
     )

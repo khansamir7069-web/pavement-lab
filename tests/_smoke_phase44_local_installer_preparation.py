@@ -43,7 +43,7 @@ _FILES = (
     "Build.bat",
     "build/installer/pyinstaller.spec",
     "build/installer/bundle_iitpave.md",
-    "build/pavement_lab.spec",
+    "build/archive/legacy/pavement_lab.spec",
     "build/installer.iss",
     "build/build_exe.ps1",
 )

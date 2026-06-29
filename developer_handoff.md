@@ -119,7 +119,7 @@ SQLite cannot drop `NOT NULL`. `projects.mix_type` (legacy NOT NULL) is saved as
 ## 5. Dynamic Specification System (Phase 2)
 
 - **Source of truth:** `app/data/mix_specs.json` (bundled).
-- **User override:** `%LOCALAPPDATA%\PavementLab\mix_specs.json` (takes precedence if present).
+- **User override:** `%LOCALAPPDATA%\RoadX\mix_specs.json` (takes precedence if present).
 - **Two globals populated at import:**
   - `MIX_SPECS: dict[str, MixSpec]` — only types with a `marshall` block (10 of 25)
   - `MIX_TYPES: dict[str, MixTypeRecord]` — all 25 types with richer metadata

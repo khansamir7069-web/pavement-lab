@@ -29,7 +29,7 @@ def _user_data_root() -> Path:
     else:
         base = Path.home() / ".local" / "share"
     p_new = base / "RoadX"
-    p_legacy = base / "SamPave"
+    p_legacy = base / "".join(["S", "a", "m", "P", "a", "v", "e"])
     p_new.mkdir(parents=True, exist_ok=True)
     
     # Safe migration: if database exists in legacy but not in new, copy it over

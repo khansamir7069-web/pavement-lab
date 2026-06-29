@@ -4,7 +4,7 @@
   "engineering_intent": "End-of-life pavement; high-severity cracking + medium pothole density + high-severity rutting; mechanistic checks fail by a wide margin.",
   "condition": {
     "work_name": "End-of-life corridor (sample 04)",
-    "surveyed_by": "PavementLab QA",
+    "surveyed_by": "RoadX QA",
     "survey_date": "2026-04-18",
     "lane_id": "Both",
     "chainage_from_km": 5.0,

@@ -4,7 +4,7 @@
   "engineering_intent": "5-year-old urban arterial; medium rutting + low cracking + low ravelling; moderate traffic.",
   "condition": {
     "work_name": "Urban arterial (sample 02)",
-    "surveyed_by": "PavementLab QA",
+    "surveyed_by": "RoadX QA",
     "survey_date": "2026-04-12",
     "lane_id": "Lane 1",
     "chainage_from_km": 0.0,

@@ -4,7 +4,7 @@
   "engineering_intent": "Heavily-trafficked corridor near the end of life; medium rutting + low cracking + medium ravelling; mechanistic checks fail.",
   "condition": {
     "work_name": "Heavy-corridor overlay candidate (sample 03)",
-    "surveyed_by": "PavementLab QA",
+    "surveyed_by": "RoadX QA",
     "survey_date": "2026-04-15",
     "lane_id": "Lane 2",
     "chainage_from_km": 0.0,

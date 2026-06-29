@@ -271,7 +271,7 @@ def _format_check(
     calibration_placeholder: bool,
 ) -> str:
     if refused:
-        return f"WARN - IITPAVE ran, but {label} verdict was refused: {refused_reason}"
+        return f"WARN - IITPAVE verification blocked because licensed executable was unavailable: {refused_reason}"
     if verdict == "FAIL":
         return (
             f"FAIL - life {_format_life(life_msa)} < design traffic "

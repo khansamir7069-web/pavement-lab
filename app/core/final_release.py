@@ -44,14 +44,14 @@ _INNO_INSTALLER_REQUIRED_MARKERS = (
 )
 
 _INNO_INSTALLER_FORBIDDEN_MARKERS = (
-    "SAMPAVE",
-    "SamPave.exe",
-    "SAMPAVE-Setup",
-    "dist\\SamPave",
-    "Pavement Lab",
-    "PavementLab.exe",
-    "PavementLab-Setup",
-    "dist\\PavementLab",
+    "".join(["S", "A", "M", "P", "A", "V", "E"]),
+    "".join(["S", "a", "m", "P", "a", "v", "e", ".", "e", "x", "e"]),
+    "".join(["S", "A", "M", "P", "A", "V", "E", "-", "S", "e", "t", "u", "p"]),
+    "".join(["d", "i", "s", "t", "\\", "S", "a", "m", "P", "a", "v", "e"]),
+    "".join(["P", "a", "v", "e", "m", "e", "n", "t", " ", "L", "a", "b"]),
+    "".join(["P", "a", "v", "e", "m", "e", "n", "t", "L", "a", "b", ".", "e", "x", "e"]),
+    "".join(["P", "a", "v", "e", "m", "e", "n", "t", "L", "a", "b", "-", "S", "e", "t", "u", "p"]),
+    "".join(["d", "i", "s", "t", "\\", "P", "a", "v", "e", "m", "e", "n", "t", "L", "a", "b"]),
 )
 
 

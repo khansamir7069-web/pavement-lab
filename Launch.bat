@@ -1,6 +1,6 @@
 @echo off
 REM ============================================================
-REM  SamPave Engineering Suite — one-click launcher
+REM  RoadX Professional Suite — one-click launcher
 REM  - If the standalone .exe exists, run it directly (no Python needed).
 REM  - Otherwise fall back to "python run.py" using whichever Python is
 REM    available (in this order: project venv  →  py launcher  →  python).
@@ -9,10 +9,10 @@ REM ============================================================
 setlocal ENABLEDELAYEDEXPANSION
 
 set "ROOT=%~dp0"
-set "EXE=%ROOT%dist\SamPave\SamPave.exe"
+set "EXE=%ROOT%dist\RoadX\RoadX.exe"
 
 if exist "%EXE%" (
-    echo Launching SamPave Engineering Suite...
+    echo Launching RoadX Professional Suite...
     start "" "%EXE%"
     exit /b 0
 )
@@ -56,7 +56,7 @@ set "RC=%ERRORLEVEL%"
 popd
 if !RC! NEQ 0 (
     echo.
-    echo SamPave exited with code !RC!.
+    echo RoadX exited with code !RC!.
     pause
 )
 exit /b !RC!

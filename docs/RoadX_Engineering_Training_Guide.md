@@ -1,4 +1,4 @@
-# RoadX Engineering Training Guide — V2.0 Professional Baseline
+# RoadX Engineering Training Guide — RoadX Professional Suite v2.2
 
 ## CRITICAL SAFETY DISCLAIMER
 > [!IMPORTANT]

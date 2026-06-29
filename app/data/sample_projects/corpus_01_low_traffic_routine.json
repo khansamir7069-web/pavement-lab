@@ -4,7 +4,7 @@
   "engineering_intent": "Newly built rural road; nothing observed; mechanistic checks pass with margin.",
   "condition": {
     "work_name": "Rural NH connector (sample 01)",
-    "surveyed_by": "PavementLab QA",
+    "surveyed_by": "RoadX QA",
     "survey_date": "2026-04-10",
     "lane_id": "LHS",
     "chainage_from_km": 0.0,

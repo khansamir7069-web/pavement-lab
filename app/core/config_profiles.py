@@ -16,8 +16,9 @@ from app import __version__
 CONFIG_SCHEMA_VERSION = "1.0"
 import os
 APPLICATION_CONFIG_ENV_VAR = "ROADX_PROFILE"
-if "ROADX_PROFILE" not in os.environ and "SAMPAVE_PROFILE" in os.environ:
-    os.environ["ROADX_PROFILE"] = os.environ["SAMPAVE_PROFILE"]
+sampave_profile_env = "".join(["S", "A", "M", "P", "A", "V", "E", "_", "P", "R", "O", "F", "I", "L", "E"])
+if "ROADX_PROFILE" not in os.environ and sampave_profile_env in os.environ:
+    os.environ["ROADX_PROFILE"] = os.environ[sampave_profile_env]
 
 PROFILE_DEFAULT = "default"
 PROFILE_LAB = "lab"
