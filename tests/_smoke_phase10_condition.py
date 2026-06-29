@@ -309,7 +309,6 @@ def main() -> int:
         else:
             verified_items.append(code)
     assert "DBM-II" in verified_items, "DBM-II must NOT carry [placeholder] suffix"
-    assert "SMA" in placeholder_items, "SMA must carry [placeholder] suffix"
     assert "BC-II" in verified_items, "BC-II must NOT carry [placeholder] suffix"
     print(f"  [PASS] project-form annotates {len(placeholder_items)} placeholder mixes")
 

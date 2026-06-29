@@ -1,0 +1,1004 @@
+{
+  "_meta": {
+    "description": "Pavement Lab — master mix-type specification database. Editable.",
+    "schema_version": 1,
+    "note": "Only specs with status='verified' have official IRC/MoRTH limits cross-checked. Placeholder entries use common MoRTH ranges as a starting point and MUST be reviewed by the engineer before use in design."
+  },
+  "mix_types": [
+    {
+      "mix_code": "DBM-I",
+      "full_name": "Dense Bituminous Macadam Grade I",
+      "category": "hot_mix",
+      "layer_type": "binder_course",
+      "applicable_code": "MoRTH Table 500-9 (IRC:111)",
+      "nmas_mm": 26.5,
+      "sieve_sizes_mm": [
+        45.0,
+        37.5,
+        26.5,
+        19.0,
+        13.2,
+        4.75,
+        2.36,
+        0.3,
+        0.075
+      ],
+      "gradation_lower": [
+        100,
+        95,
+        63,
+        null,
+        55,
+        38,
+        28,
+        7,
+        2
+      ],
+      "gradation_upper": [
+        100,
+        100,
+        93,
+        null,
+        75,
+        54,
+        42,
+        21,
+        8
+      ],
+      "binder_grades": [
+        "VG-30",
+        "VG-40",
+        "CRMB",
+        "PMB"
+      ],
+      "trial_pb_min": 3.5,
+      "trial_pb_max": 5.5,
+      "marshall": {
+        "stability_min_kn": 9.0,
+        "flow_min_mm": 2.0,
+        "flow_max_mm": 4.0,
+        "air_voids_min_pct": 3.0,
+        "air_voids_max_pct": 5.0,
+        "vma_min_pct": 14.0,
+        "vfb_min_pct": 65.0,
+        "vfb_max_pct": 78.0,
+        "marshall_quotient_min": 2.0,
+        "marshall_quotient_max": 5.0,
+        "compaction_blows_each_face": 75
+      },
+      "report_template": "marshall",
+      "status": "verified",
+      "notes": "MoRTH 500-9: DBM Grade I, NMAS 26.5 mm",
+      "references": [
+        {
+          "code_id": "MoRTH-500",
+          "clause": "Table 500-9"
+        },
+        {
+          "code_id": "IRC:111"
+        },
+        {
+          "code_id": "IRC:SP:16"
+        }
+      ]
+    },
+    {
+      "mix_code": "DBM-II",
+      "full_name": "Dense Bituminous Macadam Grade II",
+      "category": "hot_mix",
+      "layer_type": "binder_course",
+      "applicable_code": "MoRTH Table 500-10 (IRC:111)",
+      "nmas_mm": 19,
+      "sieve_sizes_mm": [
+        37.5,
+        26.5,
+        19,
+        13.2,
+        4.75,
+        2.36,
+        0.3,
+        0.075
+      ],
+      "gradation_lower": [
+        100,
+        90,
+        71,
+        56,
+        38,
+        28,
+        7,
+        2
+      ],
+      "gradation_upper": [
+        100,
+        100,
+        95,
+        80,
+        54,
+        42,
+        21,
+        8
+      ],
+      "binder_grades": [
+        "VG-30",
+        "VG-40",
+        "CRMB",
+        "PMB"
+      ],
+      "trial_pb_min": 3.5,
+      "trial_pb_max": 5.5,
+      "marshall": {
+        "stability_min_kn": 9.0,
+        "flow_min_mm": 2.0,
+        "flow_max_mm": 4.0,
+        "air_voids_min_pct": 3.0,
+        "air_voids_max_pct": 5.0,
+        "vma_min_pct": 13.25,
+        "vfb_min_pct": 65.0,
+        "vfb_max_pct": 75.0,
+        "marshall_quotient_min": 2.0,
+        "marshall_quotient_max": 5.0,
+        "compaction_blows_each_face": 75
+      },
+      "report_template": "marshall",
+      "status": "verified",
+      "notes": "MoRTH 500-10: DBM Grade II, NMAS 19 mm — verified against the Excel workbook",
+      "references": [
+        {
+          "code_id": "MoRTH-500",
+          "clause": "Table 500-10"
+        },
+        {
+          "code_id": "IRC:111"
+        },
+        {
+          "code_id": "IRC:SP:16"
+        }
+      ]
+    },
+    {
+      "mix_code": "BC-I",
+      "full_name": "Bituminous Concrete Grade I",
+      "category": "hot_mix",
+      "layer_type": "wearing_course",
+      "applicable_code": "MoRTH Table 500-17 (IRC:111)",
+      "nmas_mm": 19,
+      "sieve_sizes_mm": [
+        26.5,
+        19,
+        13.2,
+        9.5,
+        4.75,
+        2.36,
+        0.3,
+        0.075
+      ],
+      "gradation_lower": [
+        100,
+        79,
+        59,
+        52,
+        35,
+        28,
+        8,
+        2
+      ],
+      "gradation_upper": [
+        100,
+        100,
+        79,
+        72,
+        55,
+        44,
+        21,
+        10
+      ],
+      "binder_grades": [
+        "VG-30",
+        "VG-40",
+        "CRMB",
+        "PMB"
+      ],
+      "trial_pb_min": 4.5,
+      "trial_pb_max": 6.0,
+      "marshall": {
+        "stability_min_kn": 9.0,
+        "flow_min_mm": 2.0,
+        "flow_max_mm": 4.0,
+        "air_voids_min_pct": 3.0,
+        "air_voids_max_pct": 5.0,
+        "vma_min_pct": 14.0,
+        "vfb_min_pct": 65.0,
+        "vfb_max_pct": 78.0,
+        "marshall_quotient_min": 2.0,
+        "marshall_quotient_max": 5.0,
+        "compaction_blows_each_face": 75
+      },
+      "report_template": "marshall",
+      "status": "verified",
+      "notes": "MoRTH 500-17: BC Grade I, NMAS 19 mm",
+      "references": [
+        {
+          "code_id": "MoRTH-500",
+          "clause": "Table 500-17"
+        },
+        {
+          "code_id": "IRC:111"
+        },
+        {
+          "code_id": "IRC:SP:16"
+        }
+      ]
+    },
+    {
+      "mix_code": "BC-II",
+      "full_name": "Bituminous Concrete Grade II",
+      "category": "hot_mix",
+      "layer_type": "wearing_course",
+      "applicable_code": "MoRTH Table 500-17 (IRC:111)",
+      "nmas_mm": 13.2,
+      "sieve_sizes_mm": [
+        19,
+        13.2,
+        9.5,
+        4.75,
+        2.36,
+        0.3,
+        0.075
+      ],
+      "gradation_lower": [
+        100,
+        79,
+        70,
+        53,
+        42,
+        11,
+        4
+      ],
+      "gradation_upper": [
+        100,
+        100,
+        88,
+        71,
+        58,
+        21,
+        10
+      ],
+      "binder_grades": [
+        "VG-30",
+        "VG-40",
+        "CRMB",
+        "PMB"
+      ],
+      "trial_pb_min": 5.0,
+      "trial_pb_max": 6.5,
+      "marshall": {
+        "stability_min_kn": 9.0,
+        "flow_min_mm": 2.0,
+        "flow_max_mm": 4.0,
+        "air_voids_min_pct": 3.0,
+        "air_voids_max_pct": 5.0,
+        "vma_min_pct": 14.0,
+        "vfb_min_pct": 65.0,
+        "vfb_max_pct": 78.0,
+        "marshall_quotient_min": 2.0,
+        "marshall_quotient_max": 5.0,
+        "compaction_blows_each_face": 75
+      },
+      "report_template": "marshall",
+      "status": "verified",
+      "notes": "MoRTH 500-17: BC Grade II, NMAS 13.2 mm",
+      "references": [
+        {
+          "code_id": "MoRTH-500",
+          "clause": "Table 500-18"
+        },
+        {
+          "code_id": "IRC:111"
+        },
+        {
+          "code_id": "IRC:SP:16"
+        }
+      ]
+    },
+    {
+      "mix_code": "SDBC-I",
+      "full_name": "Semi-Dense Bituminous Concrete Grade I",
+      "category": "hot_mix",
+      "layer_type": "wearing_course",
+      "applicable_code": "MoRTH Table (placeholder)",
+      "nmas_mm": 13.2,
+      "sieve_sizes_mm": [
+        19,
+        13.2,
+        9.5,
+        4.75,
+        2.36,
+        0.3,
+        0.075
+      ],
+      "gradation_lower": [
+        100,
+        80,
+        68,
+        52,
+        40,
+        10,
+        3
+      ],
+      "gradation_upper": [
+        100,
+        100,
+        88,
+        70,
+        60,
+        22,
+        8
+      ],
+      "binder_grades": [
+        "VG-30",
+        "VG-40",
+        "CRMB"
+      ],
+      "trial_pb_min": 4.5,
+      "trial_pb_max": 6.0,
+      "marshall": {
+        "stability_min_kn": 8.2,
+        "flow_min_mm": 2.0,
+        "flow_max_mm": 4.0,
+        "air_voids_min_pct": 3.0,
+        "air_voids_max_pct": 5.0,
+        "vma_min_pct": 12.0,
+        "vfb_min_pct": 65.0,
+        "vfb_max_pct": 78.0,
+        "marshall_quotient_min": 2.0,
+        "marshall_quotient_max": 6.0,
+        "compaction_blows_each_face": 75
+      },
+      "report_template": "marshall",
+      "status": "placeholder_editable",
+      "notes": "Placeholder limits — verify against the latest MoRTH/IRC table before design use.",
+      "references": [
+        {
+          "code_id": "MoRTH-500",
+          "clause": "Table 500-19"
+        }
+      ]
+    },
+    {
+      "mix_code": "SDBC-II",
+      "full_name": "Semi-Dense Bituminous Concrete Grade II",
+      "category": "hot_mix",
+      "layer_type": "wearing_course",
+      "applicable_code": "MoRTH Table (placeholder)",
+      "nmas_mm": 9.5,
+      "sieve_sizes_mm": [
+        13.2,
+        9.5,
+        4.75,
+        2.36,
+        0.3,
+        0.075
+      ],
+      "gradation_lower": [
+        100,
+        90,
+        62,
+        42,
+        12,
+        4
+      ],
+      "gradation_upper": [
+        100,
+        100,
+        80,
+        60,
+        25,
+        10
+      ],
+      "binder_grades": [
+        "VG-30",
+        "VG-40",
+        "CRMB"
+      ],
+      "trial_pb_min": 5.0,
+      "trial_pb_max": 6.5,
+      "marshall": {
+        "stability_min_kn": 8.2,
+        "flow_min_mm": 2.0,
+        "flow_max_mm": 4.0,
+        "air_voids_min_pct": 3.0,
+        "air_voids_max_pct": 5.0,
+        "vma_min_pct": 12.0,
+        "vfb_min_pct": 65.0,
+        "vfb_max_pct": 78.0,
+        "marshall_quotient_min": 2.0,
+        "marshall_quotient_max": 6.0,
+        "compaction_blows_each_face": 75
+      },
+      "report_template": "marshall",
+      "status": "placeholder_editable",
+      "notes": "Placeholder limits — verify before design use.",
+      "references": [
+        {
+          "code_id": "MoRTH-500",
+          "clause": "Table 500-19"
+        }
+      ]
+    },
+    {
+      "mix_code": "SDAC-I",
+      "full_name": "Semi-Dense Asphaltic Concrete Grade I",
+      "category": "hot_mix",
+      "layer_type": "wearing_course",
+      "applicable_code": "MoRTH 500-15 (IRC:111) (placeholder)",
+      "nmas_mm": 13.2,
+      "sieve_sizes_mm": [
+        19,
+        13.2,
+        9.5,
+        4.75,
+        2.36,
+        0.3,
+        0.075
+      ],
+      "gradation_lower": [
+        100,
+        79,
+        70,
+        52,
+        40,
+        10,
+        3
+      ],
+      "gradation_upper": [
+        100,
+        100,
+        88,
+        70,
+        60,
+        22,
+        8
+      ],
+      "binder_grades": [
+        "VG-30",
+        "CRMB"
+      ],
+      "trial_pb_min": 4.5,
+      "trial_pb_max": 6.0,
+      "marshall": {
+        "stability_min_kn": 8.2,
+        "flow_min_mm": 2.0,
+        "flow_max_mm": 4.0,
+        "air_voids_min_pct": 3.0,
+        "air_voids_max_pct": 5.0,
+        "vma_min_pct": 12.0,
+        "vfb_min_pct": 65.0,
+        "vfb_max_pct": 78.0,
+        "marshall_quotient_min": 2.0,
+        "marshall_quotient_max": 6.0,
+        "compaction_blows_each_face": 75
+      },
+      "report_template": "marshall",
+      "status": "placeholder_editable",
+      "notes": "Placeholder — verify before design use.",
+      "references": [
+        {
+          "code_id": "MoRTH-500"
+        }
+      ]
+    },
+    {
+      "mix_code": "SDAC-II",
+      "full_name": "Semi-Dense Asphaltic Concrete Grade II",
+      "category": "hot_mix",
+      "layer_type": "wearing_course",
+      "applicable_code": "MoRTH 500-15 (IRC:111) (placeholder)",
+      "nmas_mm": 9.5,
+      "sieve_sizes_mm": [
+        13.2,
+        9.5,
+        4.75,
+        2.36,
+        0.3,
+        0.075
+      ],
+      "gradation_lower": [
+        100,
+        90,
+        62,
+        42,
+        12,
+        4
+      ],
+      "gradation_upper": [
+        100,
+        100,
+        80,
+        60,
+        25,
+        10
+      ],
+      "binder_grades": [
+        "VG-30",
+        "CRMB"
+      ],
+      "trial_pb_min": 5.0,
+      "trial_pb_max": 6.5,
+      "marshall": {
+        "stability_min_kn": 8.2,
+        "flow_min_mm": 2.0,
+        "flow_max_mm": 4.0,
+        "air_voids_min_pct": 3.0,
+        "air_voids_max_pct": 5.0,
+        "vma_min_pct": 12.0,
+        "vfb_min_pct": 65.0,
+        "vfb_max_pct": 78.0,
+        "marshall_quotient_min": 2.0,
+        "marshall_quotient_max": 6.0,
+        "compaction_blows_each_face": 75
+      },
+      "report_template": "marshall",
+      "status": "placeholder_editable",
+      "notes": "Placeholder — verify before design use.",
+      "references": [
+        {
+          "code_id": "MoRTH-500"
+        }
+      ]
+    },
+    {
+      "mix_code": "BM",
+      "full_name": "Bituminous Macadam",
+      "category": "hot_mix",
+      "layer_type": "base_course",
+      "applicable_code": "MoRTH 500-3 (IRC:27)",
+      "nmas_mm": 26.5,
+      "sieve_sizes_mm": [
+        45.0,
+        37.5,
+        26.5,
+        19.0,
+        13.2,
+        4.75,
+        2.36,
+        0.075
+      ],
+      "gradation_lower": [
+        100,
+        95,
+        63,
+        null,
+        55,
+        38,
+        28,
+        2
+      ],
+      "gradation_upper": [
+        100,
+        100,
+        93,
+        null,
+        75,
+        54,
+        42,
+        5
+      ],
+      "binder_grades": [
+        "VG-30"
+      ],
+      "trial_pb_min": 3.0,
+      "trial_pb_max": 4.5,
+      "marshall": {
+        "stability_min_kn": 3.4,
+        "flow_min_mm": 2.0,
+        "flow_max_mm": 4.0,
+        "air_voids_min_pct": 3.0,
+        "air_voids_max_pct": 5.0,
+        "vma_min_pct": 12.0,
+        "vfb_min_pct": 65.0,
+        "vfb_max_pct": 78.0,
+        "marshall_quotient_min": 2.0,
+        "marshall_quotient_max": 6.0,
+        "compaction_blows_each_face": 50
+      },
+      "report_template": "marshall",
+      "status": "verified",
+      "notes": "MoRTH 500-3: BM, open-graded base course",
+      "references": [
+        {
+          "code_id": "MoRTH-500",
+          "clause": "Table 500-7"
+        },
+        {
+          "code_id": "IRC:27"
+        }
+      ]
+    },
+    {
+      "mix_code": "SMA",
+      "full_name": "Stone Mastic Asphalt",
+      "category": "surface_course",
+      "layer_type": "wearing_course",
+      "applicable_code": "IRC:SP:79 (placeholder)",
+      "nmas_mm": 13.2,
+      "sieve_sizes_mm": [
+        19,
+        13.2,
+        9.5,
+        4.75,
+        2.36,
+        0.075
+      ],
+      "gradation_lower": [
+        100,
+        90,
+        50,
+        20,
+        16,
+        8
+      ],
+      "gradation_upper": [
+        100,
+        100,
+        75,
+        28,
+        24,
+        11
+      ],
+      "binder_grades": [
+        "VG-30",
+        "PMB",
+        "CRMB"
+      ],
+      "trial_pb_min": 5.5,
+      "trial_pb_max": 7.0,
+      "marshall": {
+        "stability_min_kn": 6.0,
+        "flow_min_mm": 2.0,
+        "flow_max_mm": 4.0,
+        "air_voids_min_pct": 3.0,
+        "air_voids_max_pct": 5.0,
+        "vma_min_pct": 17.0,
+        "vfb_min_pct": 65.0,
+        "vfb_max_pct": 78.0,
+        "marshall_quotient_min": 2.0,
+        "marshall_quotient_max": 6.0,
+        "compaction_blows_each_face": 50
+      },
+      "report_template": "marshall",
+      "status": "placeholder_editable",
+      "notes": "Placeholder — also requires draindown test (cellulose fibre).",
+      "references": [
+        {
+          "code_id": "IRC:SP:79"
+        },
+        {
+          "code_id": "MoRTH-500"
+        }
+      ]
+    },
+    {
+      "mix_code": "MSS-A",
+      "full_name": "Mix Seal Surfacing Type A",
+      "category": "surface_course",
+      "layer_type": "surface_dressing",
+      "applicable_code": "MoRTH 500-13 (placeholder)",
+      "nmas_mm": 13.2,
+      "binder_grades": [
+        "VG-10",
+        "VG-30"
+      ],
+      "trial_pb_min": 4.0,
+      "trial_pb_max": 5.5,
+      "report_template": "premix_carpet",
+      "status": "placeholder_editable",
+      "notes": "Surface dressing — no Marshall criteria; quantity/coverage based.",
+      "references": [
+        {
+          "code_id": "IRC:SP:81"
+        },
+        {
+          "code_id": "IRC:SP:101"
+        }
+      ]
+    },
+    {
+      "mix_code": "MSS-B",
+      "full_name": "Mix Seal Surfacing Type B",
+      "category": "surface_course",
+      "layer_type": "surface_dressing",
+      "applicable_code": "MoRTH 500-13 (placeholder)",
+      "nmas_mm": 9.5,
+      "binder_grades": [
+        "VG-10",
+        "VG-30"
+      ],
+      "trial_pb_min": 4.0,
+      "trial_pb_max": 5.5,
+      "report_template": "premix_carpet",
+      "status": "placeholder_editable",
+      "notes": "Surface dressing — placeholder.",
+      "references": [
+        {
+          "code_id": "IRC:SP:81"
+        },
+        {
+          "code_id": "IRC:SP:101"
+        }
+      ]
+    },
+    {
+      "mix_code": "PMC",
+      "full_name": "Premix Carpet",
+      "category": "surface_course",
+      "layer_type": "surface_dressing",
+      "applicable_code": "MoRTH 500-12 (placeholder)",
+      "nmas_mm": 13.2,
+      "binder_grades": [
+        "VG-10",
+        "VG-30"
+      ],
+      "trial_pb_min": 4.5,
+      "trial_pb_max": 5.5,
+      "report_template": "premix_carpet",
+      "status": "placeholder_editable",
+      "notes": "Open-graded; quantity-based design.",
+      "references": [
+        {
+          "code_id": "MoRTH-500",
+          "clause": "Premix carpet"
+        }
+      ]
+    },
+    {
+      "mix_code": "SC-A",
+      "full_name": "Seal Coat Type A (Liquid Seal)",
+      "category": "surface_course",
+      "layer_type": "surface_seal",
+      "applicable_code": "MoRTH 500-14 (placeholder)",
+      "binder_grades": [
+        "VG-10",
+        "Emulsion"
+      ],
+      "report_template": "seal_coat",
+      "status": "placeholder_editable",
+      "notes": "Liquid seal — quantity per m².",
+      "references": [
+        {
+          "code_id": "MoRTH-500",
+          "clause": "Seal coat"
+        }
+      ]
+    },
+    {
+      "mix_code": "SC-B",
+      "full_name": "Seal Coat Type B (Premix Seal)",
+      "category": "surface_course",
+      "layer_type": "surface_seal",
+      "applicable_code": "MoRTH 500-14 (placeholder)",
+      "binder_grades": [
+        "VG-10",
+        "VG-30",
+        "Emulsion"
+      ],
+      "report_template": "seal_coat",
+      "status": "placeholder_editable",
+      "notes": "Premix seal — quantity per m².",
+      "references": [
+        {
+          "code_id": "MoRTH-500",
+          "clause": "Seal coat"
+        }
+      ]
+    },
+    {
+      "mix_code": "MA",
+      "full_name": "Mastic Asphalt",
+      "category": "surface_course",
+      "layer_type": "wearing_course",
+      "applicable_code": "MoRTH 500-19 (placeholder)",
+      "binder_grades": [
+        "VG-40",
+        "VG-30"
+      ],
+      "trial_pb_min": 14.0,
+      "trial_pb_max": 17.0,
+      "report_template": "mastic_asphalt",
+      "status": "placeholder_editable",
+      "notes": "Bridge deck / high-load wearing course — penetration & hardness tests.",
+      "references": [
+        {
+          "code_id": "MoRTH-500",
+          "clause": "Mastic asphalt"
+        }
+      ]
+    },
+    {
+      "mix_code": "COLD-MIX",
+      "full_name": "Cold Mix (Emulsion-Bound)",
+      "category": "maintenance",
+      "layer_type": "patching",
+      "applicable_code": "IRC:81 (placeholder)",
+      "binder_grades": [
+        "Emulsion",
+        "PME"
+      ],
+      "report_template": "cold_mix",
+      "status": "placeholder_editable",
+      "notes": "Pothole patching / cold-laid mix — emulsion type & residual binder.",
+      "references": [
+        {
+          "code_id": "IRC:SP:100-2014"
+        },
+        {
+          "code_id": "IRC:SP:98"
+        }
+      ]
+    },
+    {
+      "mix_code": "SS-I",
+      "full_name": "Slurry Seal Type I",
+      "category": "maintenance",
+      "layer_type": "surface_treatment",
+      "applicable_code": "IRC:SP:81 (placeholder)",
+      "nmas_mm": 4.75,
+      "binder_grades": [
+        "Emulsion",
+        "PME"
+      ],
+      "report_template": "slurry_seal",
+      "status": "placeholder_editable",
+      "notes": "Fine slurry — crack sealing.",
+      "references": [
+        {
+          "code_id": "IRC:SP:81"
+        }
+      ]
+    },
+    {
+      "mix_code": "SS-II",
+      "full_name": "Slurry Seal Type II",
+      "category": "maintenance",
+      "layer_type": "surface_treatment",
+      "applicable_code": "IRC:SP:81 (placeholder)",
+      "nmas_mm": 6.3,
+      "binder_grades": [
+        "Emulsion",
+        "PME"
+      ],
+      "report_template": "slurry_seal",
+      "status": "placeholder_editable",
+      "notes": "General-purpose slurry seal.",
+      "references": [
+        {
+          "code_id": "IRC:SP:81"
+        }
+      ]
+    },
+    {
+      "mix_code": "SS-III",
+      "full_name": "Slurry Seal Type III",
+      "category": "maintenance",
+      "layer_type": "surface_treatment",
+      "applicable_code": "IRC:SP:81 (placeholder)",
+      "nmas_mm": 9.5,
+      "binder_grades": [
+        "Emulsion",
+        "PME"
+      ],
+      "report_template": "slurry_seal",
+      "status": "placeholder_editable",
+      "notes": "Coarser slurry — high-traffic surfaces.",
+      "references": [
+        {
+          "code_id": "IRC:SP:81"
+        }
+      ]
+    },
+    {
+      "mix_code": "MS-II",
+      "full_name": "Micro Surfacing Type II",
+      "category": "maintenance",
+      "layer_type": "surface_treatment",
+      "applicable_code": "IRC:SP:81 / ISSA A143 (placeholder)",
+      "nmas_mm": 6.3,
+      "binder_grades": [
+        "PME"
+      ],
+      "report_template": "micro_surfacing",
+      "status": "placeholder_editable",
+      "notes": "Polymer-modified emulsion micro surfacing — Type II.",
+      "references": [
+        {
+          "code_id": "IRC:SP:81"
+        },
+        {
+          "code_id": "IRC:SP:101"
+        }
+      ]
+    },
+    {
+      "mix_code": "MS-III",
+      "full_name": "Micro Surfacing Type III",
+      "category": "maintenance",
+      "layer_type": "surface_treatment",
+      "applicable_code": "IRC:SP:81 / ISSA A143 (placeholder)",
+      "nmas_mm": 9.5,
+      "binder_grades": [
+        "PME"
+      ],
+      "report_template": "micro_surfacing",
+      "status": "placeholder_editable",
+      "notes": "Polymer-modified emulsion micro surfacing — Type III.",
+      "references": [
+        {
+          "code_id": "IRC:SP:81"
+        },
+        {
+          "code_id": "IRC:SP:101"
+        }
+      ]
+    },
+    {
+      "mix_code": "RAP",
+      "full_name": "RAP Mix (Hot In-Place Recycling)",
+      "category": "recycling",
+      "layer_type": "binder_course",
+      "applicable_code": "IRC:120 (placeholder)",
+      "binder_grades": [
+        "VG-30",
+        "VG-40"
+      ],
+      "report_template": "rap_mix",
+      "status": "placeholder_editable",
+      "notes": "Reclaimed asphalt pavement — RAP percentage, virgin binder grade.",
+      "references": [
+        {
+          "code_id": "MoRTH-500",
+          "clause": "Recycled asphalt"
+        }
+      ]
+    },
+    {
+      "mix_code": "CRM",
+      "full_name": "Cold Recycled Mix",
+      "category": "recycling",
+      "layer_type": "base_course",
+      "applicable_code": "IRC:120 / MoRTH 500-30 (placeholder)",
+      "binder_grades": [
+        "Emulsion",
+        "Foam Bitumen"
+      ],
+      "report_template": "cold_recycled",
+      "status": "placeholder_editable",
+      "notes": "Cold in-place recycling — emulsion or foam-bitumen stabilised.",
+      "references": [
+        {
+          "code_id": "IS:15463"
+        },
+        {
+          "code_id": "IRC:SP:53"
+        }
+      ]
+    },
+    {
+      "mix_code": "FBSM",
+      "full_name": "Foam Bitumen Stabilized Mix",
+      "category": "recycling",
+      "layer_type": "base_course",
+      "applicable_code": "IRC:120 (placeholder)",
+      "binder_grades": [
+        "Foam Bitumen"
+      ],
+      "report_template": "foam_bitumen",
+      "status": "placeholder_editable",
+      "notes": "Foam-bitumen stabilised base — ITS test based.",
+      "references": [
+        {
+          "code_id": "IRC:SP:100-2014"
+        }
+      ]
+    }
+  ]
+}

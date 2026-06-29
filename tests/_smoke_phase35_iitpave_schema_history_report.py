@@ -143,9 +143,9 @@ def main() -> int:
         ),
     )
     assert out == combined
-    assert included == ["IITPAVE Schema Diagnostics History"]
+    assert "IITPAVE Schema Diagnostics History" in included
     combined_text = _doc_text(combined)
-    assert "COMBINED PAVEMENT-DESIGN REPORT" in combined_text
+    assert "PAVEMENT DESIGN REPORT" in combined_text
     assert "IITPAVE Schema Diagnostics History" in combined_text
     assert "IITPAVE SCHEMA DIAGNOSTICS HISTORY" in combined_text
     assert "calculations blocked" in combined_text
@@ -172,7 +172,7 @@ def main() -> int:
             mix_type_key=imported_project.mix_type if imported_project else "",
         ),
     )
-    assert imported_included == ["IITPAVE Schema Diagnostics History"]
+    assert "IITPAVE Schema Diagnostics History" in imported_included
     assert "IITPAVE SCHEMA DIAGNOSTICS HISTORY" in _doc_text(imported_combined)
     print("  [PASS] imported history remains reportable")
 

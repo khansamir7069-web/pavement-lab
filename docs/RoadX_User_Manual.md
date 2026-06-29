@@ -1,4 +1,4 @@
-# RoadX V2.0 Professional Baseline — User Manual
+# RoadX V2.2 Professional Suite — User Manual
 
 ## CRITICAL SAFETY DISCLAIMER
 > [!IMPORTANT]
@@ -7,7 +7,7 @@
 ---
 
 ## 1. Introduction & System Overview
-RoadX Engineering Suite V2.0 Professional Baseline is a Qt-based desktop application designed to streamline the flexible pavement design workflow in accordance with the Indian Roads Congress (IRC) standards, specifically **IRC:37-2018** (Guidelines for the Design of Flexible Pavements) and Marshall mix design standards (**IRC:111-2009**).
+RoadX Engineering Suite V2.2 Professional Suite is a Qt-based desktop application designed to streamline the flexible pavement design workflow in accordance with the Indian Roads Congress (IRC) standards, specifically **IRC:37-2018** (Guidelines for the Design of Flexible Pavements) and Marshall mix design standards (**IRC:111-2009**).
 
 The application integrates traffic analysis, subgrade estimation, catalog lookup, layer structure customization, stabilized cement-treated base/sub-base design, engineering compatibility checker, and the IITPAVE mechanistic analysis engine into a unified database-driven desktop suite.
 

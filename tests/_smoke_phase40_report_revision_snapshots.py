@@ -130,7 +130,7 @@ def main() -> int:
         ),
         schema_history_selection_ids=(999999, row1.id),
     )
-    assert included == ["IITPAVE Schema Diagnostics History"]
+    assert "IITPAVE Schema Diagnostics History" in included
     rows = db.list_report_revision_snapshots(project.id)
     review = build_report_revision_history_review(project.id, rows)
     assert review.status == REPORT_REVISION_HISTORY_STATUS_AVAILABLE

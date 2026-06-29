@@ -246,6 +246,10 @@ class Database:
             cols_proj = {r[1] for r in conn.execute(text("PRAGMA table_info(projects)"))}
             if "validation_results_json" not in cols_proj:
                 conn.execute(text("ALTER TABLE projects ADD COLUMN validation_results_json TEXT"))
+            if "parent_project_id" not in cols_proj:
+                conn.execute(text("ALTER TABLE projects ADD COLUMN parent_project_id INTEGER"))
+            if "revision_number" not in cols_proj:
+                conn.execute(text("ALTER TABLE projects ADD COLUMN revision_number INTEGER"))
 
 
     def _get_sync_state_from_project(self, p: Project) -> dict:

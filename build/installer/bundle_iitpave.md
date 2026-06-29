@@ -1,6 +1,6 @@
 # Bundling the IITPAVE executable (Phase 17 / V1)
 
-PavementLab V1 ships the **integration seam** for the IRC:37-2018 cl. 6.2
+RoadX Professional Suite v2.2 ships the **integration seam** for the IRC:37-2018 cl. 6.2
 multi-layered elastic analysis tool (IITPAVE) but **not** the binary
 itself — the binary is operator-supplied because of licensing and
 because version-locking the executable belongs to the deployment, not
@@ -54,7 +54,7 @@ Phase 22 adds a structured diagnostics layer in
 these candidate sources in order:
 
 1. caller-supplied `configured_path`;
-2. `SAMPAVE_IITPAVE_EXE`;
+2. `ROADX_IITPAVE_EXE`;
 3. the bundled drop-in directory shown above;
 4. optional `PATH` search when explicitly requested.
 
@@ -80,7 +80,7 @@ claim IRC:37 compliance.
 
 Phase 25 adds `app.core.iitpave.output_contract.inspect_iitpave_output_contract(...)`.
 It inspects raw output text/files before any parser is used. The only
-recognized parseable contract today is SamPave's own Phase-13 stub marker
+recognized parseable contract today is RoadX's own Phase-13 stub marker
 (`PHASE13_STUB_V1`), which remains placeholder-only. Real IITPAVE-looking
 output is classified as `real_contract_pending` and blocked until a verified
 real IITPAVE output schema/fixture is added. Unknown, missing, empty, or
@@ -162,7 +162,7 @@ stderr. Missing exe → `FileNotFoundError` (placeholder-safety contract
 | `parse_iitpave_output(stub_text)` | Returns `MechanisticResult(is_placeholder=True, source="stub")`. |
 | `compute_mechanistic_validation(...)` | Refusal gate fires → `summary.refused=True`, both verdicts `None`, reason cites placeholder. |
 | `ExternalExeRunner(...).run()` | Raises `FileNotFoundError` referencing this document. |
-| Word reports (Phase 15) | Render `[REFUSED]` banner with the verbatim Phase-14 refusal reason; calibration tables still shown for transparency. |
+| Word reports (Phase 15) | Render `[BLOCKED]` / unavailable warning banner with the verbatim Phase-14 refusal reason; calibration tables still shown for transparency. |
 | Sample validation (Phase 16) | `corpus_NN_*` fixtures that set `mechanistic.is_placeholder=true` are expected to produce `refused: true` in their golden snapshots. |
 
 In other words: nothing is silently broken, and every consumer can tell

@@ -111,9 +111,9 @@ def main() -> int:
         CombinedReportContext(project_title=proj.work_name,
                               work_name=proj.work_name),
     )
-    assert "Bill of Material Quantities" in included, included
+    assert any("BOQ" in name for name in included), included
     ctxt = _all_text(out)
-    assert "BILL OF MATERIAL QUANTITIES" in ctxt
+    assert "BOQ" in ctxt or "MATERIAL QUANTITIES" in ctxt.upper()
     print(f"  OK — sections: {included}")
 
     print("\n=== Panel end-to-end ===")

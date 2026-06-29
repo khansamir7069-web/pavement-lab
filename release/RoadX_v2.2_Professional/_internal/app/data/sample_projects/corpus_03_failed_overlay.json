@@ -1,0 +1,74 @@
+{
+  "name": "corpus_03_failed_overlay",
+  "description": "Poor PCI; heavy traffic; large strains -> overlay required + mechanistic FAIL.",
+  "engineering_intent": "Heavily-trafficked corridor near the end of life; medium rutting + low cracking + medium ravelling; mechanistic checks fail.",
+  "condition": {
+    "work_name": "Heavy-corridor overlay candidate (sample 03)",
+    "surveyed_by": "PavementLab QA",
+    "survey_date": "2026-04-15",
+    "lane_id": "Lane 2",
+    "chainage_from_km": 0.0,
+    "chainage_to_km": 1.0,
+    "records": [
+      {"distress_type": "rutting",   "severity": "medium", "length_m": 0.0, "area_m2": 100.0, "count": 0, "notes": "wheel paths"},
+      {"distress_type": "cracking",  "severity": "low",    "length_m": 100.0, "area_m2": 0.0, "count": 0, "notes": "longitudinal"},
+      {"distress_type": "ravelling", "severity": "medium", "length_m": 0.0, "area_m2": 30.0, "count": 0, "notes": "outer lane"}
+    ]
+  },
+  "traffic": {
+    "initial_cvpd": 10000.0,
+    "growth_rate_pct": 6.0,
+    "design_life_years": 20,
+    "terrain": "Plain",
+    "lane_config": "Four-lane divided",
+    "road_category": "NH / SH"
+  },
+  "structural": {
+    "road_category": "NH / SH",
+    "design_life_years": 20,
+    "initial_cvpd": 10000.0,
+    "growth_rate_pct": 6.0,
+    "vdf": 4.8,
+    "ldf": 0.45,
+    "subgrade_cbr_pct": 6.0
+  },
+  "mechanistic": {
+    "include": true,
+    "is_placeholder": false,
+    "source": "external_exe",
+    "epsilon_t_microstrain": 300.0,
+    "epsilon_v_microstrain": 600.0,
+    "design_msa_override": null,
+    "c_factor": 1.0,
+    "structure": {
+      "layers": [
+        {"name": "BC",  "material": "BC",  "modulus_mpa": 3000.0, "poisson_ratio": 0.35, "thickness_mm": 50.0},
+        {"name": "DBM", "material": "DBM", "modulus_mpa": 2500.0, "poisson_ratio": 0.35, "thickness_mm": 90.0},
+        {"name": "GSB", "material": "GSB", "modulus_mpa": 300.0,  "poisson_ratio": 0.35, "thickness_mm": 250.0},
+        {"name": "Subgrade", "material": "Subgrade", "modulus_mpa": 60.0, "poisson_ratio": 0.40, "thickness_mm": null}
+      ]
+    }
+  },
+  "calibration_overrides": {
+    "rehab_thresholds": null,
+    "fatigue_calibration": null,
+    "rutting_calibration": null
+  },
+  "expected": {
+    "condition": {
+      "pci_band": "Poor"
+    },
+    "traffic": {
+      "msa_band": "heavy"
+    },
+    "mechanistic": {
+      "refused": false,
+      "fatigue_verdict": "FAIL",
+      "rutting_verdict": "FAIL"
+    },
+    "rehab": {
+      "categories_must_include": ["overlay", "surface_treatment"],
+      "categories_must_exclude": ["routine_maintenance", "reconstruction", "crack_sealing"]
+    }
+  }
+}

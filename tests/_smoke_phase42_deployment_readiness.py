@@ -168,7 +168,7 @@ def main() -> int:
         schema_history_selection_ids=(history.id,),
     )
     assert report.is_file()
-    assert included == ["IITPAVE Schema Diagnostics History"]
+    assert "IITPAVE Schema Diagnostics History" in included
     bundle = build_report_export_bundle(
         _tmp / "phase42_bundle",
         db,

@@ -1,0 +1,206 @@
+{
+  "_meta": {
+    "description": "Pavement Lab — binder/bitumen grade master list. Editable.",
+    "schema_version": 1
+  },
+  "grades": [
+    {
+      "code": "VG-10",
+      "full_name": "Viscosity Grade 10 (IS 73)",
+      "default_sg": 1.01,
+      "applicable_tests": [
+        "specific_gravity",
+        "penetration",
+        "softening_point",
+        "ductility",
+        "viscosity",
+        "flash_point"
+      ],
+      "category": "neat",
+      "references": [
+        {
+          "code_id": "IS:73"
+        },
+        {
+          "code_id": "IS:1201-1220"
+        }
+      ]
+    },
+    {
+      "code": "VG-20",
+      "full_name": "Viscosity Grade 20 (IS 73)",
+      "default_sg": 1.01,
+      "applicable_tests": [
+        "specific_gravity",
+        "penetration",
+        "softening_point",
+        "ductility",
+        "viscosity",
+        "flash_point"
+      ],
+      "category": "neat",
+      "references": [
+        {
+          "code_id": "IS:73"
+        },
+        {
+          "code_id": "IS:1201-1220"
+        }
+      ]
+    },
+    {
+      "code": "VG-30",
+      "full_name": "Viscosity Grade 30 (IS 73)",
+      "default_sg": 1.01,
+      "applicable_tests": [
+        "specific_gravity",
+        "penetration",
+        "softening_point",
+        "ductility",
+        "viscosity",
+        "flash_point"
+      ],
+      "category": "neat",
+      "references": [
+        {
+          "code_id": "IS:73"
+        },
+        {
+          "code_id": "IS:1201-1220"
+        }
+      ]
+    },
+    {
+      "code": "VG-40",
+      "full_name": "Viscosity Grade 40 (IS 73)",
+      "default_sg": 1.02,
+      "applicable_tests": [
+        "specific_gravity",
+        "penetration",
+        "softening_point",
+        "ductility",
+        "viscosity",
+        "flash_point"
+      ],
+      "category": "neat",
+      "references": [
+        {
+          "code_id": "IS:73"
+        },
+        {
+          "code_id": "IS:1201-1220"
+        }
+      ]
+    },
+    {
+      "code": "CRMB",
+      "full_name": "Crumb Rubber Modified Bitumen (IRC:SP:53)",
+      "default_sg": 1.03,
+      "applicable_tests": [
+        "specific_gravity",
+        "penetration",
+        "softening_point",
+        "elastic_recovery",
+        "viscosity",
+        "flash_point"
+      ],
+      "category": "modified",
+      "references": [
+        {
+          "code_id": "IS:15463"
+        },
+        {
+          "code_id": "IRC:SP:53"
+        }
+      ]
+    },
+    {
+      "code": "PMB",
+      "full_name": "Polymer Modified Bitumen (IRC:SP:53)",
+      "default_sg": 1.02,
+      "applicable_tests": [
+        "specific_gravity",
+        "penetration",
+        "softening_point",
+        "elastic_recovery",
+        "viscosity",
+        "flash_point"
+      ],
+      "category": "modified",
+      "references": [
+        {
+          "code_id": "IS:15462"
+        },
+        {
+          "code_id": "IRC:SP:53"
+        }
+      ]
+    },
+    {
+      "code": "Emulsion",
+      "full_name": "Cationic Bitumen Emulsion (IS 8887)",
+      "default_sg": 1.0,
+      "applicable_tests": [
+        "residue_pct",
+        "viscosity",
+        "storage_stability",
+        "particle_charge"
+      ],
+      "category": "emulsion",
+      "references": [
+        {
+          "code_id": "IRC:SP:100-2014"
+        },
+        {
+          "code_id": "MoRTH-500"
+        }
+      ]
+    },
+    {
+      "code": "PME",
+      "full_name": "Polymer Modified Emulsion (IS 15462)",
+      "default_sg": 1.02,
+      "applicable_tests": [
+        "residue_pct",
+        "viscosity",
+        "storage_stability",
+        "particle_charge"
+      ],
+      "category": "emulsion",
+      "references": [
+        {
+          "code_id": "IRC:SP:81"
+        },
+        {
+          "code_id": "IRC:SP:53"
+        }
+      ]
+    },
+    {
+      "code": "Foam Bitumen",
+      "full_name": "Foam Bitumen (Hot bitumen + water injection)",
+      "default_sg": 1.01,
+      "applicable_tests": [
+        "specific_gravity",
+        "expansion_ratio",
+        "half_life"
+      ],
+      "category": "modified",
+      "references": [
+        {
+          "code_id": "IRC:SP:100-2014"
+        }
+      ]
+    },
+    {
+      "code": "Custom",
+      "full_name": "Custom / User-defined",
+      "default_sg": 1.0,
+      "applicable_tests": [
+        "specific_gravity"
+      ],
+      "category": "custom",
+      "references": []
+    }
+  ]
+}

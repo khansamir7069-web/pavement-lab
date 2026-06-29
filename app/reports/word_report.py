@@ -445,7 +445,12 @@ def export_to_pdf(docx_path: Path) -> Path:
         from docx2pdf import convert
         convert(str(docx_path), str(pdf_path))
         return pdf_path
-    except Exception:
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(
+            f"Windows COM PDF export failed (Word not running/licensed or fatal COM error): {e}. "
+            "Attempting fallback conversion."
+        )
         if soffice:
             try:
                 subprocess.run(

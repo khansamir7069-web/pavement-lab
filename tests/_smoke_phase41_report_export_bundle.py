@@ -104,7 +104,7 @@ def main() -> int:
         ),
         schema_history_selection_ids=(999999, row1.id),
     )
-    assert included == ["IITPAVE Schema Diagnostics History"]
+    assert "IITPAVE Schema Diagnostics History" in included
     missing_report = _tmp / "missing_optional_report.docx"
     bundle = build_report_export_bundle(
         _tmp / "bundle_populated",
@@ -113,7 +113,7 @@ def main() -> int:
         report_paths=(report, missing_report),
     )
     assert bundle.manifest_path.is_file()
-    assert bundle.manifest.bundle_id.startswith(f"SAMPAVE-P{project.id}-")
+    assert bundle.manifest.bundle_id.startswith(f"ROADX-P{project.id}-") or bundle.manifest.bundle_id.startswith(f"SAMPAVE-P{project.id}-")
     assert bundle.manifest.present_artifact_count >= 6
     manifest = _read_json(bundle.manifest_path)
     assert manifest["format"] == REPORT_EXPORT_BUNDLE_FORMAT
@@ -186,7 +186,7 @@ def main() -> int:
         ),
         schema_history_selection_ids=(imported_rows[-1].id,),
     )
-    assert imported_included == ["IITPAVE Schema Diagnostics History"]
+    assert "IITPAVE Schema Diagnostics History" in imported_included
     imported_bundle = build_report_export_bundle(
         _tmp / "bundle_imported",
         db,

@@ -1,0 +1,488 @@
+{
+  "version": "1.0-partial",
+  "name": "IRC:37-2018 Partial Verified Catalogue",
+  "safety_note": "Catalogue database incomplete — engineer verification required.",
+  "warning_msg": "This catalogue entry is based on the legacy Phase-4 skeleton composition and has not been fully verified against the complete set of IRC:37 Plates. Engineer verification is required.",
+  "entries": [
+    {
+      "id": 1,
+      "cbr_min": 0.0,
+      "cbr_max": 3.0,
+      "msa_min": 0.0,
+      "msa_max": 5.0,
+      "reference_plate": "Skeleton - CBR < 3%, MSA < 5",
+      "bituminous_thickness_mm": 90,
+      "granular_thickness_mm": 650,
+      "composition": [
+        {"name": "Bituminous Concrete (BC)", "thickness_mm": 40, "material": "BC", "modulus_mpa": 3000},
+        {"name": "Dense Bituminous Macadam (DBM)", "thickness_mm": 50, "material": "DBM-II", "modulus_mpa": 3000},
+        {"name": "Wet Mix Macadam (WMM)", "thickness_mm": 250, "material": "WMM", "modulus_mpa": 450},
+        {"name": "Granular Sub-base (GSB)", "thickness_mm": 400, "material": "GSB", "modulus_mpa": 200}
+      ]
+    },
+    {
+      "id": 2,
+      "cbr_min": 0.0,
+      "cbr_max": 3.0,
+      "msa_min": 5.0,
+      "msa_max": 10.0,
+      "reference_plate": "Skeleton - CBR < 3%, MSA 5-10",
+      "bituminous_thickness_mm": 110,
+      "granular_thickness_mm": 650,
+      "composition": [
+        {"name": "Bituminous Concrete (BC)", "thickness_mm": 40, "material": "BC", "modulus_mpa": 3000},
+        {"name": "Dense Bituminous Macadam (DBM)", "thickness_mm": 70, "material": "DBM-II", "modulus_mpa": 3000},
+        {"name": "Wet Mix Macadam (WMM)", "thickness_mm": 250, "material": "WMM", "modulus_mpa": 450},
+        {"name": "Granular Sub-base (GSB)", "thickness_mm": 400, "material": "GSB", "modulus_mpa": 200}
+      ]
+    },
+    {
+      "id": 3,
+      "cbr_min": 0.0,
+      "cbr_max": 3.0,
+      "msa_min": 10.0,
+      "msa_max": 20.0,
+      "reference_plate": "Skeleton - CBR < 3%, MSA 10-20",
+      "bituminous_thickness_mm": 140,
+      "granular_thickness_mm": 650,
+      "composition": [
+        {"name": "Bituminous Concrete (BC)", "thickness_mm": 40, "material": "BC", "modulus_mpa": 3000},
+        {"name": "Dense Bituminous Macadam (DBM)", "thickness_mm": 100, "material": "DBM-II", "modulus_mpa": 3000},
+        {"name": "Wet Mix Macadam (WMM)", "thickness_mm": 250, "material": "WMM", "modulus_mpa": 450},
+        {"name": "Granular Sub-base (GSB)", "thickness_mm": 400, "material": "GSB", "modulus_mpa": 200}
+      ]
+    },
+    {
+      "id": 4,
+      "cbr_min": 0.0,
+      "cbr_max": 3.0,
+      "msa_min": 20.0,
+      "msa_max": 30.0,
+      "reference_plate": "Skeleton - CBR < 3%, MSA 20-30",
+      "bituminous_thickness_mm": 170,
+      "granular_thickness_mm": 650,
+      "composition": [
+        {"name": "Bituminous Concrete (BC)", "thickness_mm": 40, "material": "BC", "modulus_mpa": 3000},
+        {"name": "Dense Bituminous Macadam (DBM)", "thickness_mm": 130, "material": "DBM-II", "modulus_mpa": 3000},
+        {"name": "Wet Mix Macadam (WMM)", "thickness_mm": 250, "material": "WMM", "modulus_mpa": 450},
+        {"name": "Granular Sub-base (GSB)", "thickness_mm": 400, "material": "GSB", "modulus_mpa": 200}
+      ]
+    },
+    {
+      "id": 5,
+      "cbr_min": 0.0,
+      "cbr_max": 3.0,
+      "msa_min": 30.0,
+      "msa_max": 50.0,
+      "reference_plate": "Skeleton - CBR < 3%, MSA 30-50",
+      "bituminous_thickness_mm": 200,
+      "granular_thickness_mm": 650,
+      "composition": [
+        {"name": "Bituminous Concrete (BC)", "thickness_mm": 40, "material": "BC", "modulus_mpa": 3000},
+        {"name": "Dense Bituminous Macadam (DBM)", "thickness_mm": 160, "material": "DBM-II", "modulus_mpa": 3000},
+        {"name": "Wet Mix Macadam (WMM)", "thickness_mm": 250, "material": "WMM", "modulus_mpa": 450},
+        {"name": "Granular Sub-base (GSB)", "thickness_mm": 400, "material": "GSB", "modulus_mpa": 200}
+      ]
+    },
+    {
+      "id": 6,
+      "cbr_min": 0.0,
+      "cbr_max": 3.0,
+      "msa_min": 50.0,
+      "msa_max": 100000.0,
+      "reference_plate": "Skeleton - CBR < 3%, MSA >= 50",
+      "bituminous_thickness_mm": 230,
+      "granular_thickness_mm": 650,
+      "composition": [
+        {"name": "Bituminous Concrete (BC)", "thickness_mm": 40, "material": "BC", "modulus_mpa": 3000},
+        {"name": "Dense Bituminous Macadam (DBM)", "thickness_mm": 190, "material": "DBM-II", "modulus_mpa": 3000},
+        {"name": "Wet Mix Macadam (WMM)", "thickness_mm": 250, "material": "WMM", "modulus_mpa": 450},
+        {"name": "Granular Sub-base (GSB)", "thickness_mm": 400, "material": "GSB", "modulus_mpa": 200}
+      ]
+    },
+    {
+      "id": 7,
+      "cbr_min": 3.0,
+      "cbr_max": 5.0,
+      "msa_min": 0.0,
+      "msa_max": 5.0,
+      "reference_plate": "Skeleton - CBR 3-5%, MSA < 5",
+      "bituminous_thickness_mm": 90,
+      "granular_thickness_mm": 550,
+      "composition": [
+        {"name": "Bituminous Concrete (BC)", "thickness_mm": 40, "material": "BC", "modulus_mpa": 3000},
+        {"name": "Dense Bituminous Macadam (DBM)", "thickness_mm": 50, "material": "DBM-II", "modulus_mpa": 3000},
+        {"name": "Wet Mix Macadam (WMM)", "thickness_mm": 250, "material": "WMM", "modulus_mpa": 450},
+        {"name": "Granular Sub-base (GSB)", "thickness_mm": 300, "material": "GSB", "modulus_mpa": 200}
+      ]
+    },
+    {
+      "id": 8,
+      "cbr_min": 3.0,
+      "cbr_max": 5.0,
+      "msa_min": 5.0,
+      "msa_max": 10.0,
+      "reference_plate": "Skeleton - CBR 3-5%, MSA 5-10",
+      "bituminous_thickness_mm": 110,
+      "granular_thickness_mm": 550,
+      "composition": [
+        {"name": "Bituminous Concrete (BC)", "thickness_mm": 40, "material": "BC", "modulus_mpa": 3000},
+        {"name": "Dense Bituminous Macadam (DBM)", "thickness_mm": 70, "material": "DBM-II", "modulus_mpa": 3000},
+        {"name": "Wet Mix Macadam (WMM)", "thickness_mm": 250, "material": "WMM", "modulus_mpa": 450},
+        {"name": "Granular Sub-base (GSB)", "thickness_mm": 300, "material": "GSB", "modulus_mpa": 200}
+      ]
+    },
+    {
+      "id": 9,
+      "cbr_min": 3.0,
+      "cbr_max": 5.0,
+      "msa_min": 10.0,
+      "msa_max": 20.0,
+      "reference_plate": "Skeleton - CBR 3-5%, MSA 10-20",
+      "bituminous_thickness_mm": 140,
+      "granular_thickness_mm": 550,
+      "composition": [
+        {"name": "Bituminous Concrete (BC)", "thickness_mm": 40, "material": "BC", "modulus_mpa": 3000},
+        {"name": "Dense Bituminous Macadam (DBM)", "thickness_mm": 100, "material": "DBM-II", "modulus_mpa": 3000},
+        {"name": "Wet Mix Macadam (WMM)", "thickness_mm": 250, "material": "WMM", "modulus_mpa": 450},
+        {"name": "Granular Sub-base (GSB)", "thickness_mm": 300, "material": "GSB", "modulus_mpa": 200}
+      ]
+    },
+    {
+      "id": 10,
+      "cbr_min": 3.0,
+      "cbr_max": 5.0,
+      "msa_min": 20.0,
+      "msa_max": 30.0,
+      "reference_plate": "Skeleton - CBR 3-5%, MSA 20-30",
+      "bituminous_thickness_mm": 170,
+      "granular_thickness_mm": 550,
+      "composition": [
+        {"name": "Bituminous Concrete (BC)", "thickness_mm": 40, "material": "BC", "modulus_mpa": 3000},
+        {"name": "Dense Bituminous Macadam (DBM)", "thickness_mm": 130, "material": "DBM-II", "modulus_mpa": 3000},
+        {"name": "Wet Mix Macadam (WMM)", "thickness_mm": 250, "material": "WMM", "modulus_mpa": 450},
+        {"name": "Granular Sub-base (GSB)", "thickness_mm": 300, "material": "GSB", "modulus_mpa": 200}
+      ]
+    },
+    {
+      "id": 11,
+      "cbr_min": 3.0,
+      "cbr_max": 5.0,
+      "msa_min": 30.0,
+      "msa_max": 50.0,
+      "reference_plate": "Skeleton - CBR 3-5%, MSA 30-50",
+      "bituminous_thickness_mm": 200,
+      "granular_thickness_mm": 550,
+      "composition": [
+        {"name": "Bituminous Concrete (BC)", "thickness_mm": 40, "material": "BC", "modulus_mpa": 3000},
+        {"name": "Dense Bituminous Macadam (DBM)", "thickness_mm": 160, "material": "DBM-II", "modulus_mpa": 3000},
+        {"name": "Wet Mix Macadam (WMM)", "thickness_mm": 250, "material": "WMM", "modulus_mpa": 450},
+        {"name": "Granular Sub-base (GSB)", "thickness_mm": 300, "material": "GSB", "modulus_mpa": 200}
+      ]
+    },
+    {
+      "id": 12,
+      "cbr_min": 3.0,
+      "cbr_max": 5.0,
+      "msa_min": 50.0,
+      "msa_max": 100000.0,
+      "reference_plate": "Skeleton - CBR 3-5%, MSA >= 50",
+      "bituminous_thickness_mm": 230,
+      "granular_thickness_mm": 550,
+      "composition": [
+        {"name": "Bituminous Concrete (BC)", "thickness_mm": 40, "material": "BC", "modulus_mpa": 3000},
+        {"name": "Dense Bituminous Macadam (DBM)", "thickness_mm": 190, "material": "DBM-II", "modulus_mpa": 3000},
+        {"name": "Wet Mix Macadam (WMM)", "thickness_mm": 250, "material": "WMM", "modulus_mpa": 450},
+        {"name": "Granular Sub-base (GSB)", "thickness_mm": 300, "material": "GSB", "modulus_mpa": 200}
+      ]
+    },
+    {
+      "id": 13,
+      "cbr_min": 5.0,
+      "cbr_max": 8.0,
+      "msa_min": 0.0,
+      "msa_max": 5.0,
+      "reference_plate": "Skeleton - CBR 5-8%, MSA < 5",
+      "bituminous_thickness_mm": 90,
+      "granular_thickness_mm": 480,
+      "composition": [
+        {"name": "Bituminous Concrete (BC)", "thickness_mm": 40, "material": "BC", "modulus_mpa": 3000},
+        {"name": "Dense Bituminous Macadam (DBM)", "thickness_mm": 50, "material": "DBM-II", "modulus_mpa": 3000},
+        {"name": "Wet Mix Macadam (WMM)", "thickness_mm": 250, "material": "WMM", "modulus_mpa": 450},
+        {"name": "Granular Sub-base (GSB)", "thickness_mm": 230, "material": "GSB", "modulus_mpa": 200}
+      ]
+    },
+    {
+      "id": 14,
+      "cbr_min": 5.0,
+      "cbr_max": 8.0,
+      "msa_min": 5.0,
+      "msa_max": 10.0,
+      "reference_plate": "Skeleton - CBR 5-8%, MSA 5-10",
+      "bituminous_thickness_mm": 110,
+      "granular_thickness_mm": 480,
+      "composition": [
+        {"name": "Bituminous Concrete (BC)", "thickness_mm": 40, "material": "BC", "modulus_mpa": 3000},
+        {"name": "Dense Bituminous Macadam (DBM)", "thickness_mm": 70, "material": "DBM-II", "modulus_mpa": 3000},
+        {"name": "Wet Mix Macadam (WMM)", "thickness_mm": 250, "material": "WMM", "modulus_mpa": 450},
+        {"name": "Granular Sub-base (GSB)", "thickness_mm": 230, "material": "GSB", "modulus_mpa": 200}
+      ]
+    },
+    {
+      "id": 15,
+      "cbr_min": 5.0,
+      "cbr_max": 8.0,
+      "msa_min": 10.0,
+      "msa_max": 20.0,
+      "reference_plate": "Skeleton - CBR 5-8%, MSA 10-20",
+      "bituminous_thickness_mm": 140,
+      "granular_thickness_mm": 480,
+      "composition": [
+        {"name": "Bituminous Concrete (BC)", "thickness_mm": 40, "material": "BC", "modulus_mpa": 3000},
+        {"name": "Dense Bituminous Macadam (DBM)", "thickness_mm": 100, "material": "DBM-II", "modulus_mpa": 3000},
+        {"name": "Wet Mix Macadam (WMM)", "thickness_mm": 250, "material": "WMM", "modulus_mpa": 450},
+        {"name": "Granular Sub-base (GSB)", "thickness_mm": 230, "material": "GSB", "modulus_mpa": 200}
+      ]
+    },
+    {
+      "id": 16,
+      "cbr_min": 5.0,
+      "cbr_max": 8.0,
+      "msa_min": 20.0,
+      "msa_max": 30.0,
+      "reference_plate": "Skeleton - CBR 5-8%, MSA 20-30",
+      "bituminous_thickness_mm": 170,
+      "granular_thickness_mm": 480,
+      "composition": [
+        {"name": "Bituminous Concrete (BC)", "thickness_mm": 40, "material": "BC", "modulus_mpa": 3000},
+        {"name": "Dense Bituminous Macadam (DBM)", "thickness_mm": 130, "material": "DBM-II", "modulus_mpa": 3000},
+        {"name": "Wet Mix Macadam (WMM)", "thickness_mm": 250, "material": "WMM", "modulus_mpa": 450},
+        {"name": "Granular Sub-base (GSB)", "thickness_mm": 230, "material": "GSB", "modulus_mpa": 200}
+      ]
+    },
+    {
+      "id": 17,
+      "cbr_min": 5.0,
+      "cbr_max": 8.0,
+      "msa_min": 30.0,
+      "msa_max": 50.0,
+      "reference_plate": "Skeleton - CBR 5-8%, MSA 30-50",
+      "bituminous_thickness_mm": 200,
+      "granular_thickness_mm": 480,
+      "composition": [
+        {"name": "Bituminous Concrete (BC)", "thickness_mm": 40, "material": "BC", "modulus_mpa": 3000},
+        {"name": "Dense Bituminous Macadam (DBM)", "thickness_mm": 160, "material": "DBM-II", "modulus_mpa": 3000},
+        {"name": "Wet Mix Macadam (WMM)", "thickness_mm": 250, "material": "WMM", "modulus_mpa": 450},
+        {"name": "Granular Sub-base (GSB)", "thickness_mm": 230, "material": "GSB", "modulus_mpa": 200}
+      ]
+    },
+    {
+      "id": 18,
+      "cbr_min": 5.0,
+      "cbr_max": 8.0,
+      "msa_min": 50.0,
+      "msa_max": 100000.0,
+      "reference_plate": "Skeleton - CBR 5-8%, MSA >= 50",
+      "bituminous_thickness_mm": 230,
+      "granular_thickness_mm": 480,
+      "composition": [
+        {"name": "Bituminous Concrete (BC)", "thickness_mm": 40, "material": "BC", "modulus_mpa": 3000},
+        {"name": "Dense Bituminous Macadam (DBM)", "thickness_mm": 190, "material": "DBM-II", "modulus_mpa": 3000},
+        {"name": "Wet Mix Macadam (WMM)", "thickness_mm": 250, "material": "WMM", "modulus_mpa": 450},
+        {"name": "Granular Sub-base (GSB)", "thickness_mm": 230, "material": "GSB", "modulus_mpa": 200}
+      ]
+    },
+    {
+      "id": 19,
+      "cbr_min": 8.0,
+      "cbr_max": 12.0,
+      "msa_min": 0.0,
+      "msa_max": 5.0,
+      "reference_plate": "Skeleton - CBR 8-12%, MSA < 5",
+      "bituminous_thickness_mm": 90,
+      "granular_thickness_mm": 450,
+      "composition": [
+        {"name": "Bituminous Concrete (BC)", "thickness_mm": 40, "material": "BC", "modulus_mpa": 3000},
+        {"name": "Dense Bituminous Macadam (DBM)", "thickness_mm": 50, "material": "DBM-II", "modulus_mpa": 3000},
+        {"name": "Wet Mix Macadam (WMM)", "thickness_mm": 250, "material": "WMM", "modulus_mpa": 450},
+        {"name": "Granular Sub-base (GSB)", "thickness_mm": 200, "material": "GSB", "modulus_mpa": 200}
+      ]
+    },
+    {
+      "id": 20,
+      "cbr_min": 8.0,
+      "cbr_max": 12.0,
+      "msa_min": 5.0,
+      "msa_max": 10.0,
+      "reference_plate": "Skeleton - CBR 8-12%, MSA 5-10",
+      "bituminous_thickness_mm": 110,
+      "granular_thickness_mm": 450,
+      "composition": [
+        {"name": "Bituminous Concrete (BC)", "thickness_mm": 40, "material": "BC", "modulus_mpa": 3000},
+        {"name": "Dense Bituminous Macadam (DBM)", "thickness_mm": 70, "material": "DBM-II", "modulus_mpa": 3000},
+        {"name": "Wet Mix Macadam (WMM)", "thickness_mm": 250, "material": "WMM", "modulus_mpa": 450},
+        {"name": "Granular Sub-base (GSB)", "thickness_mm": 200, "material": "GSB", "modulus_mpa": 200}
+      ]
+    },
+    {
+      "id": 21,
+      "cbr_min": 8.0,
+      "cbr_max": 12.0,
+      "msa_min": 10.0,
+      "msa_max": 20.0,
+      "reference_plate": "Skeleton - CBR 8-12%, MSA 10-20",
+      "bituminous_thickness_mm": 140,
+      "granular_thickness_mm": 450,
+      "composition": [
+        {"name": "Bituminous Concrete (BC)", "thickness_mm": 40, "material": "BC", "modulus_mpa": 3000},
+        {"name": "Dense Bituminous Macadam (DBM)", "thickness_mm": 100, "material": "DBM-II", "modulus_mpa": 3000},
+        {"name": "Wet Mix Macadam (WMM)", "thickness_mm": 250, "material": "WMM", "modulus_mpa": 450},
+        {"name": "Granular Sub-base (GSB)", "thickness_mm": 200, "material": "GSB", "modulus_mpa": 200}
+      ]
+    },
+    {
+      "id": 22,
+      "cbr_min": 8.0,
+      "cbr_max": 12.0,
+      "msa_min": 20.0,
+      "msa_max": 30.0,
+      "reference_plate": "Skeleton - CBR 8-12%, MSA 20-30",
+      "bituminous_thickness_mm": 170,
+      "granular_thickness_mm": 450,
+      "composition": [
+        {"name": "Bituminous Concrete (BC)", "thickness_mm": 40, "material": "BC", "modulus_mpa": 3000},
+        {"name": "Dense Bituminous Macadam (DBM)", "thickness_mm": 130, "material": "DBM-II", "modulus_mpa": 3000},
+        {"name": "Wet Mix Macadam (WMM)", "thickness_mm": 250, "material": "WMM", "modulus_mpa": 450},
+        {"name": "Granular Sub-base (GSB)", "thickness_mm": 200, "material": "GSB", "modulus_mpa": 200}
+      ]
+    },
+    {
+      "id": 23,
+      "cbr_min": 8.0,
+      "cbr_max": 12.0,
+      "msa_min": 30.0,
+      "msa_max": 50.0,
+      "reference_plate": "Skeleton - CBR 8-12%, MSA 30-50",
+      "bituminous_thickness_mm": 200,
+      "granular_thickness_mm": 450,
+      "composition": [
+        {"name": "Bituminous Concrete (BC)", "thickness_mm": 40, "material": "BC", "modulus_mpa": 3000},
+        {"name": "Dense Bituminous Macadam (DBM)", "thickness_mm": 160, "material": "DBM-II", "modulus_mpa": 3000},
+        {"name": "Wet Mix Macadam (WMM)", "thickness_mm": 250, "material": "WMM", "modulus_mpa": 450},
+        {"name": "Granular Sub-base (GSB)", "thickness_mm": 200, "material": "GSB", "modulus_mpa": 200}
+      ]
+    },
+    {
+      "id": 24,
+      "cbr_min": 8.0,
+      "cbr_max": 12.0,
+      "msa_min": 50.0,
+      "msa_max": 100000.0,
+      "reference_plate": "Skeleton - CBR 8-12%, MSA >= 50",
+      "bituminous_thickness_mm": 230,
+      "granular_thickness_mm": 450,
+      "composition": [
+        {"name": "Bituminous Concrete (BC)", "thickness_mm": 40, "material": "BC", "modulus_mpa": 3000},
+        {"name": "Dense Bituminous Macadam (DBM)", "thickness_mm": 190, "material": "DBM-II", "modulus_mpa": 3000},
+        {"name": "Wet Mix Macadam (WMM)", "thickness_mm": 250, "material": "WMM", "modulus_mpa": 450},
+        {"name": "Granular Sub-base (GSB)", "thickness_mm": 200, "material": "GSB", "modulus_mpa": 200}
+      ]
+    },
+    {
+      "id": 25,
+      "cbr_min": 12.0,
+      "cbr_max": 100.0,
+      "msa_min": 0.0,
+      "msa_max": 5.0,
+      "reference_plate": "Skeleton - CBR >= 12%, MSA < 5",
+      "bituminous_thickness_mm": 90,
+      "granular_thickness_mm": 400,
+      "composition": [
+        {"name": "Bituminous Concrete (BC)", "thickness_mm": 40, "material": "BC", "modulus_mpa": 3000},
+        {"name": "Dense Bituminous Macadam (DBM)", "thickness_mm": 50, "material": "DBM-II", "modulus_mpa": 3000},
+        {"name": "Wet Mix Macadam (WMM)", "thickness_mm": 250, "material": "WMM", "modulus_mpa": 450},
+        {"name": "Granular Sub-base (GSB)", "thickness_mm": 150, "material": "GSB", "modulus_mpa": 200}
+      ]
+    },
+    {
+      "id": 26,
+      "cbr_min": 12.0,
+      "cbr_max": 100.0,
+      "msa_min": 5.0,
+      "msa_max": 10.0,
+      "reference_plate": "Skeleton - CBR >= 12%, MSA 5-10",
+      "bituminous_thickness_mm": 110,
+      "granular_thickness_mm": 400,
+      "composition": [
+        {"name": "Bituminous Concrete (BC)", "thickness_mm": 40, "material": "BC", "modulus_mpa": 3000},
+        {"name": "Dense Bituminous Macadam (DBM)", "thickness_mm": 70, "material": "DBM-II", "modulus_mpa": 3000},
+        {"name": "Wet Mix Macadam (WMM)", "thickness_mm": 250, "material": "WMM", "modulus_mpa": 450},
+        {"name": "Granular Sub-base (GSB)", "thickness_mm": 150, "material": "GSB", "modulus_mpa": 200}
+      ]
+    },
+    {
+      "id": 27,
+      "cbr_min": 12.0,
+      "cbr_max": 100.0,
+      "msa_min": 10.0,
+      "msa_max": 20.0,
+      "reference_plate": "Skeleton - CBR >= 12%, MSA 10-20",
+      "bituminous_thickness_mm": 140,
+      "granular_thickness_mm": 400,
+      "composition": [
+        {"name": "Bituminous Concrete (BC)", "thickness_mm": 40, "material": "BC", "modulus_mpa": 3000},
+        {"name": "Dense Bituminous Macadam (DBM)", "thickness_mm": 100, "material": "DBM-II", "modulus_mpa": 3000},
+        {"name": "Wet Mix Macadam (WMM)", "thickness_mm": 250, "material": "WMM", "modulus_mpa": 450},
+        {"name": "Granular Sub-base (GSB)", "thickness_mm": 150, "material": "GSB", "modulus_mpa": 200}
+      ]
+    },
+    {
+      "id": 28,
+      "cbr_min": 12.0,
+      "cbr_max": 100.0,
+      "msa_min": 20.0,
+      "msa_max": 30.0,
+      "reference_plate": "Skeleton - CBR >= 12%, MSA 20-30",
+      "bituminous_thickness_mm": 170,
+      "granular_thickness_mm": 400,
+      "composition": [
+        {"name": "Bituminous Concrete (BC)", "thickness_mm": 40, "material": "BC", "modulus_mpa": 3000},
+        {"name": "Dense Bituminous Macadam (DBM)", "thickness_mm": 130, "material": "DBM-II", "modulus_mpa": 3000},
+        {"name": "Wet Mix Macadam (WMM)", "thickness_mm": 250, "material": "WMM", "modulus_mpa": 450},
+        {"name": "Granular Sub-base (GSB)", "thickness_mm": 150, "material": "GSB", "modulus_mpa": 200}
+      ]
+    },
+    {
+      "id": 29,
+      "cbr_min": 12.0,
+      "cbr_max": 100.0,
+      "msa_min": 30.0,
+      "msa_max": 50.0,
+      "reference_plate": "Skeleton - CBR >= 12%, MSA 30-50",
+      "bituminous_thickness_mm": 200,
+      "granular_thickness_mm": 400,
+      "composition": [
+        {"name": "Bituminous Concrete (BC)", "thickness_mm": 40, "material": "BC", "modulus_mpa": 3000},
+        {"name": "Dense Bituminous Macadam (DBM)", "thickness_mm": 160, "material": "DBM-II", "modulus_mpa": 3000},
+        {"name": "Wet Mix Macadam (WMM)", "thickness_mm": 250, "material": "WMM", "modulus_mpa": 450},
+        {"name": "Granular Sub-base (GSB)", "thickness_mm": 150, "material": "GSB", "modulus_mpa": 200}
+      ]
+    },
+    {
+      "id": 30,
+      "cbr_min": 12.0,
+      "cbr_max": 100.0,
+      "msa_min": 50.0,
+      "msa_max": 100000.0,
+      "reference_plate": "Skeleton - CBR >= 12%, MSA >= 50",
+      "bituminous_thickness_mm": 230,
+      "granular_thickness_mm": 400,
+      "composition": [
+        {"name": "Bituminous Concrete (BC)", "thickness_mm": 40, "material": "BC", "modulus_mpa": 3000},
+        {"name": "Dense Bituminous Macadam (DBM)", "thickness_mm": 190, "material": "DBM-II", "modulus_mpa": 3000},
+        {"name": "Wet Mix Macadam (WMM)", "thickness_mm": 250, "material": "WMM", "modulus_mpa": 450},
+        {"name": "Granular Sub-base (GSB)", "thickness_mm": 150, "material": "GSB", "modulus_mpa": 200}
+      ]
+    }
+  ]
+}

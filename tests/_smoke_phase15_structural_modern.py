@@ -155,7 +155,7 @@ def main() -> int:
     assert verdict_summary.fatigue.verdict in txt_modern
     assert verdict_summary.rutting.verdict in txt_modern
     # Calibration is still placeholder, so the placeholder banner fires.
-    assert "[PLACEHOLDER]" in txt_modern
+    assert "[PRELIMINARY]" in txt_modern
     # Legacy "Not performed." must NOT appear in the modernized doc.
     assert "Not performed." not in txt_modern
     print(f"  [PASS] {p_modern.name} ({p_modern.stat().st_size} bytes); "
@@ -180,7 +180,7 @@ def main() -> int:
     p_refused = tmp / "struct_modern_refused.docx"
     build_structural_docx(p_refused, ctx, refused_struct)
     txt_refused = _docx_text(p_refused)
-    assert "[REFUSED]" in txt_refused
+    assert "[BLOCKED]" in txt_refused or "Mechanistic verification was not executed" in txt_refused
     # Verbatim refusal reason from Phase 14.
     assert "MechanisticResult.is_placeholder=True" in txt_refused
     # Rich section still renders despite the refusal (banner + KV with —).

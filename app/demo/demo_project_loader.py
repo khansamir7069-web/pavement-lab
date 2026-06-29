@@ -150,32 +150,36 @@ def create_demo_project(db, name_suffix: str = "") -> int:
             design_msa=traffic_result.design_msa,
             c_factor=1.0,
             cumulative_life_msa=250.0,
-            verdict="PASS",
+            verdict=None,
             calibration=FatigueCalibration(label="IRC37_PLACEHOLDER_80pct", k1=2.21e-04, k2=3.89, k3=0.854, reliability_pct=80, is_placeholder=True),
             is_placeholder=True,
-            refused=False,
+            refused=True,
+            refused_reason="Mechanistic verification was not executed because a licensed IITPAVE installation was unavailable.",
             notes="Mechanistic verification was not executed because a licensed IITPAVE installation was unavailable."
         )
         rutting_check = RuttingCheck(
             epsilon_v_microstrain=220.0,
             design_msa=traffic_result.design_msa,
             cumulative_life_msa=300.0,
-            verdict="PASS",
+            verdict=None,
             calibration=RuttingCalibration(label="IRC37_PLACEHOLDER_80pct", k_r=4.1656e-08, k_v=4.5337, reliability_pct=80, is_placeholder=True),
             is_placeholder=True,
-            refused=False,
+            refused=True,
+            refused_reason="Mechanistic verification was not executed because a licensed IITPAVE installation was unavailable.",
             notes="Mechanistic verification was not executed because a licensed IITPAVE installation was unavailable."
         )
         summary = MechanisticValidationSummary(
             fatigue=fatigue_check,
             rutting=rutting_check,
             is_placeholder=True,
-            refused=False,
-            refused_reason="",
+            refused=True,
+            refused_reason="Mechanistic verification was not executed because a licensed IITPAVE installation was unavailable.",
             notes="Mechanistic verification was not executed because a licensed IITPAVE installation was unavailable."
         )
         inputs_payload = {
             "is_mock_preset": True,
+            "refused": True,
+            "refused_reason": "Mechanistic verification was not executed because a licensed IITPAVE installation was unavailable.",
             "notes": "Mechanistic verification was not executed because a licensed IITPAVE installation was unavailable."
         }
         db.save_mechanistic_validation(

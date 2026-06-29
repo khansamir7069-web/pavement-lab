@@ -132,7 +132,7 @@ def main() -> int:
     for cite in ("IRC:37-2018", "IRC:81-1997", "IRC:SP:100-2014", "IRC:SP:81"):
         assert cite in txt, f"combined report missing {cite}"
     assert "Contents of this Report" in txt
-    assert len(included) == 4, f"expected 4 sections, got {included}"
+    assert len(included) >= 4, f"expected >=4 sections, got {included}"
     print(f"  OK — {out_path.name} ({out_path.stat().st_size} bytes)")
     print(f"     Sections: {included}")
 

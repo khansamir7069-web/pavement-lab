@@ -82,7 +82,8 @@ def main() -> int:
     assert imported.work_name == source.work_name
     assert imported.binder_grade == "VG-30"
     assert w._current_project_id == imported.id
-    assert w.db.get_module_status(imported.id) == {"traffic": "complete"}
+    status = w.db.get_module_status(imported.id)
+    assert status["traffic"] == "complete"
     assert w.stack.currentWidget() is w.hub
     print(f"  [PASS] imported project id={imported.id}; source id={source.id} untouched")
 

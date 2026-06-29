@@ -189,9 +189,14 @@ def write_mechanistic_section(
         ))
 
     # --- Verification Mode Banner / Info ---
+    is_mock = (
+        "Demo verification example only" in (summary.notes or "")
+        or "Real IITPAVE verification was not performed" in (summary.notes or "")
+        or "unavailable" in (summary.notes or "").lower()
+        or "not executed" in (summary.notes or "").lower()
+    )
     if validation_mode is None:
-        is_mock = "Demo verification example only" in (summary.notes or "")
-        if is_mock:
+        if is_mock or summary.refused:
             validation_mode = "IRC Catalogue Design (Decision Support Mode)"
         else:
             validation_mode = "Mechanistically Verified Design" if (not summary.is_placeholder and not summary.refused) else "IRC Catalogue Design (Decision Support Mode)"
@@ -226,7 +231,6 @@ def write_mechanistic_section(
         add_table(doc, ["Layer", "Material", "Thickness", "Elastic Modulus (MPa)", "Poisson's Ratio"], comp_rows)
 
     # --- Overall blocked/unavailable banner -----------------------------
-    is_mock = "Demo verification example only" in (summary.notes or "") or "Real IITPAVE verification was not performed" in (summary.notes or "")
     if is_mock or summary.refused:
         add_placeholder_banner(doc, "WARNING: Mechanistic verification was not executed because a licensed IITPAVE installation was unavailable.")
     elif summary.is_placeholder:
@@ -238,12 +242,12 @@ def write_mechanistic_section(
     add_kv_table(doc, (
         ("IITPAVE Executed",   "No" if (summary.refused or is_mock) else "Yes"),
         ("Calibration Status", "Preliminary (Standard)" if summary.is_placeholder else "Project Calibrated"),
-        ("Fatigue verdict",    _fmt_verdict(summary.fatigue.verdict)),
-        ("Rutting verdict",    _fmt_verdict(summary.rutting.verdict)),
+        ("Fatigue verdict",    "—" if (summary.refused or is_mock) else _fmt_verdict(summary.fatigue.verdict)),
+        ("Rutting verdict",    "—" if (summary.refused or is_mock) else _fmt_verdict(summary.rutting.verdict)),
         ("Fatigue life (MSA)",
-            _fmt_optional_float(summary.fatigue.cumulative_life_msa, "{:.2f}")),
+            "—" if (summary.refused or is_mock) else _fmt_optional_float(summary.fatigue.cumulative_life_msa, "{:.2f}")),
         ("Rutting life (MSA)",
-            _fmt_optional_float(summary.rutting.cumulative_life_msa, "{:.2f}")),
+            "—" if (summary.refused or is_mock) else _fmt_optional_float(summary.rutting.cumulative_life_msa, "{:.2f}")),
         ("Design traffic (MSA)",
             f"{summary.fatigue.design_msa:.2f}"),
     ))

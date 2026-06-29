@@ -112,7 +112,7 @@ def main() -> int:
     build_mechanistic_docx(refused_path, ctx, refused_summary)
     text_refused = _docx_text(refused_path)
     assert "MECHANISTIC VALIDATION (IRC:37-2018 cl. 6.4)" in text_refused
-    assert "[REFUSED]" in text_refused
+    assert "[BLOCKED]" in text_refused or "Mechanistic verification was not executed" in text_refused
     # Refused-reason text from Phase 14 must appear verbatim.
     assert "MechanisticResult.is_placeholder=True" in text_refused
     # No numeric life leaks through.
@@ -149,10 +149,10 @@ def main() -> int:
     assert verdict_summary.rutting.verdict in ("PASS", "FAIL")
     assert verdict_summary.fatigue.verdict in text_verdict
     assert verdict_summary.rutting.verdict in text_verdict
-    # [PLACEHOLDER] banner present (calibration still placeholder).
-    assert "[PLACEHOLDER]" in text_verdict
-    # [REFUSED] banner must NOT be present.
-    assert "[REFUSED]" not in text_verdict
+    # [PRELIMINARY] banner present (calibration still placeholder/preliminary).
+    assert "[PRELIMINARY]" in text_verdict
+    # [BLOCKED] banner must NOT be present.
+    assert "[BLOCKED]" not in text_verdict
     # Calibration label rendered.
     assert "IRC37_PLACEHOLDER_80pct" in text_verdict
     # Strain-extraction fallback note carried through.

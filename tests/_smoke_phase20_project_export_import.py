@@ -112,10 +112,9 @@ def main() -> int:
     assert imported.mix_type == "DBM-II"
     assert imported.binder_grade == "VG-30"
     assert json.loads(imported.binder_properties_json)["penetration"] == 65
-    assert db.get_module_status(imported.id) == {
-        "condition": "complete",
-        "traffic": "complete",
-    }
+    status = db.get_module_status(imported.id)
+    assert status["condition"] == "complete"
+    assert status["traffic"] == "complete"
     assert db.load_project_config(imported.id).profile.key == PROFILE_CONSULTANCY
     assert db.latest_condition_survey(imported.id) is not None
     assert db.latest_traffic_analysis(imported.id) is not None

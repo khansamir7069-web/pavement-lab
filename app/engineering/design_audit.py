@@ -490,15 +490,26 @@ def run_project_audit(project_id: int, db) -> AuditResult:
     else:
         mod_statuses["iitpave"] = "PASS"
         if mv.refused:
-            findings.append(AuditFinding(
-                severity="critical",
-                module="iitpave",
-                issue="Mechanistic Verification Incomplete",
-                recommendation="Execute real IITPAVE production mode validation; IRC Catalogue Design mode is active.",
-                engineering_reason="IRC Catalogue Design mode is insufficient for consultancy design validation; real mechanistic validation required.",
-                navigation_key="IITPAVE Status"
-            ))
-            mod_statuses["iitpave"] = "FAIL"
+            is_unavailable = "unavailable" in (mv.refused_reason or "").lower() or "unavailable" in (mv.notes or "").lower()
+            if is_unavailable:
+                findings.append(AuditFinding(
+                    severity="warning",
+                    module="iitpave",
+                    issue="Mechanistic Verification Blocked",
+                    recommendation="Ensure a licensed IITPAVE installation is configured to run mechanistic design checks.",
+                    engineering_reason="Mechanistic verification was not executed because a licensed IITPAVE installation was unavailable.",
+                    navigation_key="IITPAVE Status"
+                ))
+            else:
+                findings.append(AuditFinding(
+                    severity="critical",
+                    module="iitpave",
+                    issue="Mechanistic Verification Incomplete",
+                    recommendation="Execute real IITPAVE production mode validation; IRC Catalogue Design mode is active.",
+                    engineering_reason="IRC Catalogue Design mode is insufficient for consultancy design validation; real mechanistic validation required.",
+                    navigation_key="IITPAVE Status"
+                ))
+                mod_statuses["iitpave"] = "FAIL"
         else:
             try:
                 mv_results = json.loads(mv.summary_json) if mv.summary_json else {}
@@ -811,7 +822,10 @@ def run_project_audit(project_id: int, db) -> AuditResult:
     consistency_explanation = f"Cross-module integrity is aligned. Mismatches detected: {consistency_fails}."
 
     # C. Mechanistic Validation (0-100)
-    if mod_statuses["iitpave"] == "PASS":
+    if mv and mv.refused:
+        mechanistic_score = 0
+        mechanistic_explanation = "Mechanistic verification was not executed because a licensed IITPAVE installation was unavailable."
+    elif mod_statuses["iitpave"] == "PASS":
         mechanistic_score = 100
         mechanistic_explanation = "IITPAVE boundary strains successfully calculated and verify fatigue/rutting structural safety."
     elif mod_statuses["iitpave"] == "FAIL":

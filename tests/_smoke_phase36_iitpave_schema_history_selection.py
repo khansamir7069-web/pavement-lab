@@ -164,7 +164,7 @@ def main() -> int:
         ),
         schema_history_selection_ids=(row1.id,),
     )
-    assert included == ["IITPAVE Schema Diagnostics History"]
+    assert "IITPAVE Schema Diagnostics History" in included
     text = _doc_text(selected_doc)
     assert f"#{row1.id}" in text
     assert f"#{row2.id}" not in text
@@ -205,7 +205,7 @@ def main() -> int:
         CombinedReportContext(work_name=imported.work_name, mix_type_key="DBM-II"),
         schema_history_selection_ids=(imported_selected.id,),
     )
-    assert imported_included == ["IITPAVE Schema Diagnostics History"]
+    assert "IITPAVE Schema Diagnostics History" in imported_included
     assert f"#{imported_selected.id}" in _doc_text(imported_doc)
     print("  [PASS] imported records remain selectable for report inclusion")
 

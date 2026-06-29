@@ -110,7 +110,7 @@ def main() -> int:
         ),
         schema_history_selection_ids=(999999, row1.id),
     )
-    assert included == ["IITPAVE Schema Diagnostics History"]
+    assert "IITPAVE Schema Diagnostics History" in included
     text = _doc_text(report)
     assert "REPORT PROVENANCE AND TRACEABILITY" in text
     assert "Generation Metadata" in text

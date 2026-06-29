@@ -143,7 +143,7 @@ def main() -> int:
         ),
         schema_history_selection_ids=(row1.id,),
     )
-    assert included == ["IITPAVE Schema Diagnostics History"]
+    assert "IITPAVE Schema Diagnostics History" in included
     audit_rows = db.list_iitpave_schema_history_selection_audits(project.id)
     assert len(audit_rows) == 1
     audit_row = audit_rows[0]

@@ -1,4 +1,4 @@
-# Build script for SAMPAVE (Windows PowerShell).
+# Build script for RoadX Professional Suite (Windows PowerShell).
 # Run from the project root:
 #     powershell -ExecutionPolicy Bypass -File build/build_exe.ps1
 
@@ -19,5 +19,5 @@ python -m PyInstaller build/installer/pyinstaller.spec --clean --noconfirm
 
 Write-Host ""
 Write-Host "==> Build complete."
-Write-Host "Output: $(Resolve-Path dist/SamPave)"
-Write-Host "Launch: dist/SamPave/SamPave.exe"
+Write-Host "Output: $(Resolve-Path dist/RoadX)"
+Write-Host "Launch: dist/RoadX/RoadX.exe"

@@ -1,0 +1,220 @@
+/* Pavement Lab — light professional theme */
+
+QMainWindow {
+    background-color: #f4f6f9;
+}
+
+QWidget#Sidebar {
+    background-color: #1f3a68;
+    color: #ffffff;
+}
+
+QLabel#SidebarBrand {
+    color: #ffffff;
+    font-size: 14pt;
+    font-weight: bold;
+    padding: 16px 12px 6px 12px;
+}
+
+QLabel#SidebarTag {
+    color: #b9c7dc;
+    font-size: 8pt;
+    padding: 0 12px 12px 12px;
+}
+
+QListWidget#NavList {
+    background-color: #1f3a68;
+    color: #d6e2f5;
+    border: none;
+    font-size: 10pt;
+    outline: 0;
+}
+
+QListWidget#NavList::item {
+    padding: 10px 14px;
+    border-left: 3px solid transparent;
+}
+
+QListWidget#NavList::item:selected {
+    background-color: #2a4d85;
+    color: #ffffff;
+    border-left: 3px solid #f5b400;
+}
+
+QListWidget#NavList::item:hover {
+    background-color: #28477b;
+}
+
+QStackedWidget {
+    background-color: #f4f6f9;
+}
+
+QFrame#PageHeader {
+    background-color: #ffffff;
+    border-bottom: 1px solid #d8dee9;
+}
+
+QLabel#PageTitle {
+    color: #1f3a68;
+    font-size: 16pt;
+    font-weight: bold;
+}
+
+QLabel#PageSubtitle {
+    color: #6a7180;
+    font-size: 10pt;
+}
+
+QFrame.Card {
+    background-color: #ffffff;
+    border: 1px solid #e0e4eb;
+    border-radius: 6px;
+}
+
+QPushButton {
+    background-color: #1f3a68;
+    color: white;
+    border: none;
+    padding: 6px 14px;
+    border-radius: 4px;
+    font-size: 10pt;
+}
+
+QPushButton:hover {
+    background-color: #2a4d85;
+}
+
+QPushButton:disabled {
+    background-color: #b5bdcc;
+}
+
+QPushButton.Secondary {
+    background-color: #e7ebf3;
+    color: #1f3a68;
+}
+
+QPushButton.Secondary:hover {
+    background-color: #d6dde8;
+}
+
+QPushButton.Danger {
+    background-color: #c04545;
+}
+
+QTableView, QTableWidget {
+    background-color: white;
+    border: 1px solid #d8dee9;
+    gridline-color: #e0e4eb;
+    font-size: 10pt;
+    alternate-background-color: #f9fafc;
+}
+
+QTableView::item:selected, QTableWidget::item:selected {
+    background-color: #d3e0f5;
+    color: #1f3a68;
+}
+
+QHeaderView::section {
+    background-color: #f0f3f8;
+    color: #1f3a68;
+    padding: 5px;
+    border: none;
+    border-right: 1px solid #d8dee9;
+    border-bottom: 1px solid #d8dee9;
+    font-weight: bold;
+}
+
+QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox, QPlainTextEdit, QTextEdit {
+    background-color: white;
+    border: 1px solid #c5ccda;
+    border-radius: 3px;
+    padding: 4px 6px;
+    font-size: 10pt;
+}
+
+QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus,
+QComboBox:focus, QPlainTextEdit:focus, QTextEdit:focus {
+    border: 1px solid #2a4d85;
+}
+
+QGroupBox {
+    border: 1px solid #d8dee9;
+    border-radius: 4px;
+    margin-top: 14px;
+    background-color: white;
+    font-weight: bold;
+    color: #1f3a68;
+}
+
+QGroupBox::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top left;
+    padding: 0 6px;
+    left: 8px;
+}
+
+QLabel.StatusOk { color: #1d7a3a; font-weight: bold; }
+QLabel.StatusFail { color: #c04545; font-weight: bold; }
+QLabel.Hint { color: #6a7180; font-size: 9pt; }
+
+QStatusBar {
+    background-color: #1f3a68;
+    color: white;
+}
+
+QTabWidget::pane {
+    border: 1px solid #d8dee9;
+    background-color: white;
+}
+
+QTabBar::tab {
+    background-color: #e7ebf3;
+    color: #1f3a68;
+    padding: 6px 12px;
+    border: 1px solid #d8dee9;
+    border-bottom: none;
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+}
+
+QTabBar::tab:selected {
+    background-color: white;
+    border-bottom: 1px solid white;
+    margin-bottom: -1px;
+    font-weight: bold;
+}
+
+QPushButton#BackBtn {
+    background-color: #e7ebf3;
+    color: #1f3a68;
+    border: 1px solid #c5ccda;
+    padding: 4px 8px;
+    border-radius: 3px;
+    font-size: 9pt;
+    margin-right: 12px;
+}
+QPushButton#BackBtn:hover { background-color: #d6dde8; }
+
+QFrame#ModuleCard {
+    background-color: #ffffff;
+    border: 1px solid #d8dee9;
+    border-radius: 6px;
+}
+QFrame#ModuleCard:hover {
+    border: 1px solid #2a4d85;
+    background-color: #fafcff;
+}
+
+QPushButton#ImportBtn {
+    background-color: #f5b400;
+    color: #1f3a68;
+    font-weight: bold;
+    padding: 8px 10px;
+    margin: 6px 10px 4px 10px;
+    border-radius: 4px;
+    font-size: 9pt;
+}
+
+QPushButton#ImportBtn:hover {
+    background-color: #ffc929;
+}

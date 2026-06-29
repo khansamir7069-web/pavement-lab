@@ -63,8 +63,8 @@ def compile_audit_report_text(project_id: int, db) -> str:
 def compile_verification_report_text(project_id: int, db) -> str:
     """Format a summary verification report for IITPAVE mechanistic checks."""
     mech = db.latest_mechanistic_validation(project_id)
-    if not mech or mech.refused:
-        return "IITPAVE verification file not available."
+    if not mech or mech.refused or "unavailable" in (mech.notes or "").lower() or "not performed" in (mech.notes or "").lower():
+        return "Mechanistic verification was not executed because a licensed IITPAVE installation was unavailable."
 
     p = db.get_project(project_id)
     lines = [
@@ -336,10 +336,12 @@ def generate_project_archive(
             pass
 
         # Fetch IITPAVE execution runs
-        iitpave_run_log = "IITPAVE verification file not available."
+        iitpave_run_log = "Mechanistic verification was not executed because a licensed IITPAVE installation was unavailable."
+        mech = db.latest_mechanistic_validation(project_id)
+        is_mock_val = not mech or mech.refused or "unavailable" in (mech.notes or "").lower() or "not performed" in (mech.notes or "").lower()
         last_run = get_last_run_info()
         run_dir_files = []
-        if last_run and last_run.get("run_dir"):
+        if not is_mock_val and last_run and last_run.get("run_dir"):
             run_dir = Path(last_run["run_dir"])
             stdout_path = run_dir / "stdout.log"
             if stdout_path.is_file():
