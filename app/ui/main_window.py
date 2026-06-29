@@ -127,6 +127,7 @@ class MainWindow(QMainWindow):
         self._wire_signals()
         self.dashboard.refresh()
         self._show_page("dashboard")
+        self.check_and_prompt_recovery()
 
     def _build(self) -> None:
         self.setWindowTitle(f"{__app_name__} v{__version__}")
@@ -634,6 +635,7 @@ class MainWindow(QMainWindow):
     def _refresh_hub(self) -> None:
         if self._current_project_id is None:
             self.hub.set_project(None, "")
+            self.clean_autosave_checkpoint()
             return
         p = self.db.get_project(self._current_project_id)
         status = self.db.get_module_status(self._current_project_id)
@@ -642,6 +644,7 @@ class MainWindow(QMainWindow):
             p.work_name if p else "",
             status,
         )
+        self.write_autosave_checkpoint()
 
     def _on_module_selected(self, key: str) -> None:
         """Route user from Hub into the chosen module with sequence gates."""
@@ -1872,3 +1875,83 @@ class MainWindow(QMainWindow):
         except Exception as e:
             log.exception("PDF export failed")
             QMessageBox.critical(self, "Export failed", str(e))
+
+    def write_autosave_checkpoint(self) -> None:
+        if self._current_project_id is None:
+            return
+        try:
+            from app.db.project_exchange import export_project
+            checkpoint = export_project(self.db, self._current_project_id)
+            recovery_data = {
+                "project_id": self._current_project_id,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "payload": checkpoint
+            }
+            import os
+            app_data_dir = r"C:\Users\ASUS\.gemini\antigravity"
+            os.makedirs(app_data_dir, exist_ok=True)
+            recovery_path = os.path.join(app_data_dir, "active_recovery.json")
+            with open(recovery_path, "w", encoding="utf-8") as f:
+                json.dump(recovery_data, f, indent=4)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Failed to write autosave checkpoint: {e}")
+
+    def clean_autosave_checkpoint(self) -> None:
+        try:
+            import os
+            recovery_path = os.path.join(r"C:\Users\ASUS\.gemini\antigravity", "active_recovery.json")
+            if os.path.exists(recovery_path):
+                os.remove(recovery_path)
+        except Exception as e:
+            pass
+
+    def check_and_prompt_recovery(self) -> None:
+        import os
+        recovery_path = os.path.join(r"C:\Users\ASUS\.gemini\antigravity", "active_recovery.json")
+        if not os.path.exists(recovery_path):
+            return
+        try:
+            with open(recovery_path, "r", encoding="utf-8") as f:
+                recovery_data = json.load(f)
+            
+            project_id = recovery_data.get("project_id")
+            payload = recovery_data.get("payload", {})
+            work_name = payload.get("project", {}).get("work_name", "(Untitled)")
+            
+            ans = QMessageBox.question(
+                self,
+                "Recover Unsaved Project",
+                f"RoadX detected an unsaved project from an abnormal termination:\n\n"
+                f"Project: {work_name} (ID: {project_id})\n\n"
+                f"Would you like to recover the unsaved changes for this project?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.Yes
+            )
+            if ans == QMessageBox.Yes:
+                from app.db.project_exchange import import_project
+                if "project" in payload:
+                    orig_name = payload["project"].get("work_name", "Recovered Project")
+                    payload["project"]["work_name"] = f"{orig_name} (Recovered)"
+                
+                res = import_project(self.db, payload)
+                QMessageBox.information(
+                    self,
+                    "Project Recovered",
+                    f"The unsaved project has been recovered successfully and loaded as a new copy:\n\n"
+                    f"Project Name: {payload['project']['work_name']} (ID: {res.project_id})\n\n"
+                    f"The original project ID {project_id} remains untouched."
+                )
+                self._on_open_project(res.project_id)
+        except Exception as e:
+            QMessageBox.warning(
+                self,
+                "Recovery Failed",
+                f"Failed to recover the unsaved project: {e}"
+            )
+        finally:
+            self.clean_autosave_checkpoint()
+
+    def closeEvent(self, event) -> None:
+        self.clean_autosave_checkpoint()
+        event.accept()

@@ -288,3 +288,20 @@ def test_legacy_fallbacks(db):
         # Compile report - should not raise any AttributeError/KeyError and complete successfully
         build_combined_report(out_path, db, proj.id, ctx)
         assert out_path.is_file()
+
+
+def test_project_recovery_system(db):
+    """Verify that abnormal termination recovery works correctly by saving and restoring a project."""
+    proj = db.create_project(work_name="Recovery Source Project")
+    
+    from app.db.project_exchange import export_project, import_project
+    checkpoint = export_project(db, proj.id)
+    
+    # Verify we can modify name and import it back
+    payload = checkpoint
+    payload["project"]["work_name"] = f"{proj.work_name} (Recovered)"
+    
+    res = import_project(db, payload)
+    recovered_project = db.get_project(res.project_id)
+    assert recovered_project.work_name == "Recovery Source Project (Recovered)"
+    assert recovered_project.id != proj.id

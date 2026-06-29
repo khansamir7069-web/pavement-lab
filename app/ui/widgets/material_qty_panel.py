@@ -403,7 +403,8 @@ class MaterialQuantityPanel(QWidget):
                     sb.setValue(r.rate)
                     uc.setCurrentText(r.unit)
         except Exception as e:
-            print("Error loading rates:", e)
+            import logging
+            logging.getLogger(__name__).error(f"Error loading rates: {e}")
 
     def _save_rates(self) -> None:
         try:
