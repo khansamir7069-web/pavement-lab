@@ -17,10 +17,10 @@ def get_file_sha256_and_size(path: Path) -> tuple[str, int]:
     return hashlib.sha256(data).hexdigest(), len(data)
 
 def main():
-    print("==> Setting metadata variables (Audited Release Candidate RC6)")
+    print("==> Setting metadata variables (Audited Release Candidate RC7)")
     branch = "release/v2.2"
     commit = "4dbc67122869b971187bccb8bc46c1f764fcd32a"
-    tag = "v2.2-rc6"
+    tag = "v2.2-rc7"
     print(f"Git Metadata: Branch={branch}, Commit={commit}, Tag={tag}")
 
     print("==> Checking release checklist diagnostics")
@@ -135,7 +135,7 @@ The following files are packaged in this release:
 
 ## Certification Details
 * **Product Name:** RoadX Professional Suite
-* **Version:** v2.2 (Commercial Release Candidate RC6)
+* **Version:** v2.2 (Commercial Release Candidate RC7)
 * **Release Branch:** `{branch}`
 * **Release Tag:** `{tag}`
 * **Commit Hash:** `{commit}`
