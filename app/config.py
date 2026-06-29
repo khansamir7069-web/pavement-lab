@@ -22,15 +22,31 @@ def _resource_root() -> Path:
 
 
 def _user_data_root() -> Path:
-    # SamPave V1 user-data root.
-    # %LOCALAPPDATA%\SamPave on Windows, ~/.local/share/SamPave elsewhere.
+    # RoadX Professional Suite user-data root.
+    # %LOCALAPPDATA%\RoadX on Windows, ~/.local/share/RoadX elsewhere.
     if os.name == "nt":
         base = Path(os.environ.get("LOCALAPPDATA", Path.home()))
     else:
         base = Path.home() / ".local" / "share"
-    p = base / "SamPave"
-    p.mkdir(parents=True, exist_ok=True)
-    return p
+    p_new = base / "RoadX"
+    p_legacy = base / "SamPave"
+    p_new.mkdir(parents=True, exist_ok=True)
+    
+    # Safe migration: if database exists in legacy but not in new, copy it over
+    legacy_db = p_legacy / "pavement_lab.db"
+    new_db = p_new / "pavement_lab.db"
+    if legacy_db.exists() and not new_db.exists():
+        try:
+            import shutil
+            shutil.copy2(legacy_db, new_db)
+            legacy_reports = p_legacy / "reports"
+            new_reports = p_new / "reports"
+            if legacy_reports.is_dir():
+                shutil.copytree(legacy_reports, new_reports, dirs_exist_ok=True)
+        except Exception:
+            pass
+            
+    return p_new
 
 
 APP_DIR = _resource_root()

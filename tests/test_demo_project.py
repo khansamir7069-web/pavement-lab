@@ -37,7 +37,7 @@ def test_create_demo_project(db):
     
     project = db.get_project(pid)
     assert project is not None
-    assert project.work_name == "NH-48 Flexible Pavement Demo"
+    assert project.work_name == "NH-48 Flexible Pavement Preset"
     
     # 2. Traffic analysis and calculated MSA
     ta = db.latest_traffic_analysis(pid)
@@ -84,7 +84,7 @@ def test_create_demo_project(db):
         ctx = CombinedReportContext(
             project_title=project.work_name,
             work_name=project.work_name,
-            client="Demo Highway Authority",
+            client="Sample Highway Authority",
             submitted_by="Pavement Consultant Ltd."
         )
         build_combined_report(report_path, db, pid, ctx)
@@ -101,9 +101,9 @@ def test_create_fresh_copy(db):
     assert pid2 != pid1
     
     project2 = db.get_project(pid2)
-    assert project2.work_name == f"NH-48 Flexible Pavement Demo (Copy - {suffix})"
+    assert project2.work_name == f"NH-48 Flexible Pavement Preset (Copy - {suffix})"
     
     # Verify that the original project still exists
     project1 = db.get_project(pid1)
     assert project1 is not None
-    assert project1.work_name == "NH-48 Flexible Pavement Demo"
+    assert project1.work_name == "NH-48 Flexible Pavement Preset"

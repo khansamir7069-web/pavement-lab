@@ -70,7 +70,7 @@ def write_stabilized_section(
     add_heading(doc, "1. Design Validation Mode", level=2)
     add_kv_table(doc, (
         ("Validation Mode", f"★ {result.validation_mode} ★"),
-        ("CTB Fatigue Status", "Mechanistic verification required" if result.validation_mode == "Decision Support Mode" else "Mechanistically Verified (IITPAVE)"),
+        ("CTB Fatigue Status", "Mechanistic verification required" if result.validation_mode == "IRC Catalogue Design (Decision Support Mode)" else "Mechanistically Verified (IITPAVE)"),
     ))
     add_p(
         doc,
@@ -139,7 +139,7 @@ def write_stabilized_section(
     add_heading(doc, "4. Engineering Warnings & Screening Remarks", level=2)
     if result.warnings:
         warn_rows = [[f"{idx+1}", w] for idx, w in enumerate(result.warnings)]
-        add_table(doc, ["#", "Engineering screening alerts & placeholders"], warn_rows)
+        add_table(doc, ["#", "Engineering screening alerts & preliminary checks"], warn_rows)
     else:
         add_p(doc, "No engineering screening warnings generated.")
 

@@ -30,20 +30,24 @@ from app.core.production_readiness import build_production_readiness_checklist
 from app.core.release_integrity import build_release_integrity_checklist
 
 
-FINAL_RELEASE_READINESS_FORMAT = "sampave.final_release_readiness"
+FINAL_RELEASE_READINESS_FORMAT = "roadx.final_release_readiness"
 FINAL_RELEASE_READINESS_VERSION = "1.0"
 
 _INNO_INSTALLER_REQUIRED_MARKERS = (
-    '#define MyAppName "SAMPAVE"',
-    '#define MyAppPublisher "SAMPAVE"',
-    '#define MyAppExeName "SamPave.exe"',
-    "DefaultDirName={autopf}\\SAMPAVE",
-    "DefaultGroupName=SAMPAVE",
-    "OutputBaseFilename=SAMPAVE-Setup",
-    'Source: "..\\dist\\SamPave\\*"',
+    '#define MyAppName "RoadX Professional Suite"',
+    '#define MyAppPublisher "SKM Technologies"',
+    '#define MyAppExeName "RoadX.exe"',
+    "DefaultDirName={autopf}\\RoadX Professional Suite",
+    "DefaultGroupName=RoadX Professional Suite",
+    "OutputBaseFilename=RoadX_Professional_v2.2_Setup",
+    'Source: "..\\dist\\RoadX\\*"',
 )
 
 _INNO_INSTALLER_FORBIDDEN_MARKERS = (
+    "SAMPAVE",
+    "SamPave.exe",
+    "SAMPAVE-Setup",
+    "dist\\SamPave",
     "Pavement Lab",
     "PavementLab.exe",
     "PavementLab-Setup",
@@ -226,12 +230,12 @@ def _release_packaging_assets_check(repo_root: Path) -> FinalReleaseCheck:
             ]
             if missing_markers:
                 issues.append(
-                    "build/installer.iss: missing SAMPAVE packaging marker(s): "
+                    "build/installer.iss: missing RoadX packaging marker(s): "
                     + ", ".join(missing_markers)
                 )
             if forbidden_markers:
                 issues.append(
-                    "build/installer.iss: old PavementLab packaging marker(s) remain: "
+                    "build/installer.iss: forbidden packaging marker(s) remain: "
                     + ", ".join(forbidden_markers)
                 )
     status = DEPLOYMENT_CHECK_FAIL if issues else DEPLOYMENT_CHECK_PASS

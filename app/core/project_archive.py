@@ -233,7 +233,7 @@ def generate_project_archive(
             summary_lines.append(f"  CTB modulus (MPa)   : {res.get('inputs', {}).get('ctb_modulus_mpa', 'N/A')}")
             summary_lines.append(f"  CTS thickness (mm) : {res.get('inputs', {}).get('cts_thickness_mm', 'N/A')}")
             summary_lines.append(f"  CTS modulus (MPa)   : {res.get('inputs', {}).get('cts_modulus_mpa', 'N/A')}")
-            summary_lines.append(f"  Pavement Thickness Comparison Mode: {res.get('validation_mode', 'Decision Support Mode')}")
+            summary_lines.append(f"  Pavement Thickness Comparison Mode: {res.get('validation_mode', 'IRC Catalogue Design (Decision Support Mode)')}")
         except Exception:
             pass
 

@@ -22,7 +22,10 @@ from app.core.config_profiles import (
 
 log = logging.getLogger(__name__)
 
-IITPAVE_EXECUTABLE_ENV_VAR = "SAMPAVE_IITPAVE_EXE"
+import os
+IITPAVE_EXECUTABLE_ENV_VAR = "ROADX_IITPAVE_EXE"
+if "ROADX_IITPAVE_EXE" not in os.environ and "SAMPAVE_IITPAVE_EXE" in os.environ:
+    os.environ["ROADX_IITPAVE_EXE"] = os.environ["SAMPAVE_IITPAVE_EXE"]
 
 SOURCE_CONFIGURED = "configured_path"
 SOURCE_ENVIRONMENT = "environment"

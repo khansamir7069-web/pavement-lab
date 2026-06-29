@@ -146,6 +146,7 @@ class MechanisticValidationSummary:
     refused_reason: str
     references: Tuple[CodeRef, ...] = REFERENCES
     notes: str = ""
+    validation_metadata: Optional[dict[str, Any]] = None
 
     @property
     def tensile_strain_micro(self) -> Optional[float]:

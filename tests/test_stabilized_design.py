@@ -79,8 +79,8 @@ def test_ctb_valid_input_case() -> None:
     assert not has_poisson_warn
     assert not has_thick_warn
 
-    # Placeholders must still be present
-    assert any("CTB Fatigue Check (Placeholder)" in w for w in result.warnings)
+    # Preliminary notice must still be present
+    assert any("CTB Fatigue Check (Preliminary)" in w for w in result.warnings)
     assert any("Engineer review required" in w for w in result.warnings)
     assert result.validation_mode == "Decision Support Mode"
 

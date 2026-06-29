@@ -38,7 +38,7 @@ REFERENCES: Tuple[CodeRef, ...] = (
 MECHANISTIC_WORKFLOW_NOT_RUN: str = (
     "IITPAVE unavailable - mechanistic workflow has not run. "
     "Use Structural Design Compute to run local IITPAVE or configure "
-    "SAMPAVE_IITPAVE_EXE."
+    "ROADX_IITPAVE_EXE."
 )
 
 

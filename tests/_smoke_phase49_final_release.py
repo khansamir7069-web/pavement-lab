@@ -40,22 +40,22 @@ def _sample_payload(name: str) -> dict:
 
 
 def _aligned_installer_script() -> str:
-    return """; Inno Setup script for SAMPAVE.
-#define MyAppName "SAMPAVE"
-#define MyAppVersion "1.0.0"
-#define MyAppPublisher "SAMPAVE"
-#define MyAppExeName "SamPave.exe"
+    return """; Inno Setup script for RoadX Professional Suite.
+#define MyAppName "RoadX Professional Suite"
+#define MyAppVersion "2.2"
+#define MyAppPublisher "SKM Technologies"
+#define MyAppExeName "RoadX.exe"
 
 [Setup]
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
-DefaultDirName={autopf}\\SAMPAVE
-DefaultGroupName=SAMPAVE
-OutputBaseFilename=SAMPAVE-Setup
+DefaultDirName={autopf}\\RoadX Professional Suite
+DefaultGroupName=RoadX Professional Suite
+OutputBaseFilename=RoadX_Professional_v2.2_Setup
 
 [Files]
-Source: "..\\dist\\SamPave\\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\\dist\\RoadX\\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\\{#MyAppName}"; Filename: "{app}\\{#MyAppExeName}"

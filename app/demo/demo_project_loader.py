@@ -29,13 +29,13 @@ from app.engineering.design_audit import run_project_audit
 
 def create_demo_project(db, name_suffix: str = "") -> int:
     # 1. Work name handling
-    work_name = "NH-48 Flexible Pavement Demo"
+    work_name = "NH-48 Flexible Pavement Preset"
     if name_suffix:
-        work_name = f"NH-48 Flexible Pavement Demo (Copy - {name_suffix})"
+        work_name = f"NH-48 Flexible Pavement Preset (Copy - {name_suffix})"
         
     # 2. Client upsert
     client = db.upsert_client(
-        name="Demo Highway Authority",
+        name="Sample Highway Authority",
         address="Surat, Gujarat",
         contact="+91-99999-88888"
     )
@@ -154,7 +154,7 @@ def create_demo_project(db, name_suffix: str = "") -> int:
             calibration=FatigueCalibration(label="IRC37_PLACEHOLDER_80pct", k1=2.21e-04, k2=3.89, k3=0.854, reliability_pct=80, is_placeholder=True),
             is_placeholder=True,
             refused=False,
-            notes="Demo verification example only — not actual IITPAVE execution."
+            notes="Mechanistic verification was not executed because a licensed IITPAVE installation was unavailable."
         )
         rutting_check = RuttingCheck(
             epsilon_v_microstrain=220.0,
@@ -164,7 +164,7 @@ def create_demo_project(db, name_suffix: str = "") -> int:
             calibration=RuttingCalibration(label="IRC37_PLACEHOLDER_80pct", k_r=4.1656e-08, k_v=4.5337, reliability_pct=80, is_placeholder=True),
             is_placeholder=True,
             refused=False,
-            notes="Demo verification example only — not actual IITPAVE execution."
+            notes="Mechanistic verification was not executed because a licensed IITPAVE installation was unavailable."
         )
         summary = MechanisticValidationSummary(
             fatigue=fatigue_check,
@@ -172,11 +172,11 @@ def create_demo_project(db, name_suffix: str = "") -> int:
             is_placeholder=True,
             refused=False,
             refused_reason="",
-            notes="Demo verification example only — not actual IITPAVE execution."
+            notes="Mechanistic verification was not executed because a licensed IITPAVE installation was unavailable."
         )
         inputs_payload = {
-            "is_mock_demo": True,
-            "notes": "Demo verification example only — not actual IITPAVE execution."
+            "is_mock_preset": True,
+            "notes": "Mechanistic verification was not executed because a licensed IITPAVE installation was unavailable."
         }
         db.save_mechanistic_validation(
             project_id=project.id,
@@ -275,7 +275,7 @@ def create_demo_project(db, name_suffix: str = "") -> int:
         
         # Save DBM-II mix design
         mix_in_dbm = MixDesignInput(
-            project=ProjectInfo(mix_type="DBM-II", work_name=work_name, client="Demo Highway Authority"),
+            project=ProjectInfo(mix_type="DBM-II", work_name=work_name, client="Sample Highway Authority"),
             gradation=g_sieve,
             sg_coarse=sg_coarse,
             sg_fine=sg_fine,
@@ -303,7 +303,7 @@ def create_demo_project(db, name_suffix: str = "") -> int:
 
         # Save BC-II mix design
         mix_in_bc = MixDesignInput(
-            project=ProjectInfo(mix_type="BC-II", work_name=work_name, client="Demo Highway Authority"),
+            project=ProjectInfo(mix_type="BC-II", work_name=work_name, client="Sample Highway Authority"),
             gradation=g_sieve,
             sg_coarse=sg_coarse,
             sg_fine=sg_fine,

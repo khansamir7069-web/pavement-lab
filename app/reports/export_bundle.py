@@ -22,7 +22,7 @@ from .iitpave_schema_history import (
 from .report_revision import build_report_revision_history_review
 
 
-REPORT_EXPORT_BUNDLE_FORMAT = "sampave.report_export_bundle"
+REPORT_EXPORT_BUNDLE_FORMAT = "roadx.report_export_bundle"
 REPORT_EXPORT_BUNDLE_VERSION = "1.0"
 
 
@@ -198,7 +198,7 @@ def build_report_export_bundle(
     bundle_dir.mkdir(parents=True, exist_ok=True)
     created_at = _utcish_stamp()
     bundle_id = (
-        f"SAMPAVE-P{project_id}-"
+        f"ROADX-P{project_id}-"
         f"{created_at.replace('-', '').replace(':', '').replace(' ', 'T')}"
     )
 

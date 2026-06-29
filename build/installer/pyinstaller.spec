@@ -1,6 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
-# SAMPAVE — V1 installer spec (Phase 17).
-#
+# RoadX Professional Suite v2.2 installer spec.
 # Build from the project root with:
 #
 #     pyinstaller build/installer/pyinstaller.spec --clean --noconfirm
@@ -112,7 +111,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name="SamPave",
+    name="RoadX",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -133,5 +132,5 @@ coll = COLLECT(
     strip=False,
     upx=False,
     upx_exclude=[],
-    name="SamPave",
+    name="RoadX",
 )

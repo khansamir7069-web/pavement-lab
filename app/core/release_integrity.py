@@ -20,7 +20,7 @@ from app.core.deployment import (
 )
 
 
-RELEASE_INTEGRITY_FORMAT = "sampave.release_integrity"
+RELEASE_INTEGRITY_FORMAT = "roadx.release_integrity"
 RELEASE_INTEGRITY_VERSION = "1.0"
 
 REQUIRED_RELEASE_PHASE_SMOKES: tuple[str, ...] = (

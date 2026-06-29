@@ -19,7 +19,7 @@ from app.core.deployment import (
 )
 
 
-PRODUCTION_READINESS_FORMAT = "sampave.production_readiness"
+PRODUCTION_READINESS_FORMAT = "roadx.production_readiness"
 PRODUCTION_READINESS_VERSION = "1.0"
 
 SCAN_FILE_LIMIT = 10000

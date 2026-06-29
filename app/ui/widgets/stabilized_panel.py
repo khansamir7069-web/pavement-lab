@@ -392,7 +392,7 @@ class StabilizedPanel(QWidget):
         self.res_card.setVisible(True)
         
         # Determine and display active validation mode banner
-        mode = r.validation_mode
+        mode = "Mechanistically Verified Design" if r.validation_mode == "Mechanistic Verified Mode" else "IRC Catalogue Design (Decision Support Mode)"
         is_mock = False
         if r.mechanistic_validation and "Demo verification example only" in (r.mechanistic_validation.notes or ""):
             is_mock = True
@@ -400,10 +400,10 @@ class StabilizedPanel(QWidget):
         if is_mock:
             banner_style = "background-color:#fadbd8; color:#78281f; font-weight:bold; border:1px solid #f5b7b1; border-radius:4px; padding:6px 12px; font-size:10pt;"
             banner_text = (
-                "⚠️ <b>Verification Mode:</b> Decision Support Mode (Demo Run)<br>"
+                "⚠️ <b>Verification Mode:</b> IRC Catalogue Design (Decision Support Mode)<br>"
                 "<b>Demo verification example only — not actual IITPAVE execution.</b>"
             )
-        elif mode == "Mechanistic Verified Mode":
+        elif mode == "Mechanistically Verified Design":
             banner_style = "background-color:#d4efdf; color:#196f3d; font-weight:bold; border:1px solid #a3e4d7; border-radius:4px; padding:6px 12px; font-size:10pt;"
             banner_text = (
                 f"🛡️ <b>Verification Mode:</b> {mode}<br>"
@@ -414,7 +414,7 @@ class StabilizedPanel(QWidget):
             banner_style = "background-color:#fef9e7; color:#7d6608; border:1px solid #f9e79f; border-radius:4px; padding:6px 12px; font-size:10pt;"
             banner_text = (
                 f"ℹ️ <b>Verification Mode:</b> {mode}<br>"
-                "This design is computed under Decision Support Mode. "
+                "This design is computed under IRC Catalogue Design (Decision Support Mode). "
                 "IITPAVE mechanistic verification has not been performed or is using default stubs/placeholders. "
                 "To verify the design with IITPAVE.exe, configure the executable path in the "
                 "<a href='#iitpave_settings' style='color:#1a5276; font-weight:bold;'>IITPAVE Integration Manager</a>."

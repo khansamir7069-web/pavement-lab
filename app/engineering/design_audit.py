@@ -494,8 +494,8 @@ def run_project_audit(project_id: int, db) -> AuditResult:
                 severity="critical",
                 module="iitpave",
                 issue="Mechanistic Verification Incomplete",
-                recommendation="Execute real IITPAVE production mode validation; Decision Support Stub is active.",
-                engineering_reason="Decision support stub mode is insufficient for consultancy design validation.",
+                recommendation="Execute real IITPAVE production mode validation; IRC Catalogue Design mode is active.",
+                engineering_reason="IRC Catalogue Design mode is insufficient for consultancy design validation; real mechanistic validation required.",
                 navigation_key="IITPAVE Status"
             ))
             mod_statuses["iitpave"] = "FAIL"

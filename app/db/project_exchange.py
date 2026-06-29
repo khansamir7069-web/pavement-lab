@@ -36,7 +36,7 @@ from .schema import (
 )
 
 
-PROJECT_EXPORT_FORMAT = "sampave.project_export"
+PROJECT_EXPORT_FORMAT = "roadx.project_export"
 PROJECT_EXPORT_FORMAT_VERSION = "1.0"
 
 SEVERITY_ERROR = "error"
@@ -435,11 +435,12 @@ def validate_project_export_payload(
             _issue(SEVERITY_ERROR, "payload", "Project export payload must be a mapping."),
         ))
 
-    if payload.get("format") != PROJECT_EXPORT_FORMAT:
+    fmt = payload.get("format")
+    if fmt not in (PROJECT_EXPORT_FORMAT, "sampave.project_export"):
         issues.append(_issue(
             SEVERITY_ERROR,
             "format",
-            f"Unsupported project export format {payload.get('format')!r}.",
+            f"Unsupported project export format {fmt!r}.",
         ))
 
     version = payload.get("format_version")

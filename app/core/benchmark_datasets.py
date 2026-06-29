@@ -20,7 +20,7 @@ from app.core.deployment import (
 )
 
 
-BENCHMARK_DATASET_READINESS_FORMAT = "sampave.benchmark_dataset_readiness"
+BENCHMARK_DATASET_READINESS_FORMAT = "roadx.benchmark_dataset_readiness"
 BENCHMARK_DATASET_READINESS_VERSION = "1.0"
 
 

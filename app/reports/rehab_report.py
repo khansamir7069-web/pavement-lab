@@ -105,7 +105,7 @@ def write_rehab_section(
               "and — where available — the project's traffic / "
               "maintenance design data. Recommendation thresholds are "
               "IRC:82 / IRC:81 / IRC:115 / IRC:SP:81 / IRC:SP:101 "
-              "shape but remain uncalibrated placeholder values.",
+              "shape but remain preliminary decision-support values.",
               italic=True, size=10, align=WD_ALIGN_PARAGRAPH.CENTER)
         add_p(doc, f"{ctx.lab_name}  -  Report Date: {ctx.report_date}",
               size=10, align=WD_ALIGN_PARAGRAPH.CENTER)
@@ -118,16 +118,16 @@ def write_rehab_section(
             ("Submitted By",    ctx.submitted_by),
         ))
 
-    # --- Placeholder banner --------------------------------------------
+    # --- Notice banner -------------------------------------------------
     if synthesis.is_placeholder:
-        add_placeholder_banner(doc, "[PLACEHOLDER] " + (synthesis.notes or ""))
+        add_placeholder_banner(doc, "[PRELIMINARY] " + (synthesis.notes or ""))
 
     # --- Context summary -----------------------------------------------
     add_heading(doc, "Synthesis Summary", level=2)
     add_kv_table(doc, (
         ("Context",            synthesis.context_summary),
         ("Recommendations",    str(len(synthesis.recommendations))),
-        ("Placeholder",        "Yes" if synthesis.is_placeholder else "No"),
+        ("Calibration Status", "Preliminary (Standard)" if synthesis.is_placeholder else "Project Calibrated"),
     ))
 
     # --- Prioritized recommendations table -----------------------------
@@ -164,7 +164,7 @@ def write_rehab_section(
                 ("Triggers",       _triggers_inline(rec)),
                 ("Next module",    _next_module_label(rec)),
                 ("References",     _refs_inline(rec)),
-                ("Placeholder",    "Yes" if rec.is_placeholder else "No"),
+                ("Calibration Status", "Preliminary (Standard)" if rec.is_placeholder else "Project Calibrated"),
             ))
 
     # --- Engine-level notes --------------------------------------------

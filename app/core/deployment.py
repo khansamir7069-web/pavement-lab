@@ -1,6 +1,6 @@
 """Local deployment/runtime readiness helpers.
 
-Phase 42 prepares SamPave for local commercial deployment checks. The helpers
+Phase 42 prepares RoadX for local commercial deployment checks. The helpers
 validate application/runtime directories and produce audit-friendly deployment
 metadata. They do not implement cloud deployment, activation, licensing, or
 installer orchestration.
@@ -21,9 +21,9 @@ from app.config import APP_DIR, REPORTS_DIR, USER_DATA_DIR
 from app.core.iitpave.discovery import bundled_iitpave_exe_path, discover_iitpave_executable
 
 
-DEPLOYMENT_MANIFEST_FORMAT = "sampave.deployment_manifest"
+DEPLOYMENT_MANIFEST_FORMAT = "roadx.deployment_manifest"
 DEPLOYMENT_MANIFEST_VERSION = "1.0"
-LOCAL_INSTALLER_PREPARATION_FORMAT = "sampave.local_installer_preparation"
+LOCAL_INSTALLER_PREPARATION_FORMAT = "roadx.local_installer_preparation"
 LOCAL_INSTALLER_PREPARATION_VERSION = "1.0"
 
 DEPLOYMENT_SEVERITY_INFO = "info"
@@ -385,7 +385,7 @@ def default_runtime_paths(
 
 
 def _check_writable(path: Path) -> tuple[bool, str]:
-    probe = path / ".sampave_write_probe"
+    probe = path / ".roadx_write_probe"
     try:
         probe.write_text("ok", encoding="utf-8")
         probe.unlink(missing_ok=True)

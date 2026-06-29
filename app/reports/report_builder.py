@@ -315,7 +315,7 @@ def _rehydrate_structural(sd_row, mech_row=None) -> "StructuralResult | None":
                 has_mech = not mech.refused
         except Exception:
             pass
-        mode = "Mechanistic Verified Mode" if has_mech else "Decision Support Mode"
+        mode = "Mechanistically Verified Design" if has_mech else "IRC Catalogue Design (Decision Support Mode)"
         return replace(
             result,
             mechanistic_validation=mech,
@@ -1090,7 +1090,7 @@ def build_combined_report(
         add_traceability_block(doc, "IITPAVE Mechanistic Safety Verification", iit_inputs, iit_outputs, "IRC:37-2018 (Section 6 & IITPAVE Engine)")
         included.append("Appendix D: IITPAVE Verification")
     else:
-        add_p(doc, "IITPAVE mechanistic validation was not performed. Pavement design is prepared under empirical Decision Support Mode guidelines.")
+        add_p(doc, "Real IITPAVE verification was not performed. Pavement design is prepared under empirical Decision Support Mode guidelines.")
 
     # ---- APPENDIX E: MIX DESIGN ----
     doc.add_page_break()
@@ -1386,11 +1386,11 @@ def write_executive_summary_section(doc, p, structural, stabilized, mech_val, db
     
     if mech_val and not mech_val.refused:
         if "Demo verification example only" in (mech_val.notes or ""):
-            summary_para += f"Mechanistic verification has been successfully conducted (Demo verification example only — not actual IITPAVE execution)."
+            summary_para += f"Mechanistic verification has been successfully conducted (IRC Catalogue Design - Decision Support Mode)."
         else:
-            summary_para += f"Mechanistic verification has been successfully conducted using IITPAVE under Mechanistic Verified Mode."
+            summary_para += f"Mechanistic verification has been successfully conducted using IITPAVE as a Mechanistically Verified Design."
     else:
-        summary_para += f"The design calculations have been prepared under Decision Support Mode guidelines."
+        summary_para += f"The design calculations have been prepared under IRC Catalogue Design (Decision Support Mode) guidelines."
         
     add_p(doc, summary_para)
     

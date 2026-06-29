@@ -60,7 +60,7 @@ def write_condition_section(
         add_p(doc,
               "Basis: ASTM D6433 deduct-value method (shape) + IRC:82 "
               "maintenance treatment matrix. PCI score and rehab "
-              "recommendations are foundation-level placeholders pending "
+              "recommendations are preliminary decision-support values pending "
               "calibration.",
               italic=True, size=10, align=WD_ALIGN_PARAGRAPH.CENTER)
         add_p(doc, f"{ctx.lab_name}  -  Report Date: {ctx.report_date}",
@@ -74,10 +74,10 @@ def write_condition_section(
             ("Submitted By",    ctx.submitted_by),
         ))
 
-    # Placeholder banner (always shown in Phase 10)
+    # Notice banner (always shown in Phase 10)
     if result.is_placeholder:
-        add_placeholder_banner(doc, "[PLACEHOLDER] " + (result.notes or
-            "PCI weights and rehab recommendations are uncalibrated."))
+        add_placeholder_banner(doc, "[PRELIMINARY] " + (result.notes or
+            "PCI weights and rehab recommendations are preliminary (standard decision support)."))
 
     inp = result.inputs
 
@@ -107,7 +107,7 @@ def write_condition_section(
                 b.recommendation.treatment,
             ])
         add_table(doc, ["Distress", "Severity", "Extent",
-                        "Deduct Value", "Rehab (placeholder)"], rows)
+                        "Deduct Value", "Rehab Treatment (Preliminary)"], rows)
     else:
         add_p(doc, "No distress records were captured for this survey.",
               italic=True, size=10)
@@ -118,8 +118,8 @@ def write_condition_section(
         ("Total Deduct (Sum DV)",  f"{result.total_deduct:.2f}"),
         ("PCI Score (0-100)",      f"{result.pci_score:.2f}"),
         ("Condition Category",     result.condition_category),
-        ("Calibration Status",     "PLACEHOLDER (uncalibrated)"
-                                   if result.is_placeholder else "Calibrated"),
+        ("Calibration Status",     "Preliminary (Standard)"
+                                   if result.is_placeholder else "Project Calibrated"),
     ))
 
     # ---- Rehab recommendations summary (sourced from breakdown) --------

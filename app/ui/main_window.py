@@ -576,18 +576,18 @@ class MainWindow(QMainWindow):
         
         with self.db.session() as s:
             existing_demo = s.scalars(
-                select(Project).where(Project.work_name == "NH-48 Flexible Pavement Demo")
+                select(Project).where(Project.work_name == "NH-48 Flexible Pavement Preset")
             ).first()
             
         if existing_demo is not None:
             msg_box = QMessageBox(self)
-            msg_box.setWindowTitle("Demo Project Exists")
+            msg_box.setWindowTitle("Preset Project Exists")
             msg_box.setText(
-                "The project 'NH-48 Flexible Pavement Demo' already exists.\n\n"
+                "The project 'NH-48 Flexible Pavement Preset' already exists.\n\n"
                 "Please choose how you would like to proceed:"
             )
             
-            open_btn = msg_box.addButton("Open Existing Demo", QMessageBox.ActionRole)
+            open_btn = msg_box.addButton("Open Existing Preset", QMessageBox.ActionRole)
             copy_btn = msg_box.addButton("Create Fresh Copy", QMessageBox.ActionRole)
             cancel_btn = msg_box.addButton("Cancel", QMessageBox.RejectRole)
             
@@ -604,8 +604,8 @@ class MainWindow(QMainWindow):
                     new_id = create_demo_project(self.db, name_suffix=suffix)
                     QMessageBox.information(
                         self, "Success",
-                        f"Fresh copy of the demo project created successfully:\n"
-                        f"NH-48 Flexible Pavement Demo (Copy - {suffix})"
+                        f"Fresh copy of the preset project created successfully:\n"
+                        f"NH-48 Flexible Pavement Preset (Copy - {suffix})"
                     )
                     self._on_open_project(new_id)
                 except Exception as e:
@@ -617,12 +617,12 @@ class MainWindow(QMainWindow):
             try:
                 new_id = create_demo_project(self.db)
                 QMessageBox.information(
-                    self, "Success",
-                    "Demo project 'NH-48 Flexible Pavement Demo' loaded successfully."
+                     self, "Success",
+                     "Preset project 'NH-48 Flexible Pavement Preset' loaded successfully."
                 )
                 self._on_open_project(new_id)
             except Exception as e:
-                QMessageBox.critical(self, "Error", f"Failed to load demo project: {e}")
+                QMessageBox.critical(self, "Error", f"Failed to load preset project: {e}")
 
     def _on_project_saved(self, project_id: int) -> None:
         self._current_project_id = project_id
@@ -1213,7 +1213,7 @@ class MainWindow(QMainWindow):
             self,
             "Save Project Export",
             str(default),
-            "SamPave Project Export (*.json);;JSON Files (*.json);;All Files (*)",
+            "RoadX Project Export (*.json);;JSON Files (*.json);;All Files (*)",
         )
         if not path:
             return
@@ -1237,7 +1237,7 @@ class MainWindow(QMainWindow):
             self,
             "Open Project Export",
             "",
-            "SamPave Project Export (*.json);;JSON Files (*.json);;All Files (*)",
+            "RoadX Project Export (*.json);;JSON Files (*.json);;All Files (*)",
         )
         if not path:
             return
@@ -1880,6 +1880,7 @@ class MainWindow(QMainWindow):
         if self._current_project_id is None:
             return
         try:
+            from datetime import datetime, timezone
             from app.db.project_exchange import export_project
             checkpoint = export_project(self.db, self._current_project_id)
             recovery_data = {
@@ -1887,8 +1888,10 @@ class MainWindow(QMainWindow):
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "payload": checkpoint
             }
+            from app.config import USER_DATA_DIR
             import os
-            app_data_dir = r"C:\Users\ASUS\.gemini\antigravity"
+            import json
+            app_data_dir = str(USER_DATA_DIR)
             os.makedirs(app_data_dir, exist_ok=True)
             recovery_path = os.path.join(app_data_dir, "active_recovery.json")
             with open(recovery_path, "w", encoding="utf-8") as f:
@@ -1900,7 +1903,8 @@ class MainWindow(QMainWindow):
     def clean_autosave_checkpoint(self) -> None:
         try:
             import os
-            recovery_path = os.path.join(r"C:\Users\ASUS\.gemini\antigravity", "active_recovery.json")
+            from app.config import USER_DATA_DIR
+            recovery_path = os.path.join(str(USER_DATA_DIR), "active_recovery.json")
             if os.path.exists(recovery_path):
                 os.remove(recovery_path)
         except Exception as e:
@@ -1908,7 +1912,8 @@ class MainWindow(QMainWindow):
 
     def check_and_prompt_recovery(self) -> None:
         import os
-        recovery_path = os.path.join(r"C:\Users\ASUS\.gemini\antigravity", "active_recovery.json")
+        from app.config import USER_DATA_DIR
+        recovery_path = os.path.join(str(USER_DATA_DIR), "active_recovery.json")
         if not os.path.exists(recovery_path):
             return
         try:

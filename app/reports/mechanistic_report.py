@@ -107,11 +107,11 @@ def _render_fatigue(doc: Document, check: FatigueCheck) -> None:
         ["Coefficient",           "k1", f"{cal.k1:.4e}"],
         ["Strain exponent",       "k2", f"{cal.k2:g}"],
         ["Modulus exponent",      "k3", f"{cal.k3:g}"],
-        ["Placeholder",           "—",  "Yes" if cal.is_placeholder else "No"],
+        ["Calibration Status",     "—",  "Preliminary (Standard)" if cal.is_placeholder else "Project Calibrated"],
     ])
     if check.refused:
         add_placeholder_banner(doc,
-            f"[REFUSED — fatigue] {check.refused_reason}"
+            f"[BLOCKED — fatigue] {check.refused_reason}"
         )
     if check.notes:
         add_note(doc, check.notes)
@@ -140,11 +140,11 @@ def _render_rutting(doc: Document, check: RuttingCheck) -> None:
         ["Reliability",           "—",   f"{cal.reliability_pct}%"],
         ["Coefficient",           "k_r", f"{cal.k_r:.4e}"],
         ["Strain exponent",       "k_v", f"{cal.k_v:g}"],
-        ["Placeholder",           "—",   "Yes" if cal.is_placeholder else "No"],
+        ["Calibration Status",     "—",   "Preliminary (Standard)" if cal.is_placeholder else "Project Calibrated"],
     ])
     if check.refused:
         add_placeholder_banner(doc,
-            f"[REFUSED — rutting] {check.refused_reason}"
+            f"[BLOCKED — rutting] {check.refused_reason}"
         )
     if check.notes:
         add_note(doc, check.notes)
@@ -192,9 +192,9 @@ def write_mechanistic_section(
     if validation_mode is None:
         is_mock = "Demo verification example only" in (summary.notes or "")
         if is_mock:
-            validation_mode = "Decision Support Mode (Demo Run)"
+            validation_mode = "IRC Catalogue Design (Decision Support Mode)"
         else:
-            validation_mode = "Mechanistic Verified Mode" if (not summary.is_placeholder and not summary.refused) else "Decision Support Mode"
+            validation_mode = "Mechanistically Verified Design" if (not summary.is_placeholder and not summary.refused) else "IRC Catalogue Design (Decision Support Mode)"
     
     add_heading(doc, "IITPAVE Integration Details", level=2)
     integration_info = [
@@ -225,23 +225,19 @@ def write_mechanistic_section(
             ])
         add_table(doc, ["Layer", "Material", "Thickness", "Elastic Modulus (MPa)", "Poisson's Ratio"], comp_rows)
 
-    # --- Overall refusal banner (Phase 14 safety contract) --------------
-    is_mock = "Demo verification example only" in (summary.notes or "")
-    if is_mock:
-        add_placeholder_banner(doc, "WARNING: Demo verification example only — not actual IITPAVE execution.")
-    elif summary.refused:
-        add_placeholder_banner(doc,
-            f"[REFUSED] {summary.refused_reason or 'Final verdict refused.'}"
-        )
+    # --- Overall blocked/unavailable banner -----------------------------
+    is_mock = "Demo verification example only" in (summary.notes or "") or "Real IITPAVE verification was not performed" in (summary.notes or "")
+    if is_mock or summary.refused:
+        add_placeholder_banner(doc, "WARNING: Mechanistic verification was not executed because a licensed IITPAVE installation was unavailable.")
     elif summary.is_placeholder:
-        # Verdicts produced but calibration constants are placeholder.
-        add_placeholder_banner(doc, "[PLACEHOLDER] " + summary.notes)
+        # Verdicts produced but calibration constants are preliminary.
+        add_placeholder_banner(doc, "[PRELIMINARY] " + summary.notes)
 
     # --- Overall summary KV --------------------------------------------
     add_heading(doc, "Validation Summary", level=2)
     add_kv_table(doc, (
-        ("Refused",            "Yes" if summary.refused else "No"),
-        ("Placeholder",        "Yes" if summary.is_placeholder else "No"),
+        ("IITPAVE Executed",   "No" if (summary.refused or is_mock) else "Yes"),
+        ("Calibration Status", "Preliminary (Standard)" if summary.is_placeholder else "Project Calibrated"),
         ("Fatigue verdict",    _fmt_verdict(summary.fatigue.verdict)),
         ("Rutting verdict",    _fmt_verdict(summary.rutting.verdict)),
         ("Fatigue life (MSA)",

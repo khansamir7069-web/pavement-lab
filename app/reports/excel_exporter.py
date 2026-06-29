@@ -830,7 +830,7 @@ def build_layer_summary_excel(file_path: Path, project_id: int, db) -> Path:
     rows_mech = []
     if mech and not mech.refused:
         is_mock = "Demo verification example only" in (mech.notes or "")
-        mode_val = "Decision Support Mode (Demo Run)" if is_mock else "Mechanistic Verified Mode"
+        mode_val = "IRC Catalogue Design (Decision Support Mode)" if is_mock else "Mechanistically Verified Design"
         rows_mech = [
             ("Fatigue Life (MSA)", mech.fatigue_life_msa or "N/A"),
             ("Rutting Life (MSA)", mech.rutting_life_msa or "N/A"),
@@ -844,7 +844,7 @@ def build_layer_summary_excel(file_path: Path, project_id: int, db) -> Path:
         if is_mock:
             rows_mech.append(("Note", "Demo verification example only — not actual IITPAVE execution."))
     else:
-        rows_mech = [("IITPAVE Verification", "Not performed / Decision Support Mode")]
+        rows_mech = [("IITPAVE Verification", "Not performed / IRC Catalogue Design (Decision Support Mode)")]
         
     r_idx = 4
     for label, val in rows_mech:

@@ -10,5 +10,5 @@ __version__ = "2.2"
 
 # Product branding (V1 release).
 __product_name__ = "RoadX Professional Suite"
-__product_id__ = "sampave"
+__product_id__ = "roadx"
 __app_name__ = "RoadX Professional Suite"

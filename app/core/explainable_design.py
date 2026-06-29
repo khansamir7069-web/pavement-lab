@@ -424,7 +424,7 @@ def generate_explainable_details(result: StructuralResult, db: Any, project_id: 
     client_summary = {
         "recommended_pavement": " + ".join(f"{ly.name} ({ly.thickness_mm:.0f} mm)" for ly in result.composition),
         "expected_design_life": f"{result.inputs.design_life_years} Years (Designed for {msa:.2f} MSA cumulative traffic)",
-        "mechanistically_verified": "Yes (Design strains verified using silent IITPAVE validation engine)" if result.mechanistic_validation and not result.mechanistic_validation.is_placeholder else "Decision Support Mode (Catalogue baseline verified)",
+        "mechanistically_verified": "Yes (Mechanistically Verified Design using silent IITPAVE validation engine)" if result.mechanistic_validation and not result.mechanistic_validation.is_placeholder else "IRC Catalogue Design (Decision Support Mode)",
         "irc_compliant": "Yes (Conforms to IRC:37-2018 standard guidelines)",
         "construction_ready": "Yes (Uses standard materials, density specifications, and compaction tolerances)",
         "estimated_cost": f"Rs. {final_cost:,.2f} per km lane length ({rate_lbl})",

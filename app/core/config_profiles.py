@@ -14,7 +14,10 @@ from app import __version__
 
 
 CONFIG_SCHEMA_VERSION = "1.0"
-APPLICATION_CONFIG_ENV_VAR = "SAMPAVE_PROFILE"
+import os
+APPLICATION_CONFIG_ENV_VAR = "ROADX_PROFILE"
+if "ROADX_PROFILE" not in os.environ and "SAMPAVE_PROFILE" in os.environ:
+    os.environ["ROADX_PROFILE"] = os.environ["SAMPAVE_PROFILE"]
 
 PROFILE_DEFAULT = "default"
 PROFILE_LAB = "lab"
@@ -113,7 +116,7 @@ _PROFILE_REGISTRY: dict[str, ApplicationProfile] = {
     PROFILE_DEFAULT: ApplicationProfile(
         key=PROFILE_DEFAULT,
         display_name="Default",
-        description="Baseline SamPave workflow profile.",
+        description="Baseline RoadX workflow profile.",
         workflow_tags=("general",),
     ),
     PROFILE_LAB: ApplicationProfile(

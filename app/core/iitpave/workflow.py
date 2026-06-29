@@ -40,6 +40,44 @@ from .runner_config import (
 from .installation_manager import load_persisted_config
 
 
+def compile_iitpave_metadata(selection, input_text: str, output_text: str, duration: float) -> dict[str, Any]:
+    import hashlib
+    import os
+    from datetime import datetime, timezone
+    from app.core.iitpave.installation_manager import detect_iitpave_version
+    
+    inp_sha = hashlib.sha256(input_text.encode("utf-8")).hexdigest() if input_text else ""
+    out_sha = hashlib.sha256(output_text.encode("utf-8")).hexdigest() if output_text else ""
+    
+    metadata = {
+        "execution_timestamp": datetime.now(timezone.utc).isoformat(),
+        "execution_duration_sec": duration,
+        "input_sha256": inp_sha,
+        "output_sha256": out_sha,
+        "real_iitpave_executed": False,
+        "exe_path": "",
+        "exe_sha256": "",
+        "exe_version": "Unavailable"
+    }
+    
+    if selection and selection.runner and hasattr(selection.runner, "exe_path"):
+        exe_path = selection.runner.exe_path
+        metadata["exe_path"] = str(exe_path)
+        if exe_path and os.path.isfile(exe_path):
+            metadata["real_iitpave_executed"] = (selection.runner.source == SOURCE_EXTERNAL)
+            try:
+                with open(exe_path, "rb") as f:
+                    metadata["exe_sha256"] = hashlib.sha256(f.read()).hexdigest()
+            except Exception:
+                pass
+            try:
+                metadata["exe_version"] = detect_iitpave_version(str(exe_path)) or "Unknown"
+            except Exception:
+                metadata["exe_version"] = "Detected"
+                
+    return metadata
+
+
 IITPAVE_WORKFLOW_STATUS_READY = "mechanistic_workflow_ready"
 IITPAVE_WORKFLOW_STATUS_WARN = "mechanistic_workflow_warn"
 IITPAVE_WORKFLOW_STATUS_BLOCKED = "mechanistic_workflow_blocked"
@@ -95,6 +133,7 @@ def _diagnostic_structural_result(
     fatigue_check: str,
     rutting_check: str,
     note: str,
+    summary: Any = None,
 ) -> Any:
     if isinstance(result, StabilizedResult):
         existing_warnings = list(result.warnings)
@@ -105,14 +144,14 @@ def _diagnostic_structural_result(
             result,
             validation_mode="Decision Support Mode",
             warnings=tuple(existing_warnings),
-            mechanistic_validation=None,
+            mechanistic_validation=summary,
         )
     return dataclasses.replace(
         result,
         fatigue_check=fatigue_check,
         rutting_check=rutting_check,
         notes=_append_note(result.notes, note),
-        mechanistic_validation=None,
+        mechanistic_validation=summary,
     )
 
 
@@ -129,11 +168,78 @@ def _blocked(
         "IITPAVE mechanistic analysis was not completed. "
         f"{reason}"
     )
+    
+    import hashlib
+    from datetime import datetime, timezone
+    from app.core.mechanistic_validation.engine import refused_fatigue_check, refused_rutting_check, MechanisticValidationSummary
+    from app.core.mechanistic_validation.engine import get_fatigue_calibration, get_rutting_calibration
+    
+    design_msa = getattr(result, "design_msa", 0.0) or 0.0
+    fcal = get_fatigue_calibration()
+    rcal = get_rutting_calibration()
+    
+    fatigue = refused_fatigue_check(
+        design_msa=design_msa,
+        epsilon_t_microstrain=None,
+        e_bc_mpa=None,
+        c_factor=0.0,
+        calibration=fcal,
+        refused_reason=reason,
+    )
+    rutting = refused_rutting_check(
+        design_msa=design_msa,
+        epsilon_v_microstrain=None,
+        calibration=rcal,
+        refused_reason=reason,
+    )
+    
+    inp_sha = hashlib.sha256(input_text.encode("utf-8")).hexdigest() if input_text else ""
+    out_sha = hashlib.sha256(output_text.encode("utf-8")).hexdigest() if output_text else ""
+    
+    metadata = {
+        "execution_timestamp": datetime.now(timezone.utc).isoformat(),
+        "execution_duration_sec": 0.0,
+        "input_sha256": inp_sha,
+        "output_sha256": out_sha,
+        "real_iitpave_executed": False,
+        "exe_path": "",
+        "exe_sha256": "",
+        "exe_version": "Unavailable",
+        "notes": "Real IITPAVE verification was not performed."
+    }
+    
+    import os
+    if selection and selection.runner and hasattr(selection.runner, "exe_path"):
+        exe_path = selection.runner.exe_path
+        metadata["exe_path"] = str(exe_path)
+        if exe_path and os.path.isfile(exe_path):
+            try:
+                with open(exe_path, "rb") as f:
+                    metadata["exe_sha256"] = hashlib.sha256(f.read()).hexdigest()
+            except Exception:
+                pass
+            try:
+                from app.core.iitpave.installation_manager import detect_iitpave_version
+                metadata["exe_version"] = detect_iitpave_version(str(exe_path)) or "Unknown"
+            except Exception:
+                metadata["exe_version"] = "Detected"
+                
+    summary = MechanisticValidationSummary(
+        fatigue=fatigue,
+        rutting=rutting,
+        is_placeholder=True,
+        refused=True,
+        refused_reason=reason,
+        notes=f"Real IITPAVE verification was not performed: {reason}",
+        validation_metadata=metadata
+    )
+    
     diagnostic = _diagnostic_structural_result(
         result,
         fatigue_check=f"IITPAVE unavailable - {reason}",
         rutting_check=f"IITPAVE unavailable - {reason}",
         note=message,
+        summary=summary,
     )
     return IITPaveMechanisticWorkflowResult(
         status=IITPAVE_WORKFLOW_STATUS_BLOCKED,
@@ -144,6 +250,7 @@ def _blocked(
         output_contract=output_contract,
         blocked_reason=reason,
         operator_message=message,
+        summary=None,
     )
 
 
@@ -365,8 +472,11 @@ def run_structural_iitpave_mechanistic_workflow(
         reason = selection.blocked_reason or "No usable local IITPAVE executable was found."
         return _blocked(result, input_text=input_text, selection=selection, reason=reason)
 
+    import time
+    start_time = time.time()
     try:
         output_text = selection.runner.run(input_text)
+        duration = time.time() - start_time
     except Exception as exc:
         return _blocked(
             result,
@@ -410,6 +520,10 @@ def run_structural_iitpave_mechanistic_workflow(
             point_labels=(LABEL_FATIGUE, LABEL_RUTTING),
         )
     )
+    
+    metadata = compile_iitpave_metadata(selection, input_text, output_text, duration)
+    summary = dataclasses.replace(summary, validation_metadata=metadata)
+    
     return _completed(
         result,
         input_text=input_text,
@@ -442,8 +556,11 @@ def run_stabilized_iitpave_mechanistic_workflow(
         reason = selection.blocked_reason or "No usable local IITPAVE executable was found."
         return _blocked(result, input_text=input_text, selection=selection, reason=reason)
 
+    import time
+    start_time = time.time()
     try:
         output_text = selection.runner.run(input_text)
+        duration = time.time() - start_time
     except Exception as exc:
         return _blocked(
             result,
@@ -487,6 +604,10 @@ def run_stabilized_iitpave_mechanistic_workflow(
             point_labels=(LABEL_FATIGUE, LABEL_RUTTING),
         )
     )
+    
+    metadata = compile_iitpave_metadata(selection, input_text, output_text, duration)
+    summary = dataclasses.replace(summary, validation_metadata=metadata)
+    
     return _completed(
         result,
         input_text=input_text,

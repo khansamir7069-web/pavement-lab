@@ -28,7 +28,7 @@ IITPAVE_OUTPUT_STATUS_REAL_CONTRACT_SUPPORTED = "real_contract_supported"
 IITPAVE_OUTPUT_STATUS_REAL_CONTRACT_PENDING = "real_contract_pending"
 IITPAVE_OUTPUT_STATUS_UNSUPPORTED = "unsupported"
 
-IITPAVE_OUTPUT_FORMAT_STUB = "sampave_phase13_stub"
+IITPAVE_OUTPUT_FORMAT_STUB = "roadx_iitpave_stub"
 IITPAVE_OUTPUT_FORMAT_REAL_TABLE = "real_iitpave_stress_strain_table"
 IITPAVE_OUTPUT_FORMAT_REAL_PENDING = "real_iitpave_pending"
 IITPAVE_OUTPUT_FORMAT_UNKNOWN = "unknown"
@@ -170,7 +170,7 @@ def _detect_text_contract(
         issues.append(_issue(
             VALIDATION_INFO,
             "output.contract",
-            "Recognized SamPave IITPAVE stub output contract; parser may run as placeholder-only.",
+            "Recognized RoadX IITPAVE stub output contract; parser may run as placeholder-only.",
         ))
         return _result(
             status=IITPAVE_OUTPUT_STATUS_STUB_CONTRACT,

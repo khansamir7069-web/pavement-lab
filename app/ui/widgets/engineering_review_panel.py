@@ -90,8 +90,8 @@ class EngineeringReviewPanel(QWidget):
         self.iitpave_status = QComboBox()
         self.iitpave_status.addItems([
             "Not Verified",
-            "Mechanistic Verified Mode (Successful Run)",
-            "Decision Support Mode (Stub/Inapplicable)"
+            "Mechanistically Verified Design",
+            "IRC Catalogue Design (Decision Support Mode)"
         ])
         form.addRow("IITPAVE Verification Status", self.iitpave_status)
 

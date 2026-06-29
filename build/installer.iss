@@ -1,23 +1,23 @@
-; Inno Setup script for SAMPAVE.
+; Inno Setup script for RoadX Professional Suite.
 ; Open this file in Inno Setup Compiler (https://jrsoftware.org/isinfo.php)
 ; after running Build.bat and click "Compile".
 ;
-; Produces: SAMPAVE-Setup.exe
+; Produces: RoadX-Setup.exe
 
-#define MyAppName "SAMPAVE"
-#define MyAppVersion "1.0.0"
-#define MyAppPublisher "SAMPAVE"
-#define MyAppExeName "SamPave.exe"
+#define MyAppName "RoadX Professional Suite"
+#define MyAppVersion "2.2"
+#define MyAppPublisher "SKM Technologies"
+#define MyAppExeName "RoadX.exe"
 
 [Setup]
 AppId={{B4A41D78-7E40-4F40-8C40-3D5A7AE3B777}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
-DefaultDirName={autopf}\SAMPAVE
-DefaultGroupName=SAMPAVE
+DefaultDirName={autopf}\RoadX Professional Suite
+DefaultGroupName=RoadX Professional Suite
 DisableProgramGroupPage=yes
-OutputBaseFilename=SAMPAVE-Setup
+OutputBaseFilename=RoadX_Professional_v2.2_Setup
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
@@ -32,7 +32,7 @@ Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription:
 
 [Files]
 ; The PyInstaller --onedir output. Adjust the source path if your repo is elsewhere.
-Source: "..\dist\SamPave\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\dist\RoadX\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"

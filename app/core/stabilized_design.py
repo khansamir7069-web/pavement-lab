@@ -128,9 +128,9 @@ def compute_stabilized_design(
             f"is below the recommended structural minimum of 100 mm."
         )
 
-    # Fatigue check placeholder
+    # Fatigue check preliminary notice
     warnings_list.append(
-        "CTB Fatigue Check (Placeholder): Fatigue cracking validation is not fully verified from empirical "
+        "CTB Fatigue Check (Preliminary): Fatigue cracking validation is not fully verified from empirical "
         "inputs. Complete fatigue checks require mechanistic IITPAVE strain analysis."
     )
 

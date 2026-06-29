@@ -44,9 +44,9 @@ class Dashboard(QWidget):
         self.btn_new.clicked.connect(self.new_project.emit)
         header.add_action(self.btn_new)
         
-        self.btn_load_demo = styled_button("Load Demo Project", "secondary")
+        self.btn_load_demo = styled_button("Load Preset Project", "secondary")
         self.btn_load_demo.setToolTip(
-            "Load a preset demo project with sample parameters and live verification."
+            "Load a preset sample project with calibration parameters and live validation."
         )
         self.btn_load_demo.setStyleSheet("background-color: #27ae60; color: white; font-weight: bold; border-radius: 4px; padding: 6px 12px;")
         self.btn_load_demo.clicked.connect(self.load_demo_project_triggered.emit)
@@ -54,7 +54,7 @@ class Dashboard(QWidget):
 
         self.btn_import_project = styled_button("Import Project Export", "secondary")
         self.btn_import_project.setToolTip(
-            "Import a validated SamPave project-export JSON file as a new project."
+            "Import a validated RoadX project-export JSON file as a new project."
         )
         self.btn_import_project.clicked.connect(self.import_project.emit)
         header.add_action(self.btn_import_project)

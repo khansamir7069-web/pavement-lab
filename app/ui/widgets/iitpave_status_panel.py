@@ -55,13 +55,13 @@ from .common import Card, PageHeader, styled_button
 
 
 def calculate_file_hash(filepath: Path | str) -> str:
-    """Calculate the MD5 checksum of a file for compliance logging."""
+    """Calculate the SHA256 checksum of a file for compliance logging."""
     path = Path(filepath)
     if not path.is_file():
         return "N/A"
     try:
         import hashlib
-        h = hashlib.md5()
+        h = hashlib.sha256()
         with open(path, "rb") as f:
             for chunk in iter(lambda: f.read(4096), b""):
                 h.update(chunk)
@@ -322,7 +322,21 @@ class IITPaveStatusPanel(QWidget):
         slay.setContentsMargins(20, 16, 20, 16)
         slay.setSpacing(14)
 
-        # Integration status & path
+        # 1. Separately Licensed Dependency Notice
+        notice_card = Card()
+        nl = QVBoxLayout(notice_card)
+        lbl_notice = QLabel(
+            "⚠️ <b>Separately Licensed Dependency Notice:</b> RoadX Professional Suite integrates with a separately "
+            "licensed IITPAVE installation. The official mechanistic calculation engine is not bundled, distributed, "
+            "or licensed with this package. The user must configure and license their own <code>IITPAVE.exe</code> "
+            "executable path separately."
+        )
+        lbl_notice.setWordWrap(True)
+        lbl_notice.setStyleSheet("color: #7d6608; background-color: #fef9e7; border: 1px solid #fcf3cf; padding: 10px; border-radius: 4px;")
+        nl.addWidget(lbl_notice)
+        slay.addWidget(notice_card)
+
+        # 2. Integration status & path
         path_card = Card()
         pl = QVBoxLayout(path_card)
         pl.setContentsMargins(20, 16, 20, 16)
@@ -331,6 +345,19 @@ class IITPaveStatusPanel(QWidget):
         self.lbl_engine_status = QLabel("")
         self.lbl_engine_status.setMinimumHeight(32)
         pl.addWidget(self.lbl_engine_status)
+
+        # Diagnostics fields
+        diag_layout = QFormLayout()
+        self.lbl_diag_path = QLabel("—")
+        self.lbl_diag_version = QLabel("—")
+        self.lbl_diag_sha = QLabel("—")
+        self.lbl_diag_test = QLabel("—")
+        diag_layout.addRow("Active Executable Path:", self.lbl_diag_path)
+        diag_layout.addRow("Detected Version:", self.lbl_diag_version)
+        diag_layout.addRow("SHA256 Checksum:", self.lbl_diag_sha)
+        diag_layout.addRow("Diagnostics Run Status:", self.lbl_diag_test)
+        pl.addLayout(diag_layout)
+        pl.addSpacing(10)
         
         form_path = QFormLayout()
         self.cb_candidates = QComboBox()
@@ -417,7 +444,7 @@ class IITPaveStatusPanel(QWidget):
         
         form_cfg = QFormLayout()
         self.cb_mode = QComboBox()
-        self.cb_mode.addItems(["Production Mode (External Executable)", "Decision Support Mode (Stub/Placeholder)"])
+        self.cb_mode.addItems(["Production Mode (External Executable)", "IRC Catalogue Design (Decision Support Mode)"])
         form_cfg.addRow("Execution Mode", self.cb_mode)
         
         self.spin_timeout = QDoubleSpinBox()
@@ -437,6 +464,22 @@ class IITPaveStatusPanel(QWidget):
         btn_save_row.addStretch()
         ccl.addLayout(btn_save_row)
         slay.addWidget(cfg_card)
+
+        # 3. Help & Setup Guide
+        help_card = Card()
+        hl = QVBoxLayout(help_card)
+        hl.addWidget(QLabel("<b>IITPAVE Setup & Configuration Guide</b>"))
+        lbl_help = QLabel(
+            "1. Obtain a licensed copy of <code>IITPAVE.exe</code> from the Indian Roads Congress or your institution.<br/>"
+            "2. Save the executable locally on your system (e.g., <code>C:\\IITPAVE\\IITPAVE.exe</code>).<br/>"
+            "3. Select <b>Custom Manual Selection...</b> from the candidates list or click <b>Browse...</b> to link the file.<br/>"
+            "4. Alternatively, define the environment variable <code>ROADX_IITPAVE_EXE</code> to point to your binary.<br/>"
+            "5. Click <b>Save Integration Settings</b> to commit the configuration path."
+        )
+        lbl_help.setWordWrap(True)
+        lbl_help.setStyleSheet("color: #565d6d; font-size: 9.5pt; line-height: 1.4;")
+        hl.addWidget(lbl_help)
+        slay.addWidget(help_card)
 
         scroll_settings = QScrollArea()
         scroll_settings.setWidgetResizable(True)
@@ -490,13 +533,30 @@ class IITPaveStatusPanel(QWidget):
             self.txt_manual_path.setText(cfg.configured_executable_path)
         self.cb_candidates.blockSignals(False)
 
-        # Update detection badges
+        # Update detection badges and diagnostics
         if validation.selected_path:
             self.lbl_engine_status.setText("🟢 IITPAVE CONNECTED — Ready for silent subprocess validation runs.")
             self.lbl_engine_status.setStyleSheet("color:#196f3d; font-weight:bold;")
+            self.lbl_diag_path.setText(str(validation.selected_path))
+            self.lbl_diag_path.setStyleSheet("color:#196f3d;")
+            ver = detect_iitpave_version(validation.selected_path) or "Unknown"
+            self.lbl_diag_version.setText(ver)
+            sha = calculate_file_hash(validation.selected_path)
+            self.lbl_diag_sha.setText(sha)
+            self.lbl_diag_sha.setStyleSheet("font-family: Consolas; font-size: 9pt;")
+            
+            # Simple status verification
+            self.lbl_diag_test.setText("Ready (A diagnostic test run can be performed during project verification)")
+            self.lbl_diag_test.setStyleSheet("color:#333;")
         else:
             self.lbl_engine_status.setText("🟡 IITPAVE NOT CONNECTED — Runs will fall back or be blocked.")
             self.lbl_engine_status.setStyleSheet("color:#a67c00; font-weight:bold;")
+            self.lbl_diag_path.setText("Not Connected (Separate external license required)")
+            self.lbl_diag_path.setStyleSheet("color:#a81f1f;")
+            self.lbl_diag_version.setText("Unavailable")
+            self.lbl_diag_sha.setText("Unavailable")
+            self.lbl_diag_test.setText("Unavailable")
+            self.lbl_diag_test.setStyleSheet("color:#a81f1f;")
 
         # Populate last run details if available from the database
         if self._project_id:
@@ -632,7 +692,7 @@ class IITPaveStatusPanel(QWidget):
         QMessageBox.information(
             self,
             "Validation Successful",
-            f"The executable is valid!\n\nDetected Version: {version}\nMD5 Checksum: {file_hash}"
+            f"The executable is valid!\n\nDetected Version: {version}\nSHA256 Checksum: {file_hash}"
         )
         self.refresh()
 
