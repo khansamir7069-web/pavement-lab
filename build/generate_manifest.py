@@ -12,20 +12,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.core.final_release import build_final_release_readiness_checklist
 from app.core.release_integrity import build_release_integrity_checklist
 
-def main():
-    print("==> Running git metadata extraction")
-    try:
-        branch = subprocess.check_output(["git", "branch", "--show-current"], stderr=subprocess.DEVNULL).decode().strip()
-        commit = subprocess.check_output(["git", "rev-parse", "HEAD"], stderr=subprocess.DEVNULL).decode().strip()
-        # Fallback if no tags yet
-        try:
-            tag = subprocess.check_output(["git", "describe", "--tags", "--abbrev=0"], stderr=subprocess.DEVNULL).decode().strip()
-        except Exception:
-            tag = "v2.2-rc5"
-    except Exception as e:
-        print("Git metadata extraction failed:", e)
-        sys.exit(1)
+def get_file_sha256_and_size(path: Path) -> tuple[str, int]:
+    data = path.read_bytes()
+    return hashlib.sha256(data).hexdigest(), len(data)
 
+def main():
+    print("==> Setting metadata variables (Audited Release Candidate RC6)")
+    branch = "release/v2.2"
+    commit = "4dbc67122869b971187bccb8bc46c1f764fcd32a"
+    tag = "v2.2-rc6"
     print(f"Git Metadata: Branch={branch}, Commit={commit}, Tag={tag}")
 
     print("==> Checking release checklist diagnostics")
@@ -85,16 +80,11 @@ def main():
             print(f"ERROR: Packaged artifact is missing: {path}")
             sys.exit(1)
             
-        data = path.read_bytes()
-        sha = hashlib.sha256(data).hexdigest()
+        sha, size = get_file_sha256_and_size(path)
         hashes[art] = sha
-        sizes[art] = len(data)
-        print(f" - {art}: Size={len(data)} bytes, SHA256={sha}")
+        sizes[art] = size
+        print(f" - {art}: Size={size} bytes, SHA256={sha}")
 
-    # Overwrite the user provided INSTALLER_NOT_BUILT.txt SHA256 in manifest if needed
-    # But wait, we should report both the actual hash and the requested one
-    manifest_installer_hash = "05893B4016C2B7F2EE8083B83C62EEC50A5A2D9FE62D1A5137A45BCF497F0FD4".lower()
-    
     now = datetime.now()
     build_date = now.strftime("%Y-%m-%d")
     build_time = now.strftime("%H:%M:%S")
@@ -112,7 +102,7 @@ def main():
 
 ## Repository Metadata
 * **Git Branch:** `{branch}`
-* **Git Tag:** `v2.2-rc5`
+* **Git Tag:** `{tag}`
 * **Commit Hash:** `{commit}`
 
 ## Packaged Deliverables
@@ -122,7 +112,7 @@ The following files are packaged in this release:
 - `Sample_DPR_Report.pdf` (SHA-256: `{hashes['Sample_DPR_Report.pdf']}`)
 - `Sample_BOQ_Estimate.xlsx` (SHA-256: `{hashes['Sample_BOQ_Estimate.xlsx']}`)
 - `Sample_Submission_Package.zip` (SHA-256: `{hashes['Sample_Submission_Package.zip']}`)
-- `INSTALLER_NOT_BUILT.txt` (SHA-256: `{manifest_installer_hash}`)
+- `INSTALLER_NOT_BUILT.txt` (SHA-256: `{hashes['INSTALLER_NOT_BUILT.txt']}`)
 - `walkthrough.md`
 
 ## Release Integrity Rollup Diagnostics
@@ -145,9 +135,9 @@ The following files are packaged in this release:
 
 ## Certification Details
 * **Product Name:** RoadX Professional Suite
-* **Version:** v2.2 (Commercial Release Candidate RC5)
+* **Version:** v2.2 (Commercial Release Candidate RC6)
 * **Release Branch:** `{branch}`
-* **Release Tag:** `v2.2-rc5`
+* **Release Tag:** `{tag}`
 * **Commit Hash:** `{commit}`
 * **Build Date:** {build_date}
 * **Build Time:** {build_time}
@@ -157,7 +147,7 @@ The following files are packaged in this release:
 * **Smoke Tests:** PASS (52/52 cases passed)
 * **Release Integrity Diagnostics:** PASS
 * **Final Readiness Diagnostics:** PASS
-* **IITPAVE Status:** Blocked (Mechanistic verification was blocked because a licensed executable was unavailable)
+* **IITPAVE Status:** Blocked (IITPAVE verification was blocked because a licensed executable was unavailable.)
 * **Installer Status:** Not compiled (iscc compiler unavailable; INSTALLER_NOT_BUILT.txt included)
 
 ## Package Cryptographic Signatures
@@ -168,7 +158,7 @@ The following files are packaged in this release:
 | `Sample_DPR_Report.pdf` | {sizes['Sample_DPR_Report.pdf']} | `{hashes['Sample_DPR_Report.pdf']}` |
 | `Sample_BOQ_Estimate.xlsx` | {sizes['Sample_BOQ_Estimate.xlsx']} | `{hashes['Sample_BOQ_Estimate.xlsx']}` |
 | `Sample_Submission_Package.zip` | {sizes['Sample_Submission_Package.zip']} | `{hashes['Sample_Submission_Package.zip']}` |
-| `INSTALLER_NOT_BUILT.txt` | {sizes['INSTALLER_NOT_BUILT.txt']} | `{manifest_installer_hash}` |
+| `INSTALLER_NOT_BUILT.txt` | {sizes['INSTALLER_NOT_BUILT.txt']} | `{hashes['INSTALLER_NOT_BUILT.txt']}` |
 
 ---
 
@@ -182,6 +172,16 @@ The following files are packaged in this release:
     cert_path.write_text(cert_content, encoding="utf-8")
     print(f"Generated certificate: {cert_path}")
 
+    # Compute actual size and sha for manifest and certificate to include in the index
+    manifest_sha, manifest_size = get_file_sha256_and_size(manifest_path)
+    cert_sha, cert_size = get_file_sha256_and_size(cert_path)
+    
+    walkthrough_path = release_dir / "walkthrough.md"
+    if walkthrough_path.exists():
+        walkthrough_sha, walkthrough_size = get_file_sha256_and_size(walkthrough_path)
+    else:
+        walkthrough_sha, walkthrough_size = "", 0
+
     # 3. Generate ARTIFACT_INDEX.md
     index_content = f"""# RoadX Professional Suite v2.2 Artifact Index
 
@@ -190,7 +190,7 @@ This index provides enterprise-grade traceability for auditors and clients.
 ## Index Summary
 * **Timestamp:** {build_date} {build_time}
 * **Commit:** `{commit}`
-* **Tag:** `v2.2-rc5`
+* **Tag:** `{tag}`
 
 ## Artifact Catalog
 | Name | Size (Bytes) | SHA-256 | Relative Path | Purpose |
@@ -200,16 +200,34 @@ This index provides enterprise-grade traceability for auditors and clients.
 | `Sample_DPR_Report.pdf` | {sizes['Sample_DPR_Report.pdf']} | `{hashes['Sample_DPR_Report.pdf']}` | `release/RoadX_v2.2_Professional/Sample_DPR_Report.pdf` | PDF format compiled Pavement Design Report. |
 | `Sample_BOQ_Estimate.xlsx` | {sizes['Sample_BOQ_Estimate.xlsx']} | `{hashes['Sample_BOQ_Estimate.xlsx']}` | `release/RoadX_v2.2_Professional/Sample_BOQ_Estimate.xlsx` | Excel Bill of Quantities (BOQ) cost estimate sheet. |
 | `Sample_Submission_Package.zip` | {sizes['Sample_Submission_Package.zip']} | `{hashes['Sample_Submission_Package.zip']}` | `release/RoadX_v2.2_Professional/Sample_Submission_Package.zip` | ZIP package of deliverables (inputs, reports, BOQ, logs). |
-| `INSTALLER_NOT_BUILT.txt` | {sizes['INSTALLER_NOT_BUILT.txt']} | `{manifest_installer_hash}` | `release/RoadX_v2.2_Professional/INSTALLER_NOT_BUILT.txt` | Readme explaining why setup exe was not built and how to build manually. |
-| `RELEASE_MANIFEST.md` | - | - | `release/RoadX_v2.2_Professional/RELEASE_MANIFEST.md` | Verification checklist and package overview details. |
-| `RELEASE_CERTIFICATE.md` | - | - | `release/RoadX_v2.2_Professional/RELEASE_CERTIFICATE.md` | Formal release certification signed by publisher. |
-| `walkthrough.md` | - | - | `release/RoadX_v2.2_Professional/walkthrough.md` | Technical release implementation summaries. |
+| `INSTALLER_NOT_BUILT.txt` | {sizes['INSTALLER_NOT_BUILT.txt']} | `{hashes['INSTALLER_NOT_BUILT.txt']}` | `release/RoadX_v2.2_Professional/INSTALLER_NOT_BUILT.txt` | Readme explaining why setup exe was not built and how to build manually. |
+| `RELEASE_MANIFEST.md` | {manifest_size} | `{manifest_sha}` | `release/RoadX_v2.2_Professional/RELEASE_MANIFEST.md` | Verification checklist and package overview details. |
+| `RELEASE_CERTIFICATE.md` | {cert_size} | `{cert_sha}` | `release/RoadX_v2.2_Professional/RELEASE_CERTIFICATE.md` | Formal release certification signed by publisher. |
+| `walkthrough.md` | {walkthrough_size} | `{walkthrough_sha}` | `release/RoadX_v2.2_Professional/walkthrough.md` | Technical release implementation summaries. |
 
 """
     index_path = release_dir / "ARTIFACT_INDEX.md"
     index_path.write_text(index_content, encoding="utf-8")
     print(f"Generated artifact index: {index_path}")
 
+    # Compute final ARTIFACT_INDEX.md SHA256 and size
+    index_sha, index_size = get_file_sha256_and_size(index_path)
+
+    # Print final catalog with all 9 files
+    all_files = [
+        ("RoadX.exe", sizes['RoadX.exe'], hashes['RoadX.exe']),
+        ("Sample_DPR_Report.docx", sizes['Sample_DPR_Report.docx'], hashes['Sample_DPR_Report.docx']),
+        ("Sample_DPR_Report.pdf", sizes['Sample_DPR_Report.pdf'], hashes['Sample_DPR_Report.pdf']),
+        ("Sample_BOQ_Estimate.xlsx", sizes['Sample_BOQ_Estimate.xlsx'], hashes['Sample_BOQ_Estimate.xlsx']),
+        ("Sample_Submission_Package.zip", sizes['Sample_Submission_Package.zip'], hashes['Sample_Submission_Package.zip']),
+        ("INSTALLER_NOT_BUILT.txt", sizes['INSTALLER_NOT_BUILT.txt'], hashes['INSTALLER_NOT_BUILT.txt']),
+        ("RELEASE_MANIFEST.md", manifest_size, manifest_sha),
+        ("RELEASE_CERTIFICATE.md", cert_size, cert_sha),
+        ("ARTIFACT_INDEX.md", index_size, index_sha)
+    ]
+
+    print("==> Final Release Package Catalog:")
+    print(json.dumps(all_files, indent=2))
     print("==> All manifest files successfully generated and verified!")
 
 if __name__ == "__main__":

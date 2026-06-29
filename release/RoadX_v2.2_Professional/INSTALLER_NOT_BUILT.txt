@@ -20,3 +20,4 @@ To manually compile the installer:
    iscc build/installer.iss
 
 6. The compiled setup installer 'RoadX_Professional_v2.2_Setup.exe' will be generated under the 'build/' folder (or the default output directory configured in your Inno Setup options).
+                      
