@@ -1,0 +1,49 @@
+{
+  "cost": {
+    "total_project_cost": 10360000.0,
+    "section_length_m": 1000.0,
+    "section_width_m": 7.0,
+    "layer_wise_costs": [
+      {
+        "layer_name": "BC",
+        "thickness_mm": 40.0,
+        "volume_m3": 280.0,
+        "unit_rate": 12000.0,
+        "cost": 3360000.0
+      },
+      {
+        "layer_name": "DBM",
+        "thickness_mm": 100.0,
+        "volume_m3": 700.0,
+        "unit_rate": 10000.0,
+        "cost": 7000000.0
+      }
+    ]
+  },
+  "optimization": {
+    "optimal_cost": 8500000.0,
+    "converged": true
+  },
+  "pareto": [
+    {
+      "thicknesses": {
+        "BC": 80.0
+      },
+      "cost": 8500000.0,
+      "utilization": 0.85,
+      "reliability_pct": 98.0
+    }
+  ],
+  "recommendations": [
+    {
+      "recommendation": "Maintain",
+      "affected_layer": "BC",
+      "engineering_reason": "Pass",
+      "expected_impact": "None",
+      "confidence_score": 0.85
+    }
+  ],
+  "explanations": {
+    "What is governing?": "None"
+  }
+}

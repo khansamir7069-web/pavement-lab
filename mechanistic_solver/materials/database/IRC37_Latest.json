@@ -1,0 +1,37 @@
+{
+  "version": "1.1.0",
+  "database_name": "IRC:37-Latest Database",
+  "materials": [
+    {
+      "material_id": "irc_bc_latest",
+      "material_name": "Bituminous Concrete Latest",
+      "category": "Bituminous",
+      "layer_type": "Surface",
+      "default_elastic_modulus_mpa": 3100.0,
+      "recommended_modulus_min_mpa": 1500.0,
+      "recommended_modulus_max_mpa": 6000.0,
+      "poisson_ratio": 0.35,
+      "density_kg_m3": 2420.0,
+      "temperature_sensitivity": "High",
+      "moisture_sensitivity": "Low",
+      "drainage_rating": "Good",
+      "expected_design_life_years": 20,
+      "typical_irc_usage": "Wearing course with polymer binder modifiers.",
+      "engineering_notes": "Premium polymer-modified wearing course.",
+      "reference_source": "IRC:37 Draft Update",
+      "version": "1.1.0",
+      "revision": 2,
+      "created_by": "System Admin",
+      "last_updated": "2026-06-30",
+      "locked": false,
+      "optimizable": true,
+      "min_thickness_mm": 30.0,
+      "max_thickness_mm": 50.0,
+      "construction_cost_index": 10.0,
+      "carbon_footprint_index": 7.5,
+      "availability_rating": 8,
+      "material_priority": 1,
+      "sustainability_score": 65
+    }
+  ]
+}

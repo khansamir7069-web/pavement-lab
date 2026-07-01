@@ -30,6 +30,7 @@ if "ROADX_IITPAVE_EXE" not in os.environ and sampave_exe_env in os.environ:
 
 SOURCE_CONFIGURED = "configured_path"
 SOURCE_ENVIRONMENT = "environment"
+SOURCE_COMMON = "common_folders"
 SOURCE_BUNDLED = "bundled"
 SOURCE_PATH = "path"
 
@@ -163,6 +164,45 @@ def _candidate(source: str, path: Path) -> IITPaveExecutableCandidate:
     )
 
 
+def common_iitpave_exe_candidates() -> list[Path]:
+    """Generate common candidate paths for IITPAVE.exe on the system."""
+    candidates = []
+    import os
+    if os.name == "nt":
+        roots = [
+            Path("C:/IITPAVE"),
+            Path("C:/IITPAVE/bin"),
+            Path("C:/Program Files/IITPAVE"),
+            Path("C:/Program Files (x86)/IITPAVE"),
+        ]
+        userprofile = os.environ.get("USERPROFILE")
+        if userprofile:
+            roots.append(Path(userprofile) / "IITPAVE")
+        localappdata = os.environ.get("LOCALAPPDATA")
+        if localappdata:
+            roots.append(Path(localappdata) / "IITPAVE")
+            
+        for r in roots:
+            candidates.append(r / "IITPAVE.exe")
+    else:
+        roots = [
+            Path("/usr/local/bin"),
+            Path("/usr/bin"),
+            Path("/opt/iitpave"),
+        ]
+        home = os.environ.get("HOME")
+        if home:
+            roots.append(Path(home))
+            roots.append(Path(home) / ".local" / "bin")
+            
+        for r in roots:
+            candidates.append(r / "iitpave")
+            
+    candidates.append(Path("IITPAVE.exe"))
+    candidates.append(Path("iitpave"))
+    return candidates
+
+
 def discover_iitpave_executable(
     *,
     configured_path: Path | str | None = None,
@@ -186,6 +226,15 @@ def discover_iitpave_executable(
 
     add(SOURCE_CONFIGURED, _path_from(configured_path))
     add(SOURCE_ENVIRONMENT, _path_from(env_map.get(IITPAVE_EXECUTABLE_ENV_VAR)))
+    
+    # Auto-detect from common folders
+    for path in common_iitpave_exe_candidates():
+        try:
+            if path.exists():
+                add(SOURCE_COMMON, path)
+        except OSError:
+            pass
+            
     for path in bundled_iitpave_exe_candidates(app_dir=app_dir):
         add(SOURCE_BUNDLED, path)
 
@@ -259,6 +308,12 @@ def validate_iitpave_environment(
                 "iitpave.executable",
                 "IITPAVE executable was discovered on PATH; validate the "
                 f"operator-supplied binary and version before compliance use: {selected}",
+            ))
+        elif source == SOURCE_COMMON:
+            issues.append(_issue(
+                VALIDATION_INFO,
+                "iitpave.executable",
+                f"IITPAVE executable auto-detected from common folders: {selected}",
             ))
         else:
             issues.append(_issue(

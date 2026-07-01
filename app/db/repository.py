@@ -1004,23 +1004,23 @@ class Database:
         exact validation that was run. Cascade-on-project-delete is
         wired via the ORM relationship; no extra cleanup needed.
         """
-        summary_dict = _to_json_safe(summary)
+        summary_dict = _to_json_safe(summary) if summary is not None else None
         inputs_dict = _to_json_safe(inputs) if inputs is not None else None
         with self.session() as s:
             _check_not_locked(s, project_id)
             row = MechanisticValidation(
                 project_id=project_id,
                 inputs_json=json.dumps(inputs_dict) if inputs_dict is not None else None,
-                summary_json=json.dumps(summary_dict),
-                refused=bool(getattr(summary, "refused", False)),
-                is_placeholder=bool(getattr(summary, "is_placeholder", True)),
-                fatigue_verdict=getattr(summary.fatigue, "verdict", None),
-                rutting_verdict=getattr(summary.rutting, "verdict", None),
-                fatigue_life_msa=getattr(summary.fatigue, "cumulative_life_msa", None),
-                rutting_life_msa=getattr(summary.rutting, "cumulative_life_msa", None),
-                design_msa=float(getattr(summary.fatigue, "design_msa", 0.0)),
-                refused_reason=getattr(summary, "refused_reason", "") or "",
-                notes=getattr(summary, "notes", "") or "",
+                summary_json=json.dumps(summary_dict) if summary_dict is not None else None,
+                refused=bool(getattr(summary, "refused", True)) if summary is not None else True,
+                is_placeholder=bool(getattr(summary, "is_placeholder", True)) if summary is not None else True,
+                fatigue_verdict=getattr(summary.fatigue, "verdict", None) if (summary is not None and getattr(summary, "fatigue", None) is not None) else None,
+                rutting_verdict=getattr(summary.rutting, "verdict", None) if (summary is not None and getattr(summary, "rutting", None) is not None) else None,
+                fatigue_life_msa=getattr(summary.fatigue, "cumulative_life_msa", None) if (summary is not None and getattr(summary, "fatigue", None) is not None) else None,
+                rutting_life_msa=getattr(summary.rutting, "cumulative_life_msa", None) if (summary is not None and getattr(summary, "rutting", None) is not None) else None,
+                design_msa=float(getattr(summary.fatigue, "design_msa", 0.0)) if (summary is not None and getattr(summary, "fatigue", None) is not None and getattr(summary.fatigue, "design_msa", None) is not None) else 0.0,
+                refused_reason=getattr(summary, "refused_reason", "") or "" if summary is not None else "IITPAVE not configured or run failed.",
+                notes=getattr(summary, "notes", "") or "" if summary is not None else "",
                 exe_path=exe_path,
                 input_filepath=input_filepath,
                 output_filepath=output_filepath,

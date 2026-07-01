@@ -90,9 +90,10 @@ from .widgets.spec_admin import SpecAdminPanel
 from .widgets.structural_panel import StructuralPanel
 from .widgets.stabilized_panel import StabilizedPanel
 from .widgets.iitpave_status_panel import IITPaveStatusPanel
+from .widgets.roadx_solver_panel import RoadXSolverPanel
 from .widgets.subgrade_panel import SubgradePanel
 from .widgets.engineering_review_panel import EngineeringReviewPanel
-from .widgets.submission_panel import SubmissionPanel
+from .widgets.submission_center_panel import SubmissionCenterPanel as SubmissionPanel
 
 
 log = logging.getLogger(__name__)
@@ -106,7 +107,8 @@ SIDEBAR_ITEMS = [
     ("3. Subgrade / CBR", "subgrade"),
     ("4. Pavement Structural Design", "structural"),
     ("5. Alternative Selection", "stabilized"),
-    ("6. IITPAVE Verification", "iitpave_status"),
+    ("6. RoadX In-House Solver", "roadx_solver"),
+    ("IITPAVE Validation (Optional)", "iitpave_status"),
     ("7. Mix Design", "inputs"),
     ("8. BOQ", "material_qty"),
     ("9. Engineering Review", "engineering_review"),
@@ -283,6 +285,7 @@ class MainWindow(QMainWindow):
         self.traffic = TrafficPanel(self.db)
         self.condition = ConditionSurveyPanel(self.db)
         self.iitpave_status = IITPaveStatusPanel(self.db)
+        self.roadx_solver = RoadXSolverPanel(self.db)
         self.subgrade = SubgradePanel(self.db)
         self.engineering_review = EngineeringReviewPanel(self.db)
         self.engineering_review.navigate_to.connect(self._show_page)
@@ -303,6 +306,7 @@ class MainWindow(QMainWindow):
             (self.traffic,      "hub"),
             (self.condition,    "hub"),
             (self.iitpave_status, "hub"),
+            (self.roadx_solver, "hub"),
             (self.subgrade,     "hub"),
             (self.engineering_review, "hub"),
             (self.submission,   "hub"),
@@ -327,6 +331,7 @@ class MainWindow(QMainWindow):
             "traffic": self.traffic,
             "condition": self.condition,
             "iitpave_status": self.iitpave_status,
+            "roadx_solver": self.roadx_solver,
             "subgrade": self.subgrade,
             "engineering_review": self.engineering_review,
             "submission": self.submission,
@@ -340,6 +345,48 @@ class MainWindow(QMainWindow):
         # Status
         self.setStatusBar(QStatusBar())
         self.statusBar().showMessage(f"{__app_name__} ready  •  DB: {self.db.path}")
+
+        # Check packages availability
+        p3_ok = "YES"
+        try:
+            import mechanistic_solver.solver
+        except ImportError:
+            p3_ok = "NO"
+
+        p4_ok = "YES"
+        try:
+            import mechanistic_solver.advanced
+        except ImportError:
+            p4_ok = "NO"
+
+        p5_ok = "YES"
+        try:
+            import mechanistic_solver.ai
+        except ImportError:
+            p5_ok = "NO"
+
+        p6_ok = "YES"
+        try:
+            import mechanistic_solver.enterprise
+        except ImportError:
+            p6_ok = "NO"
+
+        # Check IITPAVE connection
+        from app.core.iitpave.workflow import load_persisted_config, select_iitpave_runner
+        try:
+            cfg = load_persisted_config()
+            selection = select_iitpave_runner(cfg)
+            iitpave_connected = "YES" if (selection.ok and selection.runner is not None) else "NO"
+        except Exception:
+            iitpave_connected = "NO"
+
+        status_txt = (
+            f"Phase 3: {p3_ok} | Phase 4: {p4_ok} | Phase 5: {p5_ok} | Phase 6: {p6_ok} | "
+            f"Internal Solver: YES | IITPAVE Connected: {iitpave_connected}"
+        )
+        status_lbl = QLabel(status_txt)
+        status_lbl.setStyleSheet("color: #4a5568; font-size: 8.5pt; font-weight: bold; margin-right: 10px;")
+        self.statusBar().addPermanentWidget(status_lbl)
 
     def _wire_signals(self) -> None:
         self.nav.currentRowChanged.connect(self._on_nav_changed)
@@ -369,6 +416,7 @@ class MainWindow(QMainWindow):
         self.results.generate_word.connect(self._on_export_word)
         self.results.generate_pdf.connect(self._on_export_pdf)
         self.subgrade.saved.connect(self._on_subgrade_saved)
+        self.roadx_solver.saved.connect(self._refresh_hub)
         self.engineering_review.saved.connect(self._refresh_hub)
         self.submission.saved.connect(self._refresh_hub)
         self.submission.refresh_all_requested.connect(self._on_refresh_all_requested)
@@ -414,6 +462,7 @@ class MainWindow(QMainWindow):
                 "structural": "structural",
                 "stabilized": "stabilized",
                 "iitpave_status": "iitpave_status",
+                "roadx_solver": "iitpave_status",
                 "inputs": "mix_design",
                 "results": "mix_design",
                 "material_qty": "material_qty",
@@ -470,6 +519,8 @@ class MainWindow(QMainWindow):
             self.dashboard.refresh()
         elif key == "iitpave_status":
             self.iitpave_status.set_project(self._current_project_id, work_name)
+        elif key == "roadx_solver":
+            self.roadx_solver.set_project(self._current_project_id, work_name)
         elif key == "subgrade":
             self.subgrade.set_project(self._current_project_id, work_name)
         elif key == "inputs":

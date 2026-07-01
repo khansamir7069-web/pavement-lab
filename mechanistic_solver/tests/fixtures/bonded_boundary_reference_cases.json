@@ -1,0 +1,57 @@
+[
+  {
+    "case_id": "two_layer_bonded_reference",
+    "description": "Standard 2-layer pavement with bonded interfaces",
+    "layers_count": 2,
+    "expected_matrix_dim": 6,
+    "inputs": {
+      "layers": [
+        {
+          "name": "BC",
+          "thickness": 100.0,
+          "elastic_modulus": 3000.0,
+          "poisson_ratio": 0.35,
+          "density": 2400.0
+        }
+      ],
+      "subgrade": {
+        "name": "Subgrade",
+        "thickness": null,
+        "elastic_modulus": 50.0,
+        "poisson_ratio": 0.4,
+        "density": 1800.0
+      }
+    }
+  },
+  {
+    "case_id": "three_layer_bonded_reference",
+    "description": "Standard 3-layer pavement with bonded interfaces",
+    "layers_count": 3,
+    "expected_matrix_dim": 10,
+    "inputs": {
+      "layers": [
+        {
+          "name": "BC",
+          "thickness": 40.0,
+          "elastic_modulus": 3000.0,
+          "poisson_ratio": 0.35,
+          "density": 2400.0
+        },
+        {
+          "name": "WMM",
+          "thickness": 150.0,
+          "elastic_modulus": 300.0,
+          "poisson_ratio": 0.35,
+          "density": 2200.0
+        }
+      ],
+      "subgrade": {
+        "name": "Subgrade",
+        "thickness": null,
+        "elastic_modulus": 50.0,
+        "poisson_ratio": 0.4,
+        "density": 1800.0
+      }
+    }
+  }
+]

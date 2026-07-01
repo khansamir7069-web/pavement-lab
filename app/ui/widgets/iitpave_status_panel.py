@@ -197,8 +197,8 @@ class IITPaveStatusPanel(QWidget):
         lay.setSpacing(0)
 
         self.header = PageHeader(
-            "6. IITPAVE Verification & Optimization",
-            "Perform real mechanistic pavement validation using the local IITPAVE calculation engine."
+            "External IITPAVE Verification (Optional)",
+            "Perform validation and parity checks against separately installed external IITPAVE software."
         )
         lay.addWidget(self.header)
 
@@ -214,6 +214,17 @@ class IITPaveStatusPanel(QWidget):
         # Project Info Banner
         self.lbl_project_banner = QLabel("No project loaded.")
         elay.addWidget(self.lbl_project_banner)
+
+        self.lbl_optional_validation_note = QLabel(
+            "⚠️ <b>Note:</b> This page is exclusively for performing optional validation/parity comparisons "
+            "against a separately installed, external IITPAVE executable. It is not the main pavement design engine."
+        )
+        self.lbl_optional_validation_note.setStyleSheet(
+            "background-color: #fcf3cf; color: #7e5109; border: 1px solid #f9e79f; "
+            "border-radius: 4px; padding: 10px 14px; font-size: 10pt;"
+        )
+        self.lbl_optional_validation_note.setWordWrap(True)
+        elay.addWidget(self.lbl_optional_validation_note)
 
         # Verification controls
         ctrl_card = Card()
@@ -567,9 +578,9 @@ class IITPaveStatusPanel(QWidget):
     def _render_results(self, mv) -> None:
         """Render results from a saved database MechanisticValidation record."""
         # Overall Safe banner
-        if mv.refused:
-            self.lbl_overall_verdict.setText("<b>Overall Verdict: VERIFICATION REFUSED / ERROR</b>")
-            self.lbl_overall_verdict.setStyleSheet("font-size: 14pt; padding: 10px; border-radius: 4px; background:#f9d5d5; color:#a81f1f;")
+        if mv.refused or mv.is_placeholder:
+            self.lbl_overall_verdict.setText("<b>Overall Verdict: Not Executed / Unavailable</b>")
+            self.lbl_overall_verdict.setStyleSheet("font-size: 14pt; padding: 10px; border-radius: 4px; background:#f5f6f8; color:#666;")
         elif mv.fatigue_verdict == "PASS" and mv.rutting_verdict == "PASS":
             self.lbl_overall_verdict.setText("<b>Overall Verdict: DESIGN SAFE (MECH. COMPLIANT)</b>")
             self.lbl_overall_verdict.setStyleSheet("font-size: 14pt; padding: 10px; border-radius: 4px; background:#d4efdf; color:#196f3d;")
@@ -689,12 +700,42 @@ class IITPaveStatusPanel(QWidget):
             
         version = detect_iitpave_version(path)
         file_hash = calculate_file_hash(path)
-        QMessageBox.information(
-            self,
-            "Validation Successful",
-            f"The executable is valid!\n\nDetected Version: {version}\nSHA256 Checksum: {file_hash}"
+        
+        # Run dry run!
+        from app.core import select_iitpave_runner, check_iitpave_dry_run_readiness, IITPaveRunnerConfig
+        cfg = IITPaveRunnerConfig(
+            mode=IITPAVE_RUNNER_EXTERNAL,
+            configured_executable_path=path_str
         )
-        self.refresh()
+        selection = select_iitpave_runner(cfg)
+        dry_run = check_iitpave_dry_run_readiness(selection)
+        
+        if dry_run.ok:
+            status_text = f"Ready (Diagnostics successful, code {dry_run.returncode})"
+            QMessageBox.information(
+                self,
+                "Validation Successful",
+                f"The executable is valid and runnable!\n\n"
+                f"Detected Version: {version}\n"
+                f"SHA256 Checksum: {file_hash}\n"
+                f"Return Code: {dry_run.returncode}"
+            )
+        else:
+            status_text = f"Failed: {dry_run.blocked_reason or 'Verification failed'}"
+            QMessageBox.warning(
+                self,
+                "Validation Warning",
+                f"The executable exists but dry-run verification failed/warned:\n\n"
+                f"Reason: {dry_run.blocked_reason}\n"
+                f"Detected Version: {version}\n"
+                f"SHA256 Checksum: {file_hash}"
+            )
+        
+        # Update diagnostics display fields
+        self.lbl_diag_path.setText(path_str)
+        self.lbl_diag_version.setText(version)
+        self.lbl_diag_sha.setText(file_hash)
+        self.lbl_diag_test.setText(status_text)
 
     def _on_save_settings(self) -> None:
         path_str = self.txt_manual_path.text().strip()
@@ -729,6 +770,20 @@ class IITPaveStatusPanel(QWidget):
             return
 
         cfg = load_persisted_config()
+        if cfg.mode == IITPAVE_RUNNER_EXTERNAL:
+            validation = validate_iitpave_environment(
+                configured_path=cfg.configured_executable_path or None,
+                include_path_search=cfg.include_path_search,
+            )
+            if not validation.selected_path:
+                QMessageBox.warning(
+                    self,
+                    "IITPAVE Not Configured",
+                    "Licensed IITPAVE executable is not configured.\n\n"
+                    "Browse and select IITPAVE.exe to run mechanistic verification."
+                )
+                return
+
         self.txt_live_logs.clear()
         self.progress_bar.setVisible(True)
         self.btn_run_verification.setEnabled(False)
@@ -791,9 +846,9 @@ class IITPaveStatusPanel(QWidget):
             # Log audit action
             self.db.log_project_audit(
                 project_id=self._project_id,
-                module_name="iitpave_status",
+                module="iitpave_status",
                 action="Verification Run Complete",
-                details=f"Iterations: {len(iterations)}, Overall Status: {'SAFE' if wf_res.ok else 'UNSAFE'}"
+                detail=f"Iterations: {len(iterations)}, Overall Status: {'SAFE' if wf_res.ok else 'UNSAFE'}"
             )
 
             # Increment synchronization model state

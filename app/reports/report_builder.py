@@ -1090,7 +1090,7 @@ def build_combined_report(
         add_traceability_block(doc, "IITPAVE Mechanistic Safety Verification", iit_inputs, iit_outputs, "IRC:37-2018 (Section 6 & IITPAVE Engine)")
         included.append("Appendix D: IITPAVE Verification")
     else:
-        add_p(doc, "Real IITPAVE verification was not performed. Pavement design is prepared under empirical Decision Support Mode guidelines.")
+        add_p(doc, "Mechanistic verification was not executed because a licensed IITPAVE installation was unavailable.")
 
     # ---- APPENDIX E: MIX DESIGN ----
     doc.add_page_break()
@@ -1384,13 +1384,10 @@ def write_executive_summary_section(doc, p, structural, stabilized, mech_val, db
     if stabilized:
         summary_para += "A cement-stabilized design (CTB/CTS) has been analyzed as an alternative to achieve structural thickness optimization. "
     
-    if mech_val and not mech_val.refused:
-        if "Demo verification example only" in (mech_val.notes or ""):
-            summary_para += f"Mechanistic verification has been successfully conducted (IRC Catalogue Design - Decision Support Mode)."
-        else:
-            summary_para += f"Mechanistic verification has been successfully conducted using IITPAVE as a Mechanistically Verified Design."
+    if mech_val and not mech_val.refused and not mech_val.is_placeholder:
+        summary_para += f"Mechanistic verification has been successfully conducted using IITPAVE as a Mechanistically Verified Design."
     else:
-        summary_para += f"The design calculations have been prepared under IRC Catalogue Design (Decision Support Mode) guidelines."
+        summary_para += f"The design calculations have been prepared under IRC Catalogue Design (Decision Support Mode) guidelines. Mechanistic verification was not executed because a licensed IITPAVE installation was unavailable."
         
     add_p(doc, summary_para)
     

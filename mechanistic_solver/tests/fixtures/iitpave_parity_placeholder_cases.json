@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "IITPAVEParityPlaceholderCases",
+  "description": "Fixture placeholder mapping expected structural strains outputs (fatigue tensile strain, subgrade vertical strain) against golden IITPAVE outputs.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": {
+      "case_id": { "type": "string" },
+      "inputs": {
+        "type": "object",
+        "properties": {
+          "layers": { "type": "array" },
+          "subgrade": { "type": "object" },
+          "loads": { "type": "array" }
+        },
+        "required": ["layers", "subgrade", "loads"]
+      },
+      "expected_iitpave_outputs": {
+        "type": "object",
+        "properties": {
+          "tensile_strain_microstrain": { "type": "number" },
+          "vertical_strain_microstrain": { "type": "number" }
+        },
+        "required": ["tensile_strain_microstrain", "vertical_strain_microstrain"]
+      }
+    },
+    "required": ["case_id", "inputs", "expected_iitpave_outputs"]
+  }
+}

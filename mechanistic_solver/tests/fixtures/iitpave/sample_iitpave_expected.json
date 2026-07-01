@@ -1,0 +1,37 @@
+{
+  "critical_responses": {
+    "epsilon_t_bottom_bituminous": 200.0,
+    "epsilon_v_top_subgrade": 250.0,
+    "vertical_stress": 0.45,
+    "deflection": 0.85
+  },
+  "layer_responses": [
+    {
+      "z": 40.0,
+      "r": 0.0,
+      "sigma_z": 0.45,
+      "sigma_t": 0.15,
+      "sigma_r": 0.15,
+      "tau_rz": 0.0,
+      "deflection": 0.85,
+      "epsilon_z": -0.0001,
+      "epsilon_t": 0.0002,
+      "epsilon_r": 0.0002,
+      "label": ""
+    },
+    {
+      "z": 190.0,
+      "r": 0.0,
+      "sigma_z": 0.05,
+      "sigma_t": 0.02,
+      "sigma_r": 0.02,
+      "tau_rz": 0.0,
+      "deflection": 0.25,
+      "epsilon_z": -0.00025,
+      "epsilon_t": 0.00005,
+      "epsilon_r": 0.00005,
+      "label": ""
+    }
+  ],
+  "parse_status": "success"
+}

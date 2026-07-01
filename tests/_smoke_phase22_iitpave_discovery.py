@@ -45,7 +45,7 @@ def main() -> int:
     assert any(IITPAVE_EXECUTABLE_ENV_VAR in i.message for i in missing.issues)
     missing_payload = missing.as_dict()
     assert missing_payload["ok"] is False
-    assert len(missing_payload["candidates"]) == 2
+    assert len([c for c in missing_payload["candidates"] if c["source"] != "common_folders"]) == 2
     print("  [PASS] missing binary is explicit and serializable")
 
     print("\n=== 3) Bundled executable is selected without running it ===")

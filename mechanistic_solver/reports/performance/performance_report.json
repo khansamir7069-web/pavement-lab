@@ -1,0 +1,29 @@
+{
+  "runtimes": {
+    "hankel_integration": 0.35359260000018367,
+    "transfer_matrix": 0.02248120000126619,
+    "optimization": 0.3341592000000446,
+    "reporting": 0.00025040000002718443,
+    "total": 0.36143570000001546
+  },
+  "memory": {
+    "start_mb": 0.0,
+    "peak_mb": 0.0
+  },
+  "concurrency": {
+    "worker_count": 1,
+    "batch_size": 1,
+    "throughput_jobs_per_sec": 2.7667438495974728
+  },
+  "cache": {
+    "hits": 592151,
+    "misses": 33998,
+    "hit_ratio": 0.9457030195688246,
+    "total_queries": 626149,
+    "category_sizes": {
+      "bessel_j1": 4388,
+      "burmister_coefficients": 29043,
+      "bessel_j0": 567
+    }
+  }
+}

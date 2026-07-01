@@ -1,0 +1,37 @@
+{
+  "version": "1.0.0",
+  "database_name": "Client Custom Database",
+  "materials": [
+    {
+      "material_id": "custom_aggregate_base",
+      "material_name": "Custom Aggregate Base",
+      "category": "Granular",
+      "layer_type": "Base",
+      "default_elastic_modulus_mpa": 280.0,
+      "recommended_modulus_min_mpa": 150.0,
+      "recommended_modulus_max_mpa": 350.0,
+      "poisson_ratio": 0.40,
+      "density_kg_m3": 2150.0,
+      "temperature_sensitivity": "None",
+      "moisture_sensitivity": "High",
+      "drainage_rating": "Good",
+      "expected_design_life_years": 30,
+      "typical_irc_usage": "Custom project aggregate layer.",
+      "engineering_notes": "Modified aggregate proportions from local quarry.",
+      "reference_source": "Project Custom Specification",
+      "version": "1.0.0",
+      "revision": 1,
+      "created_by": "Client Lead Engineer",
+      "last_updated": "2026-06-30",
+      "locked": false,
+      "optimizable": true,
+      "min_thickness_mm": 100.0,
+      "max_thickness_mm": 200.0,
+      "construction_cost_index": 2.8,
+      "carbon_footprint_index": 1.7,
+      "availability_rating": 9,
+      "material_priority": 2,
+      "sustainability_score": 86
+    }
+  ]
+}

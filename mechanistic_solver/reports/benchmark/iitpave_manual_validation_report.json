@@ -1,0 +1,117 @@
+{
+  "generated_at": "2026-06-30 16:28:00",
+  "results": [
+    {
+      "case_id": "case_001",
+      "parameter": "epsilon_t_bottom_bituminous",
+      "iitpave_value": 193.1,
+      "roadx_value": 407.480830584437,
+      "absolute_error": 214.380830584437,
+      "percentage_error": 1.1102062692099275,
+      "passed": false
+    },
+    {
+      "case_id": "case_001",
+      "parameter": "epsilon_v_top_subgrade",
+      "iitpave_value": 399.4,
+      "roadx_value": 418.1976689230293,
+      "absolute_error": 18.797668923029335,
+      "percentage_error": 0.047064769461765986,
+      "passed": true
+    },
+    {
+      "case_id": "case_001",
+      "parameter": "vertical_stress",
+      "iitpave_value": -0.1748,
+      "roadx_value": -0.04468202844167423,
+      "absolute_error": 0.13011797155832577,
+      "percentage_error": 0.7443819883199414,
+      "passed": false
+    },
+    {
+      "case_id": "case_001",
+      "parameter": "deflection",
+      "iitpave_value": 0.3234,
+      "roadx_value": 0.39247669800580165,
+      "absolute_error": 0.06907669800580163,
+      "percentage_error": 0.21359523192888566,
+      "passed": false
+    },
+    {
+      "case_id": "case_002",
+      "parameter": "epsilon_t_bottom_bituminous",
+      "iitpave_value": 131.8,
+      "roadx_value": 144.20497057902,
+      "absolute_error": 12.404970579019988,
+      "percentage_error": 0.09411965537951432,
+      "passed": false
+    },
+    {
+      "case_id": "case_002",
+      "parameter": "epsilon_v_top_subgrade",
+      "iitpave_value": 278.09999999999997,
+      "roadx_value": 129.2948396295571,
+      "absolute_error": 148.80516037044288,
+      "percentage_error": 0.5350778869846922,
+      "passed": false
+    },
+    {
+      "case_id": "case_002",
+      "parameter": "vertical_stress",
+      "iitpave_value": -0.1153,
+      "roadx_value": -0.010453877465628272,
+      "absolute_error": 0.10484612253437173,
+      "percentage_error": 0.909333239673649,
+      "passed": false
+    },
+    {
+      "case_id": "case_002",
+      "parameter": "deflection",
+      "iitpave_value": 0.2544,
+      "roadx_value": 0.1076224861702596,
+      "absolute_error": 0.1467775138297404,
+      "percentage_error": 0.5769556361231934,
+      "passed": false
+    },
+    {
+      "case_id": "case_003",
+      "parameter": "epsilon_t_bottom_bituminous",
+      "iitpave_value": 59.78,
+      "roadx_value": 33.381310014188635,
+      "absolute_error": 26.398689985811366,
+      "percentage_error": 0.4415973567382296,
+      "passed": false
+    },
+    {
+      "case_id": "case_003",
+      "parameter": "epsilon_v_top_subgrade",
+      "iitpave_value": 89.51,
+      "roadx_value": 89.81540489090666,
+      "absolute_error": 0.305404890906658,
+      "percentage_error": 0.0034119639247755336,
+      "passed": true
+    },
+    {
+      "case_id": "case_003",
+      "parameter": "vertical_stress",
+      "iitpave_value": -0.05924,
+      "roadx_value": -0.004028364688714105,
+      "absolute_error": 0.055211635311285895,
+      "percentage_error": 0.9319992456327801,
+      "passed": false
+    },
+    {
+      "case_id": "case_003",
+      "parameter": "deflection",
+      "iitpave_value": 0.1536,
+      "roadx_value": 0.9372414871731672,
+      "absolute_error": 0.7836414871731673,
+      "percentage_error": 5.101832598783641,
+      "passed": false
+    }
+  ],
+  "diagnostics": [
+    "Gauss integration vs adaptive quad integration differences",
+    "Poisson ratio interface coupling"
+  ]
+}

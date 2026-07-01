@@ -1,0 +1,154 @@
+[
+  {
+    "case_id": "stiff_asphalt_soft_subgrade",
+    "description": "Stiff asphalt (3000 MPa) over soft subgrade (50 MPa)",
+    "inputs": {
+      "layers": [
+        {
+          "name": "Asphalt",
+          "thickness": 100.0,
+          "elastic_modulus": 3000.0,
+          "poisson_ratio": 0.35,
+          "density": 2400.0
+        }
+      ],
+      "subgrade": {
+        "name": "Subgrade",
+        "thickness": null,
+        "elastic_modulus": 50.0,
+        "poisson_ratio": 0.4,
+        "density": 1800.0
+      },
+      "observation_points": [
+        { "x": 0.0, "y": 0.0, "z": 50.0 }
+      ]
+    },
+    "expected_outputs": {
+      "status": "experimental",
+      "layer_name": "Asphalt"
+    }
+  },
+  {
+    "case_id": "soft_top_stiff_base",
+    "description": "Soft top layer (500 MPa) over stiff base (2000 MPa)",
+    "inputs": {
+      "layers": [
+        {
+          "name": "Soft_Top",
+          "thickness": 80.0,
+          "elastic_modulus": 500.0,
+          "poisson_ratio": 0.4,
+          "density": 2100.0
+        }
+      ],
+      "subgrade": {
+        "name": "Stiff_Subgrade",
+        "thickness": null,
+        "elastic_modulus": 2000.0,
+        "poisson_ratio": 0.3,
+        "density": 2400.0
+      },
+      "observation_points": [
+        { "x": 0.0, "y": 0.0, "z": 40.0 }
+      ]
+    },
+    "expected_outputs": {
+      "status": "experimental",
+      "layer_name": "Soft_Top"
+    }
+  },
+  {
+    "case_id": "observation_asphalt_bottom",
+    "description": "Observation point at the bottom of the asphalt layer (z=100 mm)",
+    "inputs": {
+      "layers": [
+        {
+          "name": "Asphalt",
+          "thickness": 100.0,
+          "elastic_modulus": 3500.0,
+          "poisson_ratio": 0.35,
+          "density": 2400.0
+        }
+      ],
+      "subgrade": {
+        "name": "Subgrade",
+        "thickness": null,
+        "elastic_modulus": 60.0,
+        "poisson_ratio": 0.4,
+        "density": 1800.0
+      },
+      "observation_points": [
+        { "x": 0.0, "y": 0.0, "z": 100.0 }
+      ]
+    },
+    "expected_outputs": {
+      "status": "experimental",
+      "layer_name": "Subgrade"
+    }
+  },
+  {
+    "case_id": "observation_subgrade_top",
+    "description": "Observation point at top of subgrade (z=150 mm)",
+    "inputs": {
+      "layers": [
+        {
+          "name": "Asphalt",
+          "thickness": 50.0,
+          "elastic_modulus": 3000.0,
+          "poisson_ratio": 0.35,
+          "density": 2400.0
+        },
+        {
+          "name": "Base",
+          "thickness": 100.0,
+          "elastic_modulus": 300.0,
+          "poisson_ratio": 0.35,
+          "density": 2200.0
+        }
+      ],
+      "subgrade": {
+        "name": "Subgrade",
+        "thickness": null,
+        "elastic_modulus": 50.0,
+        "poisson_ratio": 0.4,
+        "density": 1800.0
+      },
+      "observation_points": [
+        { "x": 0.0, "y": 0.0, "z": 150.0 }
+      ]
+    },
+    "expected_outputs": {
+      "status": "experimental",
+      "layer_name": "Subgrade"
+    }
+  },
+  {
+    "case_id": "high_modulus_contrast",
+    "description": "Warning check for extreme stiffness ratio (4000 MPa top over 10 MPa subgrade)",
+    "inputs": {
+      "layers": [
+        {
+          "name": "Stiff_Asphalt",
+          "thickness": 100.0,
+          "elastic_modulus": 4000.0,
+          "poisson_ratio": 0.35,
+          "density": 2400.0
+        }
+      ],
+      "subgrade": {
+        "name": "Soft_Soil",
+        "thickness": null,
+        "elastic_modulus": 10.0,
+        "poisson_ratio": 0.45,
+        "density": 1500.0
+      },
+      "observation_points": [
+        { "x": 0.0, "y": 0.0, "z": 50.0 }
+      ]
+    },
+    "expected_outputs": {
+      "status": "experimental",
+      "layer_name": "Stiff_Asphalt"
+    }
+  }
+]

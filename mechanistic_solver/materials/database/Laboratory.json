@@ -1,0 +1,37 @@
+{
+  "version": "1.0.0",
+  "database_name": "Laboratory Tested Database",
+  "materials": [
+    {
+      "material_id": "lab_bc_2026",
+      "material_name": "Lab Tested BC-I (2026)",
+      "category": "Bituminous",
+      "layer_type": "Surface",
+      "default_elastic_modulus_mpa": 3200.0,
+      "recommended_modulus_min_mpa": 2000.0,
+      "recommended_modulus_max_mpa": 4500.0,
+      "poisson_ratio": 0.35,
+      "density_kg_m3": 2410.0,
+      "temperature_sensitivity": "Medium",
+      "moisture_sensitivity": "Low",
+      "drainage_rating": "Good",
+      "expected_design_life_years": 25,
+      "typical_irc_usage": "Tested wearing course specimen.",
+      "engineering_notes": "Tested in wire basket / Marshall flow moulds.",
+      "reference_source": "Laboratory Report LAB-2026-99",
+      "version": "1.0.0",
+      "revision": 1,
+      "created_by": "Senior Lab Technician",
+      "last_updated": "2026-06-29",
+      "locked": false,
+      "optimizable": false,
+      "min_thickness_mm": 40.0,
+      "max_thickness_mm": 40.0,
+      "construction_cost_index": 9.8,
+      "carbon_footprint_index": 8.2,
+      "availability_rating": 7,
+      "material_priority": 1,
+      "sustainability_score": 58
+    }
+  ]
+}

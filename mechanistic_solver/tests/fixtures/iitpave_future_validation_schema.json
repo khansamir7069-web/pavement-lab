@@ -1,0 +1,60 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "IITPAVEFutureValidationSchema",
+  "description": "Validation schema for future multi-layer solver outputs regression tests against golden IITPAVE outputs.",
+  "type": "object",
+  "properties": {
+    "case_id": { "type": "string" },
+    "layers_count": { "type": "integer" },
+    "expected_iitpave_outputs": {
+      "type": "object",
+      "properties": {
+        "epsilon_t_bottom_bituminous": { "type": ["number", "null"] },
+        "epsilon_v_top_subgrade": { "type": ["number", "null"] },
+        "vertical_stress": { "type": ["number", "null"] },
+        "deflection": { "type": ["number", "null"] }
+      }
+    },
+    "tolerance_limits": {
+      "type": "object",
+      "properties": {
+        "epsilon_t_bottom_bituminous": {
+          "type": "object",
+          "properties": {
+            "abs": { "type": "number" },
+            "rel": { "type": "number" }
+          }
+        },
+        "epsilon_v_top_subgrade": {
+          "type": "object",
+          "properties": {
+            "abs": { "type": "number" },
+            "rel": { "type": "number" }
+          }
+        },
+        "vertical_stress": {
+          "type": "object",
+          "properties": {
+            "abs": { "type": "number" },
+            "rel": { "type": "number" }
+          }
+        },
+        "deflection": {
+          "type": "object",
+          "properties": {
+            "abs": { "type": "number" },
+            "rel": { "type": "number" }
+          }
+        }
+      }
+    },
+    "iitpave_run_metadata": {
+      "type": "object",
+      "properties": {
+        "iitpave_version": { "type": "string" },
+        "timestamp": { "type": "string" }
+      }
+    }
+  },
+  "required": ["case_id", "layers_count"]
+}

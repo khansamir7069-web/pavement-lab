@@ -1,0 +1,53 @@
+{
+  "tenant_id": "tenant-123",
+  "organization_name": "Global Roads Corp",
+  "license_tier": "Enterprise",
+  "health_status": "HEALTHY",
+  "assets_summary": {
+    "total_corridors": 3,
+    "total_sections": 12
+  },
+  "digital_twin_summary": {
+    "lifecycle_state": "OPERATION",
+    "pci": 88.5,
+    "remaining_service_life_years": 15.2,
+    "active_sensors": 8,
+    "triggered_maintenance": []
+  },
+  "cloud_queue_summary": {
+    "total_jobs": 45,
+    "pending_jobs": 0,
+    "completed_jobs": 45,
+    "queue_status": "idle"
+  },
+  "network_analysis": {
+    "network_size_sections": 2,
+    "budget_limit": 1500000.0,
+    "allocated_total": 850000.0,
+    "remaining_budget": 650000.0,
+    "prioritized_actions": [
+      {
+        "road_name": "NH-2",
+        "section_name": "Sec 4A",
+        "passed": false,
+        "rehab_cost": 450000.0,
+        "budget_allocated": true
+      },
+      {
+        "road_name": "NH-8",
+        "section_name": "Sec 12B",
+        "passed": true,
+        "rehab_cost": 400000.0,
+        "budget_allocated": true
+      }
+    ]
+  },
+  "audit_trail": [
+    {
+      "user_id": "engineer-1",
+      "action": "run_solver",
+      "target_id": "sec-4A",
+      "details": "Deterministic check passed"
+    }
+  ]
+}

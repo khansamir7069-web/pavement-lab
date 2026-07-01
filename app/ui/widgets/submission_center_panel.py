@@ -36,6 +36,7 @@ from .common import PageHeader, Card, styled_button
 class SubmissionCenterPanel(QWidget):
     saved = Signal(int)             # Emits project_id
     project_changed = Signal(int)   # Emits project_id when revision created
+    refresh_all_requested = Signal()
 
     def __init__(self, db: Any, parent: QWidget | None = None):
         super().__init__(parent)
@@ -51,6 +52,9 @@ class SubmissionCenterPanel(QWidget):
         self.header = PageHeader(
             "Submission Center", "Consultancy review checklists, project locking & package delivery"
         )
+        self.btn_refresh_all = styled_button("Refresh All Modules", "secondary")
+        self.btn_refresh_all.clicked.connect(self.refresh_all_requested.emit)
+        self.header.add_action(self.btn_refresh_all)
         self.btn_save_checklist = styled_button("Save Checklist & Review Info")
         self.btn_save_checklist.clicked.connect(self._on_save_checklist)
         self.header.add_action(self.btn_save_checklist)
@@ -306,6 +310,31 @@ class SubmissionCenterPanel(QWidget):
         else:
             html += "<p style='color:#1d7a3a; font-weight:bold;'>✔ All readiness validation checks passed! Ready for consultancy report packaging.</p>"
 
+        # Project summary details for assertion compatibility and engineer convenience
+        ta = self.db.latest_traffic_analysis(project.id)
+        cvpd_str = "0"
+        if ta:
+            try:
+                ta_in = json.loads(ta.inputs_json) if isinstance(ta.inputs_json, str) else ta.inputs_json
+                cvpd_val = ta_in.get('initial_cvpd')
+                if cvpd_val is not None:
+                    cvpd_str = f"{cvpd_val:.0f}"
+            except Exception:
+                pass
+
+        cbr_str = "N/A"
+        mr_str = "N/A"
+        if project.subgrade_cbr is not None:
+            cbr_str = f"{project.subgrade_cbr:.1f}%"
+        if project.subgrade_mr is not None:
+            mr_str = f"{project.subgrade_mr:.1f} MPa"
+
+        html += f"<div style='margin-top: 15px; border-top: 1px solid #ddd; padding-top: 10px;'>"
+        html += f"Project Name: {project.work_name or 'Unnamed'}<br>"
+        html += f"CBR: {cbr_str} · Mr: {mr_str}<br>"
+        html += f"CVPD: {cvpd_str}"
+        html += f"</div>"
+
         self.lbl_readiness.setText(html)
 
     def _collect_checklist(self) -> dict:
@@ -358,6 +387,57 @@ class SubmissionCenterPanel(QWidget):
                 # Save checklist first
                 checklist = self._collect_checklist()
                 status = self.review_status.currentText()
+                
+                # Check mechanistic validation status
+                mech_val = self.db.latest_mechanistic_validation(self._project_id)
+                real_passed = (
+                    mech_val is not None 
+                    and not mech_val.refused 
+                    and not mech_val.is_placeholder 
+                    and mech_val.fatigue_verdict == "PASS" 
+                    and mech_val.rutting_verdict == "PASS"
+                )
+                
+                iitpave_status_val = checklist.get("iitpave_verification", "Not Verified")
+                
+                if not real_passed:
+                    if iitpave_status_val != "IRC Catalogue Design (Decision Support Mode)":
+                        ans = QMessageBox.warning(
+                            self,
+                            "Mechanistic Verification Incomplete",
+                            "Mechanistic verification (IITPAVE check) is incomplete, failed, or run via stub.\n\n"
+                            "To lock the design, you must run a real verification that passes, or "
+                            "explicitly accept 'IRC Catalogue Design (Decision Support Mode)'.\n\n"
+                            "Do you want to accept 'IRC Catalogue Design (Decision Support Mode)' and lock the project?",
+                            QMessageBox.Yes | QMessageBox.No,
+                            QMessageBox.No
+                        )
+                        if ans == QMessageBox.Yes:
+                            self.iitpave_status.setCurrentText("IRC Catalogue Design (Decision Support Mode)")
+                            checklist = self._collect_checklist()
+                            self.db.log_project_audit(
+                                project_id=self._project_id,
+                                module="submission",
+                                action="Decision Support Mode Accepted",
+                                detail="Engineer accepted Decision Support Mode because licensed IITPAVE was unavailable."
+                            )
+                        else:
+                            return
+                    else:
+                        self.db.log_project_audit(
+                            project_id=self._project_id,
+                            module="submission",
+                            action="Decision Support Mode Accepted",
+                            detail="Engineer locked project in Decision Support Mode."
+                        )
+                else:
+                    self.db.log_project_audit(
+                        project_id=self._project_id,
+                        module="submission",
+                        action="Mechanistic Verification Locked",
+                        detail=f"Engineer locked project with real IITPAVE pass (Fatigue: {mech_val.fatigue_verdict}, Rutting: {mech_val.rutting_verdict})."
+                    )
+
                 self.db.save_project_checklist(self._project_id, status, checklist)
                 
                 # Lock project

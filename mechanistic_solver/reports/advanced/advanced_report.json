@@ -1,0 +1,33 @@
+{
+  "viscoelastic": {
+    "t_ref": 20.0,
+    "e_t_0_1s": 2400.0,
+    "e_star_10hz": 2750.0
+  },
+  "temperature": {
+    "surface_temp_celsius": 40.0,
+    "modulus_correction_factor": 0.85,
+    "thermal_strain": 0.00015
+  },
+  "moving_load": {
+    "max_displacement_mm": 0.38,
+    "max_tensile_strain_microstrain": 118.0,
+    "max_compressive_strain_microstrain": -78.0
+  },
+  "composite": {
+    "overlay_recommendation_mm": 82.0,
+    "rigid_slab_bending_stress_mpa": 1.15
+  },
+  "reliability": {
+    "total_simulations": 100,
+    "reliability_pct": 96.0,
+    "reliability_index_beta": 1.751,
+    "failure_probability": 0.04,
+    "sensitivity_ranking": [
+      {
+        "parameter": "bc_thickness",
+        "correlation_coefficient": -0.84
+      }
+    ]
+  }
+}

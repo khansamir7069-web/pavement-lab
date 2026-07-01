@@ -1,0 +1,10 @@
+"""IRC:37 mechanistic design engine components."""
+from __future__ import annotations
+
+from mechanistic_solver.design.fatigue import compute_fatigue_life, check_fatigue_adequacy
+from mechanistic_solver.design.rutting import compute_rutting_life, check_rutting_adequacy
+from mechanistic_solver.design.adequacy import check_structural_adequacy
+from mechanistic_solver.design.optimization import optimize_bituminous_thickness
+from mechanistic_solver.design.recommendations import RecommendationEngine
+from mechanistic_solver.design.reporting import IRCDesignReportGenerator
+from mechanistic_solver.design.irc37_engine import IRC37DesignEngine

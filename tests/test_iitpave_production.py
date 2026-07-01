@@ -456,3 +456,201 @@ def test_database_persistence_run_logs() -> None:
     assert "attempt" in loaded.iteration_history_json
     assert "BC" in loaded.recommended_thickness_json
 
+
+def test_missing_iitpave_does_not_crash_and_saves_refused_cleanly() -> None:
+    # Test that missing IITPAVE does not crash the workflow and saves refused cleanly
+    from app.core.iitpave.workflow import run_structural_iitpave_mechanistic_workflow
+    from app.core import StructuralInput, StructuralResult, PavementLayer
+    from app.db.repository import Database
+    import tempfile
+    
+    tmp = Path(tempfile.mkdtemp(prefix="iitpave_test_missing_"))
+    db_file = tmp / "test_missing.db"
+    db = Database(db_file)
+    
+    layers = (
+        PavementLayer(name="BC", thickness_mm=40.0, material="BC", modulus_mpa=3000.0, poisson=0.35),
+        PavementLayer(name="DBM", thickness_mm=80.0, material="DBM", modulus_mpa=3000.0, poisson=0.35),
+        PavementLayer(name="WMM", thickness_mm=250.0, material="WMM", modulus_mpa=300.0, poisson=0.4),
+        PavementLayer(name="GSB", thickness_mm=150.0, material="GSB", modulus_mpa=150.0, poisson=0.4)
+    )
+    inputs = StructuralInput(
+        road_category="NH / SH", design_life_years=15, initial_cvpd=2000.0,
+        growth_rate_pct=7.5, vdf=2.5, ldf=0.75, subgrade_cbr_pct=5.0
+    )
+    result = StructuralResult(
+        inputs=inputs, design_msa=10.0, growth_factor=18.0, subgrade_mr_mpa=50.0,
+        composition=layers, total_pavement_thickness_mm=520.0
+    )
+    
+    cfg = IITPaveRunnerConfig(
+        mode=IITPAVE_RUNNER_EXTERNAL,
+        configured_executable_path="C:/non_existent_iitpave_path_12345/IITPAVE.exe",
+    )
+    
+    # 1. Verification run should return a blocked/refused result gracefully without crashing
+    workflow_res = run_structural_iitpave_mechanistic_workflow(result, runner_config=cfg)
+    assert workflow_res.blocked is True
+    assert "not found" in workflow_res.blocked_reason.lower() or "not exist" in workflow_res.blocked_reason.lower() or "no usable local" in workflow_res.blocked_reason.lower() or "invalid" in workflow_res.blocked_reason.lower()
+    
+    # 2. summary is None when blocked
+    assert workflow_res.summary is None
+    
+    # 3. Database persistence should work cleanly
+    row = db.save_mechanistic_validation(
+        project_id=1,
+        summary=workflow_res.summary,
+        inputs=workflow_res.as_dict()
+    )
+    assert row is not None
+    assert row.refused is True
+    assert row.fatigue_verdict is None
+    assert row.rutting_verdict is None
+
+
+def test_stub_missing_iitpave_never_produces_pass_verdict() -> None:
+    from app.core.iitpave.workflow import run_structural_iitpave_mechanistic_workflow
+    from app.core import StructuralInput, StructuralResult, PavementLayer
+    
+    layers = (
+        PavementLayer(name="BC", thickness_mm=40.0, material="BC", modulus_mpa=3000.0, poisson=0.35),
+        PavementLayer(name="DBM", thickness_mm=80.0, material="DBM", modulus_mpa=3000.0, poisson=0.35),
+        PavementLayer(name="WMM", thickness_mm=250.0, material="WMM", modulus_mpa=300.0, poisson=0.4),
+        PavementLayer(name="GSB", thickness_mm=150.0, material="GSB", modulus_mpa=150.0, poisson=0.4)
+    )
+    inputs = StructuralInput(
+        road_category="NH / SH", design_life_years=15, initial_cvpd=2000.0,
+        growth_rate_pct=7.5, vdf=2.5, ldf=0.75, subgrade_cbr_pct=5.0
+    )
+    result = StructuralResult(
+        inputs=inputs, design_msa=10.0, growth_factor=18.0, subgrade_mr_mpa=50.0,
+        composition=layers, total_pavement_thickness_mm=520.0
+    )
+    
+    cfg = IITPaveRunnerConfig(
+        mode=IITPAVE_RUNNER_STUB,
+    )
+    
+    workflow_res = run_structural_iitpave_mechanistic_workflow(result, runner_config=cfg)
+    
+    # Verdicts MUST be None (which maps to N/A), never PASS or FAIL
+    assert workflow_res.summary is not None
+    assert workflow_res.summary.refused is True
+    assert workflow_res.summary.fatigue.verdict is None
+    assert workflow_res.summary.rutting.verdict is None
+
+
+def test_decision_support_mode_locking_rules() -> None:
+    # Test locking checks in submission center panel rehydration logic
+    import tempfile
+    from app.db.repository import Database
+    from app.db.schema import Project
+    
+    tmp = Path(tempfile.mkdtemp(prefix="iitpave_test_lock_"))
+    db_file = tmp / "test_lock.db"
+    db = Database(db_file)
+    
+    # Create project
+    proj = db.create_project(work_name="Lock Verification Project")
+    db.initialize_workflow_statuses(proj.id)
+    
+    # Check that initially mechanistic validation is not run
+    mech_val = db.latest_mechanistic_validation(proj.id)
+    assert mech_val is None
+    
+    # Lock is allowed if checklist has "IRC Catalogue Design (Decision Support Mode)"
+    # We can mock this checklist save
+    db.save_project_checklist(proj.id, "Draft", {
+        "iitpave_verification": "IRC Catalogue Design (Decision Support Mode)"
+    })
+    
+    db.lock_project(proj.id)
+    p = db.get_project(proj.id)
+    assert p.locked is True
+
+
+def test_reports_show_correct_unavailable_wording() -> None:
+    import tempfile
+    from app.db.repository import Database
+    from app.db.schema import Project, StructuralDesign
+    from app.reports.report_builder import build_combined_report, CombinedReportContext
+    
+    tmp = Path(tempfile.mkdtemp(prefix="iitpave_test_report_"))
+    db_file = tmp / "test_report.db"
+    db = Database(db_file)
+    
+    proj = db.create_project(work_name="Report Wording Project")
+    db.initialize_workflow_statuses(proj.id)
+    
+    # Creating a stub structural design to bypass build_combined_report raise check
+    with db.session() as s:
+        sd = StructuralDesign(
+            project_id=proj.id,
+            inputs_json="{}",
+            composition_json="[]",
+            total_pavement_thickness_mm=0.0
+        )
+        s.add(sd)
+        s.commit()
+        
+    meta = {
+        "project_title": proj.work_name,
+        "work_name": proj.work_name,
+        "work_order_no": "",
+        "work_order_date": "",
+        "client": "",
+        "agency": "",
+        "submitted_by": "",
+        "report_date": "29-Jun-2026",
+        "binder_grade": "",
+        "mix_type_key": "",
+    }
+    ctx = CombinedReportContext(**meta)
+    out_path = tmp / "report_wording.docx"
+    
+    build_combined_report(out_path, db, proj.id, ctx)
+    assert out_path.is_file()
+    
+    # Read the text of docx to verify wording exists
+    import docx
+    doc = docx.Document(out_path)
+    full_text = []
+    for para in doc.paragraphs:
+        full_text.append(para.text)
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                full_text.append(cell.text)
+                
+    combined_text = "\n".join(full_text)
+    assert "Mechanistic verification was not executed because a licensed IITPAVE installation was unavailable." in combined_text
+
+
+def test_common_folder_discovery() -> None:
+    # Test auto-detection from common folders
+    from app.core import discover_iitpave_executable
+    import tempfile
+    from pathlib import Path
+    
+    tmp = Path(tempfile.mkdtemp(prefix="iitpave_test_common_"))
+    
+    # Create fake executable in common folders candidates structure
+    fake_common = tmp / "IITPAVE.exe"
+    fake_common.write_text("fake binary", encoding="utf-8")
+    
+    # Inject fake_common path as one of the common folders search candidates
+    # We can mock common_iitpave_exe_candidates to return [fake_common]
+    import app.core.iitpave.discovery as discovery
+    old_candidates = discovery.common_iitpave_exe_candidates
+    discovery.common_iitpave_exe_candidates = lambda: [fake_common]
+    
+    try:
+        candidates = discover_iitpave_executable(configured_path=None)
+        # Find if our mock path was discovered under SOURCE_COMMON
+        common_candidates = [c for c in candidates if c.source == "common_folders"]
+        assert len(common_candidates) == 1
+        assert common_candidates[0].path == fake_common
+    finally:
+        discovery.common_iitpave_exe_candidates = old_candidates
+
+

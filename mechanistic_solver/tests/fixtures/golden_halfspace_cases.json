@@ -1,0 +1,78 @@
+[
+  {
+    "case_id": "point_load_centerline_stress",
+    "description": "Point load vertical stress at axis (r=0, z=0.3)",
+    "equation_reference": "Boussinesq (1885)",
+    "inputs": {
+      "P": 40000.0,
+      "r": 0.0,
+      "z": 0.3,
+      "nu": 0.35
+    },
+    "expected_outputs": {
+      "sigma_z": 212206.5907891885
+    },
+    "tolerance": 1e-6
+  },
+  {
+    "case_id": "point_load_off_axis_stress",
+    "description": "Point load vertical stress off-axis (r=0.2, z=0.3)",
+    "equation_reference": "Boussinesq (1885)",
+    "inputs": {
+      "P": 40000.0,
+      "r": 0.2,
+      "z": 0.3,
+      "nu": 0.35
+    },
+    "expected_outputs": {
+      "sigma_z": 84626.5743340408
+    },
+    "tolerance": 1e-6
+  },
+  {
+    "case_id": "circular_load_shallow_centerline_stress",
+    "description": "Circular load vertical stress at shallow depth (z=0.1)",
+    "equation_reference": "Love (1929) / Huang eq. 2.1",
+    "inputs": {
+      "q": 560000.0,
+      "a": 0.15,
+      "z": 0.1,
+      "nu": 0.35
+    },
+    "expected_outputs": {
+      "sigma_z": 464420.88926580665
+    },
+    "tolerance": 1e-6
+  },
+  {
+    "case_id": "circular_load_deep_centerline_stress",
+    "description": "Circular load vertical stress at large depth (z=0.5)",
+    "equation_reference": "Love (1929) / Huang eq. 2.1",
+    "inputs": {
+      "q": 560000.0,
+      "a": 0.15,
+      "z": 0.5,
+      "nu": 0.35
+    },
+    "expected_outputs": {
+      "sigma_z": 67905.76172124338
+    },
+    "tolerance": 1e-6
+  },
+  {
+    "case_id": "circular_load_surface_deflection",
+    "description": "Surface deflection under centerline of circular load (z=0)",
+    "equation_reference": "Huang eq. 2.11",
+    "inputs": {
+      "q": 560000.0,
+      "a": 0.15,
+      "z": 0.0,
+      "E": 100000000.0,
+      "nu": 0.35
+    },
+    "expected_outputs": {
+      "vertical_deflection": 0.0014742
+    },
+    "tolerance": 1e-6
+  }
+]

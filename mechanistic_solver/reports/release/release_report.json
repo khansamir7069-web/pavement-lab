@@ -1,0 +1,40 @@
+{
+  "version": "2.2.0",
+  "build_number": "1042",
+  "commit_hash": "8ac5b6a9e1",
+  "build_timestamp": "2026-06-30T14:38:00Z",
+  "release_tier": "Enterprise",
+  "engineering_maturity": "experimental",
+  "modules": [
+    "mechanistic_solver.core",
+    "mechanistic_solver.core.cache",
+    "mechanistic_solver.core.profiler",
+    "mechanistic_solver.core.models",
+    "mechanistic_solver.solver",
+    "mechanistic_solver.solver.engine",
+    "mechanistic_solver.solver.kernels.multilayer_elastic",
+    "mechanistic_solver.solver.integration.hankel_integrator",
+    "mechanistic_solver.solver.matrix.transfer_matrix",
+    "mechanistic_solver.design",
+    "mechanistic_solver.design.irc37_engine",
+    "mechanistic_solver.design.fatigue",
+    "mechanistic_solver.design.rutting",
+    "mechanistic_solver.design.adequacy",
+    "mechanistic_solver.design.optimization",
+    "mechanistic_solver.optimization.batch_solver",
+    "mechanistic_solver.optimization.parallel",
+    "mechanistic_solver.licensing.license_manager"
+  ],
+  "dependencies": {
+    "python": ">=3.9",
+    "numpy": ">=1.20.0",
+    "scipy": ">=1.7.0",
+    "pytest": ">=7.0.0"
+  },
+  "known_limitations": [
+    "Multilayer response evaluation has not been fully verified for official IITPAVE parity.",
+    "Non-bonded interface conditions are not yet implemented.",
+    "Fatigue and rutting equation constants represent standard IRC:37 defaults."
+  ],
+  "qa_verdict": "PASSED"
+}

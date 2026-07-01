@@ -1,0 +1,59 @@
+{
+  "inputs": {
+    "layers": [
+      {
+        "name": "BC",
+        "thickness": 100.0,
+        "elastic_modulus": 3000.0,
+        "poisson_ratio": 0.35,
+        "density": 2400.0
+      },
+      {
+        "name": "WMM",
+        "thickness": 250.0,
+        "elastic_modulus": 300.0,
+        "poisson_ratio": 0.35,
+        "density": 2200.0
+      }
+    ],
+    "subgrade": {
+      "name": "Subgrade",
+      "thickness": null,
+      "elastic_modulus": 60.0,
+      "poisson_ratio": 0.4,
+      "density": 1800.0
+    },
+    "loads": [
+      {
+        "wheel_load": 20.0,
+        "pressure": 0.56,
+        "radius": 106.6,
+        "x": 0.0,
+        "y": 0.0
+      }
+    ]
+  },
+  "observation_points": [
+    {
+      "x": 0.0,
+      "y": 0.0,
+      "z": 100.0
+    },
+    {
+      "x": 0.0,
+      "y": 0.0,
+      "z": 350.0
+    }
+  ],
+  "tolerance_limits": {
+    "epsilon_t_bottom_bituminous": {
+      "absolute": 15.0,
+      "relative": 0.15
+    },
+    "epsilon_v_top_subgrade": {
+      "absolute": 15.0,
+      "relative": 0.15
+    }
+  },
+  "notes": "3-layer flexible pavement manual validation case"
+}
